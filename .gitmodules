@@ -13,3 +13,6 @@
 [submodule "submodules/json"]
 	path = submodules/json
 	url = https://github.com/nlohmann/json
+[submodule "submodules/msgpack-c"]
+	path = submodules/msgpack-c
+	url = https://github.com/msgpack/msgpack-c

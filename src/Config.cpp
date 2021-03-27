@@ -178,7 +178,9 @@ namespace rannc {
                 values_[CONF_DIR] = conf_dir.string();
 
                 const auto data  = toml::parse(conf_file.string());
-                for (const auto& it: data) {
+                for (const auto& it: data.as_table()) {
+//                for(const auto& [name, val] : data.as_table())
+
                     const std::string& name = it.first;
                     toml::value val = it.second;
 
