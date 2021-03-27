@@ -1,0 +1,103 @@
+Bootstrap: docker
+From: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+
+%help
+
+%setup
+
+%files
+    /home/IAL/mtnk/work/rannc_container/nccl-repo-ubuntu1804-2.8.3-ga-cuda10.1_1-1_amd64.deb /opt/
+
+%labels
+
+%environment
+    export CONDA_PREFIX=/opt/conda
+    export LIBTORCH_DIR=$CONDA_PREFIX/lib/python3.7/site-packages/torch/lib
+    export MPI_DIR=/usr/local
+    export Torch_DIR=$CONDA_PREFIX/lib/python3.7/site-packages/torch/share/cmake/Torch
+    export CUDNN_ROOT_DIR=/root/opt/cudnn-10.0-v7.6.2.24
+    export LD_LIBRARY_PATH=/opt/conda/lib/python3.7/site-packages/torch/lib:/usr/local/cuda/lib:/usr/local/lib:$LD_LIBRARY_PATH
+
+%post
+    BUILD_DIR=/root/build
+    mkdir -p ${BUILD_DIR}
+
+    apt update
+    apt install -y language-pack-ja
+    update-locale LANG=ja_JP.UTF-8
+
+    apt install -y wget cmake
+    apt install -y libnuma-dev
+    apt install -y libibverbs-dev
+    apt install -y git
+
+    # UCX
+    cd ${BUILD_DIR}
+    wget https://github.com/openucx/ucx/releases/download/v1.9.0/ucx-1.9.0.tar.gz
+    tar -xzf ucx-1.9.0.tar.gz && ls -al && pwd \
+    && cd ucx-1.9.0 \
+    && ./configure --prefix=/usr/local/ucx --disable-assertions --disable-debug --disable-doxygen-doc --disable-logging --disable-params-check --enable-optimizations --with-cuda=/usr/local/cuda \
+    && make -j 24 \
+    && make install
+
+    # OpenMPI
+    cd ${BUILD_DIR}
+    wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+    tar -xzf openmpi-4.0.5.tar.gz \
+        && cd openmpi-4.0.5 \
+        && ./configure --disable-getpwuid --enable-orterun-prefix-by-default --with-cuda --with-verbs --with-ucx=/usr/local/ucx \
+        && make -j 24 && make install
+
+    cd ${BUILD_DIR}
+    wget https://dl.bintray.com/boostorg/release/1.74.0/source/boost_1_74_0.tar.gz
+    tar -xzf boost_1_74_0.tar.gz \
+        && cd boost_1_74_0 \
+        && /bin/bash ./bootstrap.sh \
+        && ./b2 install -j2 define=_GLIBCXX_USE_CXX11_ABI=0
+
+
+    cd ${BUILD_DIR}
+    git clone https://github.com/NVIDIA/nccl
+    cd nccl
+    make -j src.build
+    make install
+    #apt install -y build-essential devscripts debhelper fakeroot
+   # make pkg.debian.build
+
+
+    # Update cmake
+    # See: https://askubuntu.com/questions/1166800/usr-bin-ld-cannot-find-lcuda-cublas-device-library-notfound
+    apt purge cmake
+    cd ${BUILD_DIR}
+    wget https://github.com/Kitware/CMake/releases/download/v3.19.1/cmake-3.19.1.tar.gz
+    tar -xzf cmake-3.19.1.tar.gz \
+    && cd cmake-3.19.1 \
+            && ./configure \
+            && make \
+            && make install
+
+    # apex
+    cd ${BUILD_DIR}
+    git clone https://github.com/NVIDIA/apex
+    cd apex
+    git checkout f3a960f80244cf9e80558ab30f7f7e8cbf03c0a0
+    export CUDA_HOME="$(dirname $(which nvcc))/../"
+    pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
+    # BERT pretraining
+    pip install tqdm boto3 requests six ipdb h5py html2text nltk
+    cd ${BUILD_DIR}
+    git clone https://github.com/NVIDIA/dllogger
+    cd dllogger
+    pip install .
+
+    export CONDA_PREFIX=/opt/conda
+    export LIBTORCH_DIR=$CONDA_PREFIX/lib/python3.7/site-packages/torch/lib
+    export MPI_DIR=/usr/local
+    export Torch_DIR=$CONDA_PREFIX/lib/python3.7/site-packages/torch/share/cmake/Torch
+    export CUDNN_ROOT_DIR=/root/opt/cudnn-10.0-v7.6.2.24
+    export LD_LIBRARY_PATH=/opt/conda/lib/python3.7/site-packages/torch/lib:/usr/local/cuda/lib:/usr/local/lib:$LD_LIBRARY_PATH
+
+%runscript
+
+%test
