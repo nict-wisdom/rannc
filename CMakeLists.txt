@@ -27,11 +27,11 @@ IF(CPATH)
 ENDIF()
 list(APPEND INCLUDE_LIST
         "src"
-        "extmod/spdlog/include"
-        "extmod/spdlog_setup/include"
-        "extmod/msgpack-c/include"
-        "extmod/toml11"
-        "extmod/json/single_include/nlohmann"
+        "submodules/spdlog/include"
+        "submodules/spdlog_setup/include"
+        "submodules/msgpack-c/include"
+        "submodules/toml11"
+        "submodules/json/single_include/nlohmann"
         ${TORCH_INCLUDE_DIRS}
         ${CUDA_INCLUDE_DIRS}
         ${MPI_INCLUDE_PATH}
@@ -48,7 +48,7 @@ link_directories(${LIBRARY_LIST})
 
 option(MSGPACK_BUILD_EXAMPLES OFF)
 
-add_subdirectory(pybind11)
+add_subdirectory(submodules/pybind11)
 
 set(RANNC_SRCS
         src/main.cpp
