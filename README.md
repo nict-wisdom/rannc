@@ -4,8 +4,8 @@ RaNNC is an automatic parallelization middleware to train very large-scale neura
 Since modern networks often have billions of parameters, they do not fit the memory of GPUs.
 RaNNC automatically partitions such a huge network with model parallelism and computes it using multiple GPUs.
 
-- [Documentation](https://wisdom-nict.github.io/rannc/)
-- [Examples](https://wisdom-nict.github.io/rannc-examples/)
+- [Documentation](https://nict-wisdom.github.io/rannc/)
+- [Examples](https://nict-wisdom.github.io/rannc-examples/)
 
 Compared to existing frameworks including Megatron-LM and Mesh-TensorFlow,
 which require users to implement partitioning of the given network, RaNNC automatically partitions
