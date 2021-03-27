@@ -1,0 +1,279 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Building from source &mdash; RaNNC 0.5.0rc1 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Configurations" href="config.html" />
+    <link rel="prev" title="Logging" href="logging.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> RaNNC
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limitations.html">Limitations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Building from source</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#compiler-version">Compiler version</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build-and-install">Build and Install</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">RaNNC</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Building from source</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/build.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="building-from-source">
+<h1>Building from source<a class="headerlink" href="#building-from-source" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="compiler-version">
+<h2>Compiler version<a class="headerlink" href="#compiler-version" title="Permalink to this headline">¶</a></h2>
+<p>You must use GCC v5.4 or newer. We tested RaNNC with GCC v5.4 and v7.1.
+Note that, however, RaNNC must be built complying ABI of PyTorch.</p>
+<p>RaNNC is built with <em>Pre-cxx11 ABI</em> (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=0</span></code>) as default because PyTorch installed via conda is built with <em>Pre-cxx11 ABI</em>.
+You can change the ABI setting in <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>.
+PyTorch provides you with a <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html">function</a> below to know how the binary is compiled.</p>
+</div>
+<div class="section" id="build-and-install">
+<h2>Build and Install<a class="headerlink" href="#build-and-install" title="Permalink to this headline">¶</a></h2>
+<p>You need to set some environment variables before building RaNNC to help cmake find dependent libraries.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Variables for building configurations</span><a class="headerlink" href="#id1" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>Variable</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>CUDA_HOME</p></td>
+<td><p>Path to a CUDA runtime directory.</p></td>
+</tr>
+<tr class="row-odd"><td><p>MPI_DIR</p></td>
+<td><p>Path to an MPI installation directory.</p></td>
+</tr>
+<tr class="row-even"><td><p>BOOST_DIR</p></td>
+<td><p>Path to a Boost libraries directory.</p></td>
+</tr>
+<tr class="row-odd"><td><p>CUDNN_ROOT_DIR</p></td>
+<td><p>Path to a cuDNN libraries directory.</p></td>
+</tr>
+<tr class="row-even"><td><p>LD_LIBRARY_PATH</p></td>
+<td><p>Must contain the path to NCCL lib directory.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The building process refers to PyTorch installed with conda.
+Therefore, install PyTorch with your python and run <code class="docutils literal notranslate"><span class="pre">setup.py</span></code>.
+The following script shows configurations to install RaNNC from the source.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/usr/bin/env bash</span>
+
+ <span class="c1"># Activate conda</span>
+ <span class="nb">source</span> <span class="o">[</span>CONDA_PATH<span class="o">]</span>/etc/profile.d/conda.sh
+ conda activate rannc
+
+ <span class="c1"># Set dependencies</span>
+ <span class="nb">export</span> <span class="nv">CUDA_HOME</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname <span class="k">$(</span>which nvcc<span class="k">))</span><span class="s2">/../&quot;</span>
+ <span class="nb">export</span> <span class="nv">MPI_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname <span class="k">$(</span>which ompi_info<span class="k">))</span><span class="s2">/../&quot;</span>
+ <span class="nb">export</span> <span class="nv">BOOST_DIR</span><span class="o">=[</span>BOOST_DIR_PATH<span class="o">]</span>
+ <span class="nb">export</span> <span class="nv">CUDNN_ROOT_DIR</span><span class="o">=[</span>YOUR_CUDNN_DIR_PATH<span class="o">]</span>
+
+ python setup.py build -g install
+</pre></div>
+</div>
+<p><em>Makefiles</em> under <code class="docutils literal notranslate"><span class="pre">docker/</span></code> show the complete process to build and install RaNNC.
+They are used to build pip packages.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="config.html" class="btn btn-neutral float-right" title="Configurations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="logging.html" class="btn btn-neutral float-left" title="Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Data-driven Intelligent System Research Center (DIRECT), National Institute of Information and Communications Technology (NICT).
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
