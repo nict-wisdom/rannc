@@ -1,5 +1,5 @@
-import  torch
-import  torch.utils.cpp_extension
+import torch
+import torch.utils.cpp_extension
 
 op_source = r"""
 #include <torch/script.h>
@@ -16,15 +16,15 @@ TORCH_LIBRARY(test_ops, m) {
 """
 
 torch.utils.cpp_extension.load_inline(
-    name = "testop",
-    cpp_sources = op_source,
-    extra_ldflags = [],
-    is_python_module = False,
-    verbose = True
+    name="testop",
+    cpp_sources=op_source,
+    extra_ldflags=[],
+    is_python_module=False,
+    verbose=True
 )
 
 
-def  native_compute_trace(z):
+def native_compute_trace(z):
     z = torch.ops.test_ops.d_sigmoid(z)
     return  z
 
