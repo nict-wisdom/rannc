@@ -59,6 +59,39 @@ namespace {
 
 namespace rannc {
 
+    void syncDebugName(std::shared_ptr<torch::jit::Graph>& graph) {
+        ObjectComm& ocomm = ObjectComm::get();
+
+        std::vector<std::string> input_names;
+        std::vector<std::string> output_names;
+        std::vector<torch::jit::Value*> in_nodes;
+        std::vector<torch::jit::Value*> out_nodes;
+
+        for (auto i: graph->inputs()) {
+            input_names.push_back(i->debugName());
+            in_nodes.push_back(i);
+        }
+        input_names = ocomm.bcast(input_names);
+
+        for (auto n: graph->nodes()) {
+            for (auto o: n->outputs()) {
+                output_names.push_back(o->debugName());
+                out_nodes.push_back(o);
+            }
+        }
+        output_names = ocomm.bcast(output_names);
+
+        assert(in_nodes.size() == input_names.size());
+        for (size_t idx=0; idx<in_nodes.size(); idx++) {
+            in_nodes.at(idx)->setDebugName(input_names.at(idx));
+        }
+
+        assert(out_nodes.size() == output_names.size());
+        for (size_t idx=0; idx<out_nodes.size(); idx++) {
+            out_nodes.at(idx)->setDebugName(output_names.at(idx));
+        }
+    }
+
     RaNNCModule::RaNNCModule(bool use_amp_master_params, bool allreduce_amp_master_param,
                              bool check_unused_values):
             id_(generateName("mod_")), master_(RaNNCFactory::get()),
@@ -126,6 +159,7 @@ namespace rannc {
             logger->info("Tracing model ...");
         }
         std::shared_ptr<torch::jit::Graph> graph = trace(args, fwdFunc, py_params, py_buffers, var_lookup_fn, 2);
+        syncDebugName(graph);
 
         std::unordered_map<std::string, long> graph_params = matchParamNames(graph, input_ivals.size(), param_id_map, py_params, py_buffers);
         for (const auto &it: graph_params) {

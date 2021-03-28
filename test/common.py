@@ -15,7 +15,7 @@ import pyrannc
 ASSERT_DECIMAL = 3
 seed = 0
 RELATIVE_TOLERANCE = 1e-2
-ABSOLUTE_TOLERANCE = 0.0
+ABSOLUTE_TOLERANCE = 1e-4
 
 
 def get_dataset_default(dataset_size, input_dim, output_dim):

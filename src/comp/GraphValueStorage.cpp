@@ -10,6 +10,12 @@
 namespace rannc {
 
     const torch::jit::IValue& GraphValueStorage::getValue(const IValueLocation& loc) const {
+        if (!contains(values_, loc)) {
+            std::stringstream ss;
+            ss << "No value found: " << toString(loc);
+            throw std::runtime_error(ss.str());
+        }
+
         return values_.at(loc);
     }
 

@@ -102,7 +102,7 @@ namespace rannc {
             dev_mem_ = 2 * 1024L * 1024L * 1024L * 1024L; // 2TB
         }
 
-        logger->info("Starting to partition the model. This may take a very long time ...");
+        logger->info("Starting model partitioning ... (this may take a very long time)");
 
         const int max_pipeline = config::Config::get().getVal<int>(config::MAX_PIPELINE);
         const int min_pipeline_bs = config::Config::get().getVal<int>(config::MIN_PIPELINE_BS);

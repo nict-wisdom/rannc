@@ -256,8 +256,8 @@ namespace rannc {
             }
         }
         std::vector<IRValue> results;
-        for (const std::string& n: keys(values)) {
-            results.push_back(values.at(n));
+        for (const auto& it: values) {
+            results.push_back(it.second);
         }
 
         return results;
