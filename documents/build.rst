@@ -14,6 +14,14 @@ PyTorch provides you with a `function <https://pytorch.org/docs/stable/generated
 
 Build and Install
 -----------------
+
+Clone the repository with the submodules (``--recursive`` is required).
+
+.. code-block:: bash
+
+    git clone --recursive https://github.com/nict-wisdom/rannc
+
+
 You need to set some environment variables before building RaNNC to help cmake find dependent libraries.
 
 .. list-table:: Variables for building configurations
