@@ -5,7 +5,7 @@ Since modern networks often have billions of parameters, they do not fit the mem
 RaNNC automatically partitions such a huge network with model parallelism and computes it using multiple GPUs.
 
 - [Documentation](https://nict-wisdom.github.io/rannc/)
-- [Examples](https://nict-wisdom.github.io/rannc-examples/)
+- [Examples](https://github.com/nict-wisdom/rannc-examples/)
 
 Compared to existing frameworks including Megatron-LM and Mesh-TensorFlow,
 which require users to implement partitioning of the given network, RaNNC automatically partitions
