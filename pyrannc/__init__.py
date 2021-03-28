@@ -319,8 +319,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
                 old_state_dict = self.optimizer.state_dict
 
-                def new_state_dict(opt, from_global=True, **kwargs):
-                    if from_global and (not self.use_amp_master_params or self.amp_master_param_registered):
+                def new_state_dict(opt, from_global=False, **kwargs):
+                    if from_global:
                         global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=self.use_amp_master_params, **kwargs)
                         return global_opt_state_dict
                     else:
@@ -330,7 +330,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
                 old_load_state_dict = self.optimizer.load_state_dict
 
-                def new_load_state_dict(opt, state_dict, from_global=True, **kwargs):
+                def new_load_state_dict(opt, state_dict, from_global=False, **kwargs):
                     if from_global:
                         local_state_dict = _get_local_optimizer_state_dict(state_dict, used_param_global_order)
                         old_load_state_dict(local_state_dict)

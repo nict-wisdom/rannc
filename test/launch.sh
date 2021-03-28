@@ -16,17 +16,42 @@ PARTITION_NUMS=(
 )
 
 ## test_simple
+#for PART in "${PARTITION_NUMS[@]}" ; do
+#  ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+#  ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
+#
+#  mpirun --tag-output -np 4 ${MPI_OPTS} \
+#    -x PYTEST \
+#    ${ENVS} \
+#    ./ompi_helper \
+#    "$(uname -n)" "$(get_port_unused_random)" \
+#    test_simple.py \
+#    --batch-size 64
+#
+#  sleep 10
+#done
+
+## test_half
+HALF_TESTS=(
+    "test_half_amp"
+    "test_half_loss_amp"
+    "test_half_loss_amp_layernorm"
+    "test_half_loss_amp_save"
+)
 for PART in "${PARTITION_NUMS[@]}" ; do
   ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
   ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
 
-  mpirun -np 4 ${MPI_OPTS} \
-    -x PYTEST \
-    ${ENVS} \
-    ./ompi_helper \
-    "$(uname -n)" "$(get_port_unused_random)" \
-    test_simple.py \
-    --batch-size 64
+  for TEST in "${HALF_TESTS[@]}" ; do
+    mpirun --tag-output -np 4 ${MPI_OPTS} \
+      -x PYTEST \
+      ${ENVS} \
+      ./ompi_helper \
+      "$(uname -n)" "$(get_port_unused_random)" \
+      ${TEST}.py \
+      --batch-size 64
+    sleep 10
+  done
 done
 
 #pytest --co test_simple_amp.py | grep "Function" | while read -r LINE
@@ -53,16 +78,16 @@ done
 
 
 # test_bn
-ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
-ENVS+=" -x RANNC_PARTITION_NUM=1"
-ENVS+=" -x RANNC_PIPELINE_NUM=1"
-mpirun -np 1 ${MPI_OPTS} \
-  -x PYTEST \
-  ${ENVS} \
-  ./ompi_helper \
-  "$(uname -n)" "$(get_port_unused_random)" \
-  test_bn.py \
-  --batch-size 64
+#ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+#ENVS+=" -x RANNC_PARTITION_NUM=1"
+#ENVS+=" -x RANNC_PIPELINE_NUM=1"
+#mpirun -np 1 ${MPI_OPTS} \
+#  -x PYTEST \
+#  ${ENVS} \
+#  ./ompi_helper \
+#  "$(uname -n)" "$(get_port_unused_random)" \
+#  test_bn.py \
+#  --batch-size 64
 
 # test_native
 #if ninja --version 1> /dev/null 2> /dev/null ; then
