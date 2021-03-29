@@ -4,12 +4,12 @@ Building from source
 Compiler version
 ----------------
 
-You must use GCC v5.4 or newer. We tested RaNNC with GCC v5.4 and v7.1.
-Note that, however, RaNNC must be built complying ABI of PyTorch.
+You must use GCC v5.4 or newer. RaNNC has been tested with GCC v5.4 and v7.1.
+Note that RaNNC must be built in compliance with ABI of PyTorch.
 
-RaNNC is built with *Pre-cxx11 ABI* (``_GLIBCXX_USE_CXX11_ABI=0``) as default because PyTorch installed via conda is built with *Pre-cxx11 ABI*.
+RaNNC is built with *Pre-cxx11 ABI* (``_GLIBCXX_USE_CXX11_ABI=0``) as default because PyTorch installed via conda is built with it.
 You can change the ABI setting in ``CMakeLists.txt``.
-PyTorch provides you with a `function <https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html>`_ below to know how the binary is compiled.
+PyTorch provides you with `function <https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html>`_ below to understand how the binary is compiled.
 
 
 Build and Install
@@ -22,7 +22,7 @@ Clone the repository with the submodules (``--recursive`` is required).
     git clone --recursive https://github.com/nict-wisdom/rannc
 
 
-You need to set some environment variables before building RaNNC to help cmake find dependent libraries.
+You need to set some environment variables before building RaNNC to help cmake find the dependent libraries.
 
 .. list-table:: Variables for building configurations
 
@@ -40,8 +40,8 @@ You need to set some environment variables before building RaNNC to help cmake f
      - Must contain the path to NCCL lib directory.
 
 The building process refers to PyTorch installed with conda.
-Therefore, install PyTorch with your python and run ``setup.py``.
-The following script shows configurations to install RaNNC from the source.
+Therefore, install PyTorch using your python and run ``setup.py``.
+The following script shows the configurations used to install RaNNC from the source.
 
 .. code-block:: bash
 
@@ -60,5 +60,5 @@ The following script shows configurations to install RaNNC from the source.
   python setup.py build -g install
 
 
-*Makefiles* under ``docker/`` show the complete process to build and install RaNNC.
-They are used to build pip packages.
+*Makefiles* under ``docker/`` show the complete process used to build and install RaNNC.
+These are used to build the pip packages.

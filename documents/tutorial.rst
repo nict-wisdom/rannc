@@ -10,7 +10,7 @@ Steps to use RaNNC
 0. Set up environment
 -------------------------
 
-Ensure required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
+Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
 The libraries must be included in ``LD_LIBRARY_PATH`` at runtime.
 
 
@@ -27,8 +27,8 @@ Insert ``import`` in your script.
 2. Wrap your model
 ------------------
 
-Wrap your model by ``pyrannc.RaNNCModule`` with your optimizer.
-You can use the wrapped model in almost same manner as the original model (See below).
+Wrap your model by using ``pyrannc.RaNNCModule`` with your optimizer.
+You can use the wrapped model in almost the same manner as the original model (see below).
 Note that the original model must be on a CUDA device.
 
 .. code-block:: python
@@ -38,7 +38,7 @@ Note that the original model must be on a CUDA device.
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, optimizer)
 
-If you don't use an optimizer, pass only the model.
+If you do not use an optimizer, pass only the model.
 
 .. code-block:: python
 
@@ -49,7 +49,7 @@ If you don't use an optimizer, pass only the model.
 3. Run forward/backward passes
 ------------------------------
 
-A ``RaNNCModule`` can run forward/backward passes as with a ``torch.nn.Module``.
+``RaNNCModule`` can run forward/backward passes, as with ``torch.nn.Module``.
 
 .. code-block:: python
 
@@ -58,9 +58,9 @@ A ``RaNNCModule`` can run forward/backward passes as with a ``torch.nn.Module``.
   out.backward(torch.randn_like(out))
 
 Inputs to ``RaNNCModule`` must be CUDA tensors.
-RaNNCModule has several more limitations about a wrapped model and inputs/outputs.
+RaNNCModule has several more limitations regarding a wrapped model and inputs/outputs.
 See :doc:`limitations` for details.
-The optimizer can update model parameters just by calling ``step()``.
+The optimizer can update model parameters simply by calling ``step()``.
 
 The program below (``examples/tutorial_usage.py``) shows the above usage with a very simple model.
 
@@ -102,8 +102,8 @@ The program below (``examples/tutorial_usage.py``) shows the above usage with a 
 4. Launch
 ---------
 
-A program using RaNNC requires to be launched by ``mpirun``.
-You can launch the above example script by:
+A program using RaNNC must be launched using ``mpirun``.
+You can launch the above example script by
 
 .. code-block:: bash
 
@@ -116,4 +116,4 @@ In the above example, there must be two available CUDA devices.
 
 .. note::
 
-  Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and compute them as one batch. ``torch.utils.data.distributed.DistributedSampler`` will be useful for this purpose.
+  Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and computes them as a single batch. ``torch.utils.data.distributed.DistributedSampler`` is useful for this purpose.

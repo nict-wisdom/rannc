@@ -3,8 +3,8 @@ Configurations
 
 RaNNC's runtime configurations can be set in the following two ways:
 
-- *Config file*: RaNNC automatically loads a configuration file at ``~/.pyrannc/rannc_conf.toml``. Names of configuration items must be in lower case. The path to the configuration file can be set by an environment variable ``RANNC_CONF_DIR``.
-- *Environment variables*: You can overwrite configuration by setting environment variables. Names of variables follows ``RANNC_<CONF_ITEM_NAME>`` in upper case. For example, you can set `mem_margin` in the following table by a variable ``RANNC_MEM_MARGIN``.
+- *Config file*: RaNNC automatically loads a configuration file at ``~/.pyrannc/rannc_conf.toml``. Names of configuration items must be in lowercase. The path to the configuration file can be set by an environment variable ``RANNC_CONF_DIR``.
+- *Environment variables*: You can overwrite a configuration by setting environment variables. Names of variables follow ``RANNC_<CONF_ITEM_NAME>`` in uppercase. For example, you can set `mem_margin` in the following table with a variable ``RANNC_MEM_MARGIN``.
 
 
 .. list-table:: Configurations
@@ -31,10 +31,10 @@ RaNNC's runtime configurations can be set in the following two ways:
      - Minimum number of microbatches for pipeline parallelism
    * - max_pipeline
      - 32
-     - Maxmum number of microbatches for pipeline parallelism
+     - Maximum number of microbatches for pipeline parallelism
    * - opt_param_factor
      - 2
-     - Factor to estimate memory usage by an optimizer. For example, Set this item to 2 for Adam because the optimizer uses two internal data `v` and `s`, whose sizes are equivalent to parameter tensors.
+     - Factor used to estimate memory usage by an optimizer. For example, set this item to 2 for Adam because the optimizer uses two internal data `v` and `s`, whose sizes are equivalent to parameter tensors.
    * - trace_events
      - false
      - Trace internal events if set to true. When true, the event tracing significantly degrades performance.
@@ -54,4 +54,3 @@ The following is an example of the configuration file.
    load_deployment=false
    trace_events=false
    verify_recomp=false
-
