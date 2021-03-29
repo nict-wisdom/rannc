@@ -13,13 +13,12 @@ from apex import amp
 
 import pyrannc
 from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
-from pyrannc.opt.util import gather_optimizer_state_dict
 
 ASSERT_DECIMAL = 3
 seed = 0
-RELATIVE_TOLERANCE = common.RELATIVE_TOLERANCE
-ABSOLUTE_TOLERANCE = common.ABSOLUTE_TOLERANCE
-LOSS_SCALE = 2**4
+RELATIVE_TOLERANCE = 1.0e-1
+ABSOLUTE_TOLERANCE = 1.0e-2
+LOSS_SCALE = 16.0
 
 
 if not torch.cuda.is_available():
@@ -50,8 +49,7 @@ class Net(nn.Module):
 
 
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
-           fp16, rtol, atol, get_dataset,
-           **kwargs):
+           rtol, atol, get_dataset, **kwargs):
 
     device = torch.device("cuda")
     random.seed(seed)
@@ -64,7 +62,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     lr = 0.01
 
-    #model_base = Net().to(device)
     model_base = model_base.to(device)
     rmodel_base =copy.deepcopy(model_base)
 
@@ -96,7 +93,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         # Verify the equality of outputs
         np.testing.assert_equal(tmp_loss.size(), r_loss.size())
-        np.testing.assert_almost_equal(tmp_loss.tolist(), r_loss.tolist(), decimal=ASSERT_DECIMAL)
+        np.testing.assert_allclose(tmp_loss.tolist(), r_loss.tolist(), rtol=rtol, atol=atol)
 
         with amp.scale_loss(p_loss, opt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
             scaled_loss.backward()
@@ -112,7 +109,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
             np.testing.assert_equal(rp.grad.size(), p.grad.size())
-            np.testing.assert_almost_equal(rp.grad.tolist(), p.grad.tolist(), decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(rp.grad.tolist(), p.grad.tolist(), rtol=rtol, atol=atol)
 
         opt.step()
         ropt.step()
@@ -120,87 +117,78 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
             np.testing.assert_equal(rp.size(), p.size())
-            np.testing.assert_almost_equal(rp.tolist(), p.tolist(), decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(rp.tolist(), p.tolist(), rtol=rtol, atol=atol)
 
         opt.zero_grad()
         ropt.zero_grad()
 
-    pyrannc.clear()
-
     # Save model & opt
     # state_dict should run on all ranks
-    model_state_dict = rmodel.state_dict()
+    model_state_dict = rmodel.state_dict(sync_all_ranks=True)
     global_opt_state_dict = ropt.state_dict(from_global=True)
-    # global_state, param_ranks = gather_optimizer_state_dict(ropt, use_amp_master_param=True)
 
     if pyrannc.get_rank() == 0:
         torch.save(model_state_dict, 'model.pt')
         torch.save(global_opt_state_dict, 'opt_state.pt')
+        rmodel.save_deployment(str("rannc_deployment.bin"))
 
     pyrannc.barrier()
 
     ld_model = Net().to(device)
+
+    loaded_state_dict = torch.load('model.pt')
+    ld_model.load_state_dict(loaded_state_dict)
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
     ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
                                       loss_scale="dynamic", master_weights=True)
-    ld_model.load_state_dict(torch.load('model.pt'))
     ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, use_amp_master_params=True)
 
-    global_opt_state_dict = torch.load('opt_state.pt')
-
     # Verify parameters
-    for p1, p2 in zip(rmodel.parameters(), ld_model.parameters()):
-        np.testing.assert_equal(p1.size(), p2.size())
-        np.testing.assert_almost_equal(p1.tolist(), p2.tolist(), decimal=ASSERT_DECIMAL)
+    r_params = {n: p for n, p in rmodel.named_parameters()}
+    ld_params = {n: p for n, p in ld_model.named_parameters()}
 
-    for x, tgt in data_loader:
-        x = x.to(device)
-        tgt = tgt.to(device)
-        p_out = ld_model(x, tgt)
+    for n, rp in r_params.items():
+        ld_p = ld_params[n]
+        np.testing.assert_equal(ld_p.size(), rp.size())
+        np.testing.assert_almost_equal(ld_p.tolist(), rp.tolist(), decimal=ASSERT_DECIMAL)
 
-    # Note that restoring optimizer's state follows the decomposition
-    ld_opt.load_state_dict(global_opt_state_dict, from_global=True)
+    global_opt_state_dict = torch.load('opt_state.pt')
+    opt_state_dict = opt.state_dict()
 
-    ropt_state_dict = ropt.state_dict()
-    ld_opt_state_dict = ld_opt.state_dict()
-
-    for ld_grp, r_grp in zip(ld_opt_state_dict['param_groups'], ropt_state_dict['param_groups']):
-        np.testing.assert_(ld_grp.keys(), r_grp.keys())
-        for k in r_grp.keys():
+    for ld_grp, pt_grp in zip(global_opt_state_dict['param_groups'], opt_state_dict['param_groups']):
+        np.testing.assert_(ld_grp.keys(), pt_grp.keys())
+        for k in pt_grp.keys():
             if k == 'params':
-                np.testing.assert_equal(len(ld_grp['params']), len(r_grp['params']))
+                np.testing.assert_equal(len(ld_grp['params']), len(pt_grp['params']))
             else:
-                np.testing.assert_(ld_grp[k] == r_grp[k])
+                np.testing.assert_(ld_grp[k] == pt_grp[k])
 
-        for ld_pid, r_pid in zip(ld_grp['params'], r_grp['params']):
-            ld_param_state = ld_opt_state_dict['state'][ld_pid]
-            r_param_state = ropt_state_dict['state'][r_pid]
-            np.testing.assert_(ld_param_state.keys(), r_param_state.keys())
-            for k in r_param_state.keys():
+        for ld_pid, pt_pid in zip(ld_grp['params'], pt_grp['params']):
+            ld_param_state = global_opt_state_dict['state'][ld_pid]
+            pt_param_state = opt_state_dict['state'][pt_pid]
+            np.testing.assert_(ld_param_state.keys(), pt_param_state.keys())
+            for k in pt_param_state.keys():
                 ldv = ld_param_state[k]
-                rv = r_param_state[k]
+                pv = pt_param_state[k]
                 if isinstance(ldv, torch.Tensor):
-                    np.testing.assert_equal(ldv.size(), rv.size())
-                    np.testing.assert_almost_equal(ldv.tolist(), rv.tolist(), decimal=ASSERT_DECIMAL)
+                    np.testing.assert_equal(ldv.size(), pv.size())
+                    np.testing.assert_almost_equal(ldv.tolist(), pv.tolist(), decimal=ASSERT_DECIMAL)
                 else:
-                    np.testing.assert_(ldv == rv)
+                    np.testing.assert_(ldv == pv)
 
     print("Done")
 
+
 def run(model_base, batch_size_per_proc, num_iter,
-        fp16=False,
-        rtol=common.RELATIVE_TOLERANCE,
-        atol=common.ABSOLUTE_TOLERANCE,
+        rtol=RELATIVE_TOLERANCE,
+        atol=ABSOLUTE_TOLERANCE,
         get_dataset=None,
         **kwargs):
     do_run(model_base, batch_size_per_proc,
            model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           #lambda model, x, tgt: torch.jit.trace(model, (x,)),
-           #lambda model, x, tgt: model(x),
-           #lambda out: out,
-           #bwd_with_criterion,
-           fp16, rtol, atol, get_dataset,
+           rtol, atol, get_dataset,
            **kwargs)
+
 
 def test_half_loss_amp(init_dist, batch_size, iteration):
     print("test_half_loss_amp_save")

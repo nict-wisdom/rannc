@@ -16,20 +16,20 @@ PARTITION_NUMS=(
 )
 
 ## test_simple
-#for PART in "${PARTITION_NUMS[@]}" ; do
-#  ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
-#  ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
-#
-#  mpirun --tag-output -np 4 ${MPI_OPTS} \
-#    -x PYTEST \
-#    ${ENVS} \
-#    ./ompi_helper \
-#    "$(uname -n)" "$(get_port_unused_random)" \
-#    test_simple.py \
-#    --batch-size 64
-#
-#  sleep 10
-#done
+for PART in "${PARTITION_NUMS[@]}" ; do
+  ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+  ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
+
+  mpirun --tag-output -np 4 ${MPI_OPTS} \
+    -x PYTEST \
+    ${ENVS} \
+    ./ompi_helper \
+    "$(uname -n)" "$(get_port_unused_random)" \
+    test_simple.py \
+    --batch-size 64
+
+  sleep 10
+done
 
 ## test_half
 HALF_TESTS=(
@@ -90,21 +90,21 @@ done
 #  --batch-size 64
 
 # test_native
-#if ninja --version 1> /dev/null 2> /dev/null ; then
-#  for PART in "${PARTITION_NUMS[@]}" ; do
-#
-#    ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
-#    ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
-#
-#    mpirun ${MPI_OPTS} \
-#      -x PYTEST \
-#      ${ENVS} \
-#      ./ompi_helper \
-#      "$(uname -n)" "$(get_port_unused_random)" \
-#      test_native.py \
-#      --batch-size 64
-#
-#  done
-#else
-#  echo  "No ninja found. Skipping test of native call."  1>&2
-#fi
+if ninja --version 1> /dev/null 2> /dev/null ; then
+  for PART in "${PARTITION_NUMS[@]}" ; do
+
+    ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+    ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
+
+    mpirun ${MPI_OPTS} \
+      -x PYTEST \
+      ${ENVS} \
+      ./ompi_helper \
+      "$(uname -n)" "$(get_port_unused_random)" \
+      test_native.py \
+      --batch-size 64
+
+  done
+else
+  echo  "No ninja found. Skipping test of native call."  1>&2
+fi

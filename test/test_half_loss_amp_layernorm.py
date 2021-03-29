@@ -16,9 +16,9 @@ from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
-RELATIVE_TOLERANCE = common.RELATIVE_TOLERANCE
-ABSOLUTE_TOLERANCE = common.ABSOLUTE_TOLERANCE
-LOSS_SCALE = 2**10
+RELATIVE_TOLERANCE = 1.0e-1
+ABSOLUTE_TOLERANCE = 1.0e-2
+LOSS_SCALE = 16.0
 
 
 if not torch.cuda.is_available():
@@ -66,10 +66,8 @@ class Net(nn.Module):
         return loss
 
 
-
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
-           fp16, rtol, atol, get_dataset,
-           **kwargs):
+           rtol, atol, get_dataset, **kwargs):
 
     device = torch.device("cuda")
     random.seed(seed)
@@ -82,10 +80,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     lr = 0.01
 
-    #model_base = Net().to(device)
     model_base = model_base.to(device)
-
-    print("#params={} #buffers={}".format(len(list(model_base.parameters())), len(list(model_base.buffers()))))
 
     def norm_to_float(module):
         for name, _module in module.named_modules():
@@ -135,7 +130,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
             # Verify the equality of outputs
             np.testing.assert_equal(tmp_loss.size(), r_loss.size())
-            np.testing.assert_almost_equal(tmp_loss.tolist(), r_loss.tolist(), decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(tmp_loss.tolist(), r_loss.tolist(), rtol=rtol, atol=atol)
 
             with amp.scale_loss(p_loss, opt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
                 scaled_loss.backward()
@@ -154,7 +149,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
             np.testing.assert_equal(rp.grad.size(), p.grad.size())
-            np.testing.assert_almost_equal(rp.grad.tolist(), p.grad.tolist(), decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(rp.grad.tolist(), p.grad.tolist(), rtol=rtol, atol=atol)
 
         opt.step()
         ropt.step()
@@ -162,7 +157,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
             np.testing.assert_equal(rp.size(), p.size())
-            np.testing.assert_almost_equal(rp.tolist(), p.tolist(), decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(rp.tolist(), p.tolist(), rtol=rtol, atol=atol)
 
         opt.zero_grad()
         rmodel.zero_grad()
@@ -170,19 +165,15 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     pyrannc.clear()
 
 def run(model_base, batch_size_per_proc, num_iter,
-        fp16=False,
-        rtol=common.RELATIVE_TOLERANCE,
-        atol=common.ABSOLUTE_TOLERANCE,
+        rtol=RELATIVE_TOLERANCE,
+        atol=ABSOLUTE_TOLERANCE,
         get_dataset=None,
         **kwargs):
     do_run(model_base, batch_size_per_proc,
            model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           #lambda model, x, tgt: torch.jit.trace(model, (x,)),
-           #lambda model, x, tgt: model(x),
-           #lambda out: out,
-           #bwd_with_criterion,
-           fp16, rtol, atol, get_dataset,
+           rtol, atol, get_dataset,
            **kwargs)
+
 
 def test_half_loss_amp(init_dist, batch_size, iteration):
     print("test_half_loss_amp_layernorm")

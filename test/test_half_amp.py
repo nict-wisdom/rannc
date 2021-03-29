@@ -14,11 +14,10 @@ from apex import amp
 import pyrannc
 from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
-ASSERT_DECIMAL = 3
 seed = 0
 RELATIVE_TOLERANCE = 1.0e-1
 ABSOLUTE_TOLERANCE = 1.0e-2
-LOSS_SCALE = 1.0
+LOSS_SCALE = 16.0
 
 
 if not torch.cuda.is_available():
@@ -49,7 +48,7 @@ class Net(nn.Module):
 
 
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
-           fp16, rtol, atol, get_dataset,
+           rtol, atol, get_dataset,
            **kwargs):
 
     device = torch.device("cuda")
@@ -63,10 +62,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     lr = 0.01
 
-    #model_base = Net().to(device)
     model_base = model_base.to(device)
-    #model = copy.deepcopy(model_base)
-
     rmodel_base = copy.deepcopy(model_base)
 
     opt_base = optim.SGD(model_base.parameters(), lr=lr)
@@ -124,15 +120,15 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        fp16=False,
         rtol=RELATIVE_TOLERANCE,
         atol=ABSOLUTE_TOLERANCE,
         get_dataset=None,
         **kwargs):
     do_run(model_base, batch_size_per_proc,
            model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           fp16, rtol, atol, get_dataset,
+           rtol, atol, get_dataset,
            **kwargs)
+
 
 def test_half_amp(init_dist, batch_size, iteration):
     print("test_half_amp")
