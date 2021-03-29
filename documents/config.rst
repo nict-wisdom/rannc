@@ -14,6 +14,12 @@ RaNNC's runtime configurations can be set in the following two ways:
    * - Name
      - Default
      -
+   * - show_config_items
+     - false
+     - Show configurations on startup if set to true.
+   * - mem_limit_gb
+     - 0
+     - Set a limit per device in GB if a positive number is given.
    * - mem_margin
      - 0.1
      - Memory margin for model partitioning.
@@ -26,12 +32,15 @@ RaNNC's runtime configurations can be set in the following two ways:
    * - deployment_file
      - ``/tmp/rannc_deployment.bin``
      - Path of deployment file to save/load.
+   * - partition_num
+     - 0
+     - Force the number of partitions for model parallelism if a positive value is set.
    * - min_pipeline
      - 1
-     - Minimum number of microbatches for pipeline parallelism
+     - Minimum number of microbatches for pipeline parallelism.
    * - max_pipeline
      - 32
-     - Maximum number of microbatches for pipeline parallelism
+     - Maximum number of microbatches for pipeline parallelism.
    * - opt_param_factor
      - 2
      - Factor used to estimate memory usage by an optimizer. For example, set this item to 2 for Adam because the optimizer uses two internal data `v` and `s`, whose sizes are equivalent to parameter tensors.
@@ -42,7 +51,7 @@ RaNNC's runtime configurations can be set in the following two ways:
      - ``/tmp/rannc_event_trace.json``
      - Path to an event trace file.
 
-The following is an example of the configuration file.
+The following is an example of the configuration file (``~/.pyrannc/rannc_conf.toml``).
 
 .. code-block::
 

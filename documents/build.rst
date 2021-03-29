@@ -4,7 +4,7 @@ Building from source
 Compiler version
 ----------------
 
-You must use GCC v5.4 or newer. RaNNC has been tested with GCC v5.4 and v7.1.
+You must use GCC v5.4 or newer. RaNNC has been tested with GCC v8.2.
 Note that RaNNC must be built in compliance with ABI of PyTorch.
 
 RaNNC is built with *Pre-cxx11 ABI* (``_GLIBCXX_USE_CXX11_ABI=0``) as default because PyTorch installed via conda is built with it.

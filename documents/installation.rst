@@ -17,6 +17,7 @@ Installation
 
 This version of RaNNC requires PyTorch v1.8.0.
 ``pip`` packages for ``linux_x86_64`` are available from the following links.
+We tested these packages on CentOS 7.9, CentOS 8.2, and RHEL 7.6.
 
 * :download:`For Python 3.7 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0rc1+cu102-cp37-cp37m-linux_x86_64.whl>`
 * :download:`For Python 3.8 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0rc1+cu102-cp38-cp38-linux_x86_64.whl>`
@@ -30,3 +31,4 @@ Set a CUDA version available in your environment.
   conda activate rannc
   conda install pytorch==1.8.0 cudatoolkit=10.2 -c pytorch
   pip install pyrannc-0.5.0+cu102-cp37-cp37m-linux_x86_64.whl
+

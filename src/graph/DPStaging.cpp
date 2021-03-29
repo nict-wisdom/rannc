@@ -322,7 +322,7 @@ namespace rannc {
             }
         }
 
-        logger->info("Estimated profiles of subgraphs (#partition(s))={}: batch_size={} ranks={} pipeline_num={}",
+        logger->info("Estimated profiles of subgraphs (#partition(s)={}: batch_size={} ranks={} pipeline_num={})",
                      best_sol.graphs.size(), batch_size_, mpi::getSize(), best_sol.pipeline_num);
         for (const auto &g: best_sol.graphs) {
             int repl_num = best_sol.repl_nums.at(g->getName());
