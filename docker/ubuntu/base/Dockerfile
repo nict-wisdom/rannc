@@ -68,7 +68,7 @@ RUN . /opt/conda/etc/profile.d/conda.sh \
        else \
           export CUDA_TOOLKIT_VERSION="10.2"; \
        fi \
-    && conda install -y pytorch=${PYTORCH_VERSION} torchvision torchaudio cudatoolkit=${CUDA_TOOLKIT_VERSION} -c pytorch \
+    && conda install -y pytorch=${PYTORCH_VERSION} torchvision torchaudio cudatoolkit=${CUDA_TOOLKIT_VERSION} -c pytorch -c conda-forge \
     && conda clean --all \
     && echo "conda activate rannc" >> /root/.bashrc
 
