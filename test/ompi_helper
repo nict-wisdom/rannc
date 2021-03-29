@@ -12,4 +12,5 @@ TEST_NAME=${SCRIPT%.py}
 ${PYTEST} -s --junitxml="report_${TEST_NAME}.part${RANNC_PARTITION_NUM}_np${OMPI_COMM_WORLD_SIZE}.r${OMPI_COMM_WORLD_RANK}.xml" \
     ${SCRIPT} \
     --master-address="${MASTER_ADDR}" --master-port="${MASTER_PORT}"  \
+    --rank="${OMPI_COMM_WORLD_RANK}" --world-size="${OMPI_COMM_WORLD_SIZE}"  \
     "$@"
