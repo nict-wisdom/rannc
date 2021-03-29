@@ -8,7 +8,7 @@ from apex.amp import _amp_state
 from .. import _allreduce_sum, _allreduce_min
 
 
-def allreduce_grads(optimizer):
+def allreduce_grads(optimizer, prescale=1.0):
     overflow_buf = torch.cuda.IntTensor([0])
 
     # 1. allocate an uninitialized buffer for flattened gradient
@@ -23,7 +23,7 @@ def allreduce_grads(optimizer):
     amp_C.multi_tensor_scale(65536,
                              overflow_buf,
                              [master_grads, allreduced_views],
-                             scaler.loss_scale())
+                             scaler.loss_scale() / prescale)
     # 3. sum gradient across ranks. Because of the predivision, this averages the gradient
     torch.distributed.all_reduce(flat_raw)
     # 4. combine unscaling and unflattening of allreduced gradient
@@ -87,10 +87,11 @@ def allreduce_grads_rannc(rmodel, optimizer, prescale=1.0, use_amp_master_param=
         if rmodel.allreduce_amp_master_param:
             overflow_buf = torch.cuda.IntTensor([0])
             master_grads = [param.grad for param in amp.master_params(optimizer) if param.grad is not None]
-            amp_C.multi_tensor_scale(65536,
-                                     overflow_buf,
-                                     [master_grads, master_grads],
-                                     prescale)
+            if len(master_grads) > 0:
+                amp_C.multi_tensor_scale(65536,
+                                         overflow_buf,
+                                         [master_grads, master_grads],
+                                         prescale)
             torch.cuda.synchronize()
         else:
             master_grads_to_model_grads(optimizer, scaler.loss_scale()*prescale)

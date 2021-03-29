@@ -16,8 +16,9 @@ from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
-RELATIVE_TOLERANCE = common.RELATIVE_TOLERANCE
-ABSOLUTE_TOLERANCE = common.ABSOLUTE_TOLERANCE
+RELATIVE_TOLERANCE = 1.0e-1
+ABSOLUTE_TOLERANCE = 1.0e-2
+LOSS_SCALE = 1.0
 
 
 if not torch.cuda.is_available():
@@ -70,26 +71,24 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     opt_base = optim.SGD(model_base.parameters(), lr=lr)
     model, opt = amp.initialize(model_base, opt_base, opt_level="O2",
-                                loss_scale="dynamic", master_weights=True)
+                                loss_scale=LOSS_SCALE, master_weights=True)
 
     ropt_base = optim.SGD(rmodel_base.parameters(), lr=lr)
     rmodel_base, ropt = amp.initialize(rmodel_base, ropt_base, opt_level="O2",
-                                       loss_scale="dynamic", master_weights=True)
+                                       loss_scale=LOSS_SCALE, master_weights=True)
     rmodel = pyrannc.RaNNCModule(rmodel_base, ropt)
 
-    amp._amp_state.loss_scalers[0]._loss_scale = 2**1
-
+    pyrannc.delay_grad_allreduce(True)
     for x, tgt in data_loader:
         # Create test input
         x = x.to(device)
-        rx = x.clone()
 
         p_out = model(x)
         r_out = rmodel(x)
 
         # Verify the equality of outputs
         np.testing.assert_equal(p_out.size(), r_out.size())
-        np.testing.assert_almost_equal(p_out.tolist(), r_out.tolist(), decimal=ASSERT_DECIMAL)
+        np.testing.assert_allclose(p_out.tolist(), r_out.tolist(), rtol=rtol, atol=atol)
 
         tgt = tgt.to(device)
         criterion = nn.MSELoss()
@@ -98,7 +97,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         with amp.scale_loss(loss, opt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
             scaled_loss.backward()
-        allreduce_grads(opt)
+        allreduce_grads(opt, prescale=pyrannc.get_world_size())
 
         for p in amp.master_params(opt):
             print("AFTER AR: original grad={}".format(torch.flatten(p.grad)[0:3]))
@@ -116,26 +115,22 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         expected_params = {n: p for n, p in model.named_parameters()}
         for n, p in rmodel.named_parameters():
             np.testing.assert_equal(p.size(), expected_params[n].size())
-            np.testing.assert_almost_equal(p.tolist(), expected_params[n].tolist(),
-                                           decimal=ASSERT_DECIMAL)
+            np.testing.assert_allclose(p.tolist(), expected_params[n].tolist(), rtol=rtol, atol=atol)
 
         opt.zero_grad()
         rmodel.zero_grad()
 
     pyrannc.clear()
 
+
 def run(model_base, batch_size_per_proc, num_iter,
         fp16=False,
-        rtol=common.RELATIVE_TOLERANCE,
-        atol=common.ABSOLUTE_TOLERANCE,
+        rtol=RELATIVE_TOLERANCE,
+        atol=ABSOLUTE_TOLERANCE,
         get_dataset=None,
         **kwargs):
     do_run(model_base, batch_size_per_proc,
            model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           #lambda model, x, tgt: torch.jit.trace(model, (x,)),
-           #lambda model, x, tgt: model(x),
-           #lambda out: out,
-           #bwd_with_criterion,
            fp16, rtol, atol, get_dataset,
            **kwargs)
 
