@@ -3,12 +3,12 @@ Logging
 
 RaNNC uses `spdlog <https://github.com/gabime/spdlog>`_ and
 `spdlog_setup <https://github.com/guangie88/spdlog_setup>`_ for logging.
-You can configure logging by a configuration file
+You can configure logging using a configuration file
 placed at ``~/.pyrannc/logging.toml``.
 
 Since RaNNC has loggers associated with internal modules,
 you can set a log level for each module.
-The below shows an example of the logging configuration file.
+The following shows an example of the logging configuration file.
 
 .. code-block::
 

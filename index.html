@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
@@ -5,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>RaNNC (Rapid Neural Network Connector) &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>RaNNC (Rapid Neural Network Connector) &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -89,8 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -160,15 +162,15 @@
             
   <div class="section" id="rannc-rapid-neural-network-connector">
 <h1>RaNNC (Rapid Neural Network Connector)<a class="headerlink" href="#rannc-rapid-neural-network-connector" title="Permalink to this headline">¶</a></h1>
-<p>RaNNC is an automatic parallelization middleware to train very large-scale neural networks.
+<p>RaNNC is automatic parallelization middleware used to train very large-scale neural networks.
 Since modern networks often have billions of parameters, they do not fit the memory of GPUs.
 RaNNC automatically partitions such a huge network with model parallelism and computes it using multiple GPUs.</p>
-<p>Compared to existing frameworks including Megatron-LM and Mesh-TensorFlow,
+<p>Compared to existing frameworks, including Megatron-LM and Mesh-TensorFlow,
 which require users to implement partitioning of the given network, RaNNC automatically partitions
-a network for PyTorch without any modifications to its description.
-In addition, RaNNC basically has no limitation on network architectures while such existing frameworks are only applicable to Transformer-based networks.</p>
+a network for PyTorch without any modification to its description.
+In addition, RaNNC basically has no limitation on its network architecture while the existing frameworks are only applicable to transformer-based networks.</p>
 <p>The code below shows a simple usage of RaNNC.
-Following the style of PyTorch’s data parallelism, RaNNC expects the training script to be launched with MPI so that
+Following the style of PyTorch’s data parallelism, RaNNC expects the training script to be launched with an MPI so that
 the number of processes matches the number of available GPUs.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">Net</span><span class="p">()</span>                  <span class="c1"># Define a network</span>
 <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span> <span class="c1"># Move paramsters to a cuda device</span>
@@ -179,10 +181,9 @@ the number of processes matches the number of available GPUs.</p>
 <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>               <span class="c1"># Update parameters</span>
 </pre></div>
 </div>
-<p>The only thing you need is to insert the line highlighted above.
-RaNNC profiles computation times and memory usage of components of the network and
-determines partitioning of the network so that each partitioned fragment of the network fits to GPU memory
-and the training throughput is optimized.</p>
+<p>You only need to insert the line highlighted above.
+RaNNC profiles computation times and memory usage of the components in the network and
+determines the partitioning of the network so that each partitioned fragment fits the GPU memory and the training throughput is optimized.</p>
 <p>See our IPDPS2021 paper <a class="footnote-reference brackets" href="#f1" id="id1">1</a> for the details of RaNNC’s partitioning algorithm.</p>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">Contents:</span></p>
@@ -193,8 +194,8 @@ and the training throughput is optimized.</p>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 </div>
 </div>

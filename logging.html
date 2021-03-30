@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Logging &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>Logging &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -38,7 +38,7 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Building from source" href="build.html" />
+    <link rel="next" title="Configurations" href="config.html" />
     <link rel="prev" title="API references" href="references.html" /> 
 </head>
 
@@ -92,8 +92,8 @@
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -165,11 +165,11 @@
 <h1>Logging<a class="headerlink" href="#logging" title="Permalink to this headline">¶</a></h1>
 <p>RaNNC uses <a class="reference external" href="https://github.com/gabime/spdlog">spdlog</a> and
 <a class="reference external" href="https://github.com/guangie88/spdlog_setup">spdlog_setup</a> for logging.
-You can configure logging by a configuration file
+You can configure logging using a configuration file
 placed at <code class="docutils literal notranslate"><span class="pre">~/.pyrannc/logging.toml</span></code>.</p>
 <p>Since RaNNC has loggers associated with internal modules,
 you can set a log level for each module.
-The below shows an example of the logging configuration file.</p>
+The following shows an example of the logging configuration file.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">global_pattern</span> <span class="o">=</span> <span class="s2">&quot;[%Y-%m-</span><span class="si">%d</span><span class="s2"> %T.</span><span class="si">%f</span><span class="s2">] [%L] &lt;%n&gt;: %v&quot;</span>
 
 <span class="c1"># Sinks</span>
@@ -266,7 +266,7 @@ The below shows an example of the logging configuration file.</p>
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="build.html" class="btn btn-neutral float-right" title="Building from source" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="config.html" class="btn btn-neutral float-right" title="Configurations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
         <a href="references.html" class="btn btn-neutral float-left" title="API references" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 

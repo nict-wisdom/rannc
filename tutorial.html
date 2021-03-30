@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Tutorial &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>Tutorial &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -102,8 +102,8 @@
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -179,7 +179,7 @@ Follow the steps below to learn the basic usage of RaNNC.</p>
 <h2>Steps to use RaNNC<a class="headerlink" href="#steps-to-use-rannc" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="set-up-environment">
 <h3>0. Set up environment<a class="headerlink" href="#set-up-environment" title="Permalink to this headline">¶</a></h3>
-<p>Ensure required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
+<p>Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
 The libraries must be included in <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> at runtime.</p>
 </div>
 <div class="section" id="import-rannc">
@@ -191,8 +191,8 @@ The libraries must be included in <code class="docutils literal notranslate"><sp
 </div>
 <div class="section" id="wrap-your-model">
 <h3>2. Wrap your model<a class="headerlink" href="#wrap-your-model" title="Permalink to this headline">¶</a></h3>
-<p>Wrap your model by <code class="docutils literal notranslate"><span class="pre">pyrannc.RaNNCModule</span></code> with your optimizer.
-You can use the wrapped model in almost same manner as the original model (See below).
+<p>Wrap your model by using <code class="docutils literal notranslate"><span class="pre">pyrannc.RaNNCModule</span></code> with your optimizer.
+You can use the wrapped model in almost the same manner as the original model (see below).
 Note that the original model must be on a CUDA device.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">Net</span><span class="p">()</span>
 <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
@@ -200,24 +200,24 @@ Note that the original model must be on a CUDA device.</p>
 <span class="n">model</span> <span class="o">=</span> <span class="n">pyrannc</span><span class="o">.</span><span class="n">RaNNCModule</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>If you don’t use an optimizer, pass only the model.</p>
+<p>If you do not use an optimizer, pass only the model.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">pyrannc</span><span class="o">.</span><span class="n">RaNNCModule</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="run-forward-backward-passes">
 <h3>3. Run forward/backward passes<a class="headerlink" href="#run-forward-backward-passes" title="Permalink to this headline">¶</a></h3>
-<p>A <code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code> can run forward/backward passes as with a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code> can run forward/backward passes, as with <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 <span class="n">out</span><span class="o">.</span><span class="n">backward</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>Inputs to <code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code> must be CUDA tensors.
-RaNNCModule has several more limitations about a wrapped model and inputs/outputs.
+RaNNCModule has several more limitations regarding a wrapped model and inputs/outputs.
 See <a class="reference internal" href="limitations.html"><span class="doc">Limitations</span></a> for details.
-The optimizer can update model parameters just by calling <code class="docutils literal notranslate"><span class="pre">step()</span></code>.</p>
-<p>The program below (<code class="docutils literal notranslate"><span class="pre">examples/tutorial_usage.py</span></code>) shows the above usage with a very simple model.</p>
+The optimizer can update model parameters simply by calling <code class="docutils literal notranslate"><span class="pre">step()</span></code>.</p>
+<p>The program below shows the above usage with a very simple model.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="kn">as</span> <span class="nn">nn</span>
 <span class="kn">import</span> <span class="nn">torch.optim</span> <span class="kn">as</span> <span class="nn">optim</span>
@@ -254,18 +254,44 @@ The optimizer can update model parameters just by calling <code class="docutils 
 </div>
 <div class="section" id="launch">
 <h3>4. Launch<a class="headerlink" href="#launch" title="Permalink to this headline">¶</a></h3>
-<p>A program using RaNNC requires to be launched by <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>.
-You can launch the above example script by:</p>
+<p>A program using RaNNC must be launched using <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>.
+You can launch the above example script by</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpirun -np <span class="m">2</span> python tutorial_usage.py
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">-np</span></code> indicates the number of ranks (processes).
 RaNNC allocates one CUDA device for each rank.
 In the above example, there must be two available CUDA devices.</p>
+<p>The following output shows that RaNNC uses only data parallelism to train this model.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>...
+<span class="o">[</span>DPStaging<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span> Estimated profiles of subgraphs <span class="o">(</span><span class="c1">#partition(s))=1: batch_size=128 ranks=2 pipeline_num=2</span>
+<span class="o">[</span>DPStaging<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>   <span class="nv">graph</span><span class="o">=</span>MERGE_0_1 <span class="nv">repl</span><span class="o">=</span><span class="m">2</span> <span class="nv">cp</span><span class="o">=</span><span class="nb">true</span> <span class="nv">fwd_time</span><span class="o">=</span><span class="m">99</span> <span class="nv">bwd_time</span><span class="o">=</span><span class="m">356</span> <span class="nv">ar_time</span><span class="o">=</span><span class="m">0</span> <span class="nv">in_size</span><span class="o">=</span><span class="m">1536</span> <span class="nv">out_size</span><span class="o">=</span><span class="m">1536</span> <span class="nv">mem</span><span class="o">=</span><span class="m">4752</span> <span class="o">(</span>fwd+bwd<span class="o">=</span><span class="m">4656</span> <span class="nv">opt</span><span class="o">=</span><span class="m">96</span><span class="o">)</span>
+<span class="o">[</span>Decomposer<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>  Assigned subgraph MERGE_0_1 to rank<span class="o">[</span><span class="m">1</span>,0<span class="o">]</span>
+...
+</pre></div>
+</div>
+<p>RaNNC automatically partitions a given model if the model is too large to be stored on one CUDA device’s memory.
+The model in this example is so small that data parallelism works well.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and compute them as one batch. <code class="docutils literal notranslate"><span class="pre">torch.utils.data.distributed.DistributedSampler</span></code> will be useful for this purpose.</p>
+<p>Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and computes them as a single batch. <code class="docutils literal notranslate"><span class="pre">torch.utils.data.distributed.DistributedSampler</span></code> is useful for this purpose.</p>
 </div>
+<p>To see how the partitioning works, you can force RaNNC to partition a model using model parallelism.
+The environment variable <code class="docutils literal notranslate"><span class="pre">RANNC_PARTITION_NUM</span></code> forces the number of partitions for model parallelism (See also <a class="reference internal" href="config.html"><span class="doc">Configurations</span></a>).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpirun -np <span class="m">2</span> -x <span class="nv">RANNC_PARTITION_NUM</span><span class="o">=</span><span class="m">2</span> python tutorial_usage.py
+</pre></div>
+</div>
+<p>The output shows that RaNNC produced two partitions and allocated GPUs to them.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>...
+<span class="o">[</span>DPStaging<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span> Estimated profiles of subgraphs <span class="o">(</span><span class="c1">#partition(s))=2: batch_size=128 ranks=2 pipeline_num=2</span>
+<span class="o">[</span>DPStaging<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>   <span class="nv">graph</span><span class="o">=</span>ML_mod_jy9757acx1eve7nm_p0 <span class="nv">repl</span><span class="o">=</span><span class="m">1</span> <span class="nv">cp</span><span class="o">=</span><span class="nb">true</span> <span class="nv">fwd_time</span><span class="o">=</span><span class="m">83</span> <span class="nv">bwd_time</span><span class="o">=</span><span class="m">295</span> <span class="nv">ar_time</span><span class="o">=</span><span class="m">0</span> <span class="nv">in_size</span><span class="o">=</span><span class="m">1536</span> <span class="nv">out_size</span><span class="o">=</span><span class="m">1024</span> <span class="nv">mem</span><span class="o">=</span><span class="m">3656</span> <span class="o">(</span>fwd+bwd<span class="o">=</span><span class="m">3608</span> <span class="nv">opt</span><span class="o">=</span><span class="m">48</span><span class="o">)</span>
+<span class="o">[</span>DPStaging<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>   <span class="nv">graph</span><span class="o">=</span>ML_mod_jy9757acx1eve7nm_p1 <span class="nv">repl</span><span class="o">=</span><span class="m">1</span> <span class="nv">cp</span><span class="o">=</span><span class="nb">true</span> <span class="nv">fwd_time</span><span class="o">=</span><span class="m">83</span> <span class="nv">bwd_time</span><span class="o">=</span><span class="m">296</span> <span class="nv">ar_time</span><span class="o">=</span><span class="m">0</span> <span class="nv">in_size</span><span class="o">=</span><span class="m">1024</span> <span class="nv">out_size</span><span class="o">=</span><span class="m">1536</span> <span class="nv">mem</span><span class="o">=</span><span class="m">5192</span> <span class="o">(</span>fwd+bwd<span class="o">=</span><span class="m">5144</span> <span class="nv">opt</span><span class="o">=</span><span class="m">48</span><span class="o">)</span>
+<span class="o">[</span>Decomposer<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>  Assigned subgraph ML_mod_jy9757acx1eve7nm_p1 to rank<span class="o">[</span><span class="m">1</span><span class="o">]</span>
+<span class="o">[</span>Decomposer<span class="o">]</span> <span class="o">[</span>info<span class="o">]</span>  Assigned subgraph ML_mod_jy9757acx1eve7nm_p0 to rank<span class="o">[</span><span class="m">0</span><span class="o">]</span>
+...
+</pre></div>
+</div>
+<p>For more practical usages, scripts in <code class="docutils literal notranslate"><span class="pre">test/</span></code> and <a class="reference external" href="https://github.com/nict-wisdom/rannc-examples/">examples</a> will be helpful.</p>
 </div>
 </div>
 </div>

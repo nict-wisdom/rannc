@@ -10,7 +10,7 @@ Steps to use RaNNC
 0. Set up environment
 -------------------------
 
-Ensure required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
+Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
 The libraries must be included in ``LD_LIBRARY_PATH`` at runtime.
 
 
@@ -27,8 +27,8 @@ Insert ``import`` in your script.
 2. Wrap your model
 ------------------
 
-Wrap your model by ``pyrannc.RaNNCModule`` with your optimizer.
-You can use the wrapped model in almost same manner as the original model (See below).
+Wrap your model by using ``pyrannc.RaNNCModule`` with your optimizer.
+You can use the wrapped model in almost the same manner as the original model (see below).
 Note that the original model must be on a CUDA device.
 
 .. code-block:: python
@@ -38,7 +38,7 @@ Note that the original model must be on a CUDA device.
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, optimizer)
 
-If you don't use an optimizer, pass only the model.
+If you do not use an optimizer, pass only the model.
 
 .. code-block:: python
 
@@ -49,7 +49,7 @@ If you don't use an optimizer, pass only the model.
 3. Run forward/backward passes
 ------------------------------
 
-A ``RaNNCModule`` can run forward/backward passes as with a ``torch.nn.Module``.
+``RaNNCModule`` can run forward/backward passes, as with ``torch.nn.Module``.
 
 .. code-block:: python
 
@@ -58,11 +58,11 @@ A ``RaNNCModule`` can run forward/backward passes as with a ``torch.nn.Module``.
   out.backward(torch.randn_like(out))
 
 Inputs to ``RaNNCModule`` must be CUDA tensors.
-RaNNCModule has several more limitations about a wrapped model and inputs/outputs.
+RaNNCModule has several more limitations regarding a wrapped model and inputs/outputs.
 See :doc:`limitations` for details.
-The optimizer can update model parameters just by calling ``step()``.
+The optimizer can update model parameters simply by calling ``step()``.
 
-The program below (``examples/tutorial_usage.py``) shows the above usage with a very simple model.
+The program below shows the above usage with a very simple model.
 
 .. code-block:: python
 
@@ -102,8 +102,8 @@ The program below (``examples/tutorial_usage.py``) shows the above usage with a 
 4. Launch
 ---------
 
-A program using RaNNC requires to be launched by ``mpirun``.
-You can launch the above example script by:
+A program using RaNNC must be launched using ``mpirun``.
+You can launch the above example script by
 
 .. code-block:: bash
 
@@ -113,7 +113,41 @@ You can launch the above example script by:
 RaNNC allocates one CUDA device for each rank.
 In the above example, there must be two available CUDA devices.
 
+The following output shows that RaNNC uses only data parallelism to train this model.
+
+.. code-block:: bash
+
+  ...
+  [DPStaging] [info] Estimated profiles of subgraphs (#partition(s))=1: batch_size=128 ranks=2 pipeline_num=2
+  [DPStaging] [info]   graph=MERGE_0_1 repl=2 cp=true fwd_time=99 bwd_time=356 ar_time=0 in_size=1536 out_size=1536 mem=4752 (fwd+bwd=4656 opt=96)
+  [Decomposer] [info]  Assigned subgraph MERGE_0_1 to rank[1,0]
+  ...
+
+RaNNC automatically partitions a given model if the model is too large to be stored on one CUDA device's memory.
+The model in this example is so small that data parallelism works well.
 
 .. note::
 
-  Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and compute them as one batch. ``torch.utils.data.distributed.DistributedSampler`` will be useful for this purpose.
+  Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and computes them as a single batch. ``torch.utils.data.distributed.DistributedSampler`` is useful for this purpose.
+
+
+To see how the partitioning works, you can force RaNNC to partition a model using model parallelism.
+The environment variable ``RANNC_PARTITION_NUM`` forces the number of partitions for model parallelism (See also :doc:`config`).
+
+.. code-block:: bash
+
+  mpirun -np 2 -x RANNC_PARTITION_NUM=2 python tutorial_usage.py
+
+The output shows that RaNNC produced two partitions and allocated GPUs to them.
+
+.. code-block:: bash
+
+  ...
+  [DPStaging] [info] Estimated profiles of subgraphs (#partition(s))=2: batch_size=128 ranks=2 pipeline_num=2
+  [DPStaging] [info]   graph=ML_mod_jy9757acx1eve7nm_p0 repl=1 cp=true fwd_time=83 bwd_time=295 ar_time=0 in_size=1536 out_size=1024 mem=3656 (fwd+bwd=3608 opt=48)
+  [DPStaging] [info]   graph=ML_mod_jy9757acx1eve7nm_p1 repl=1 cp=true fwd_time=83 bwd_time=296 ar_time=0 in_size=1024 out_size=1536 mem=5192 (fwd+bwd=5144 opt=48)
+  [Decomposer] [info]  Assigned subgraph ML_mod_jy9757acx1eve7nm_p1 to rank[1]
+  [Decomposer] [info]  Assigned subgraph ML_mod_jy9757acx1eve7nm_p0 to rank[0]
+  ...
+
+For more practical usages, scripts in ``test/`` and `examples <https://github.com/nict-wisdom/rannc-examples/>`_ will be helpful.

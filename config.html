@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Configurations &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>Configurations &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -38,7 +38,8 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Building from source" href="build.html" /> 
+    <link rel="next" title="Building from source" href="build.html" />
+    <link rel="prev" title="Logging" href="logging.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -91,8 +92,8 @@
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -164,8 +165,8 @@
 <h1>Configurations<a class="headerlink" href="#configurations" title="Permalink to this headline">¶</a></h1>
 <p>RaNNC’s runtime configurations can be set in the following two ways:</p>
 <ul class="simple">
-<li><p><em>Config file</em>: RaNNC automatically loads a configuration file at <code class="docutils literal notranslate"><span class="pre">~/.pyrannc/rannc_conf.toml</span></code>. Names of configuration items must be in lower case. The path to the configuration file can be set by an environment variable <code class="docutils literal notranslate"><span class="pre">RANNC_CONF_DIR</span></code>.</p></li>
-<li><p><em>Environment variables</em>: You can overwrite configuration by setting environment variables. Names of variables follows <code class="docutils literal notranslate"><span class="pre">RANNC_&lt;CONF_ITEM_NAME&gt;</span></code> in upper case. For example, you can set <cite>mem_margin</cite> in the following table by a variable <code class="docutils literal notranslate"><span class="pre">RANNC_MEM_MARGIN</span></code>.</p></li>
+<li><p><em>Config file</em>: RaNNC automatically loads a configuration file at <code class="docutils literal notranslate"><span class="pre">~/.pyrannc/rannc_conf.toml</span></code>. Names of configuration items must be in lowercase. The path to the configuration file can be set by an environment variable <code class="docutils literal notranslate"><span class="pre">RANNC_CONF_DIR</span></code>.</p></li>
+<li><p><em>Environment variables</em>: You can overwrite a configuration by setting environment variables. Names of variables follow <code class="docutils literal notranslate"><span class="pre">RANNC_&lt;CONF_ITEM_NAME&gt;</span></code> in uppercase. For example, you can set <cite>mem_margin</cite> in the following table with a variable <code class="docutils literal notranslate"><span class="pre">RANNC_MEM_MARGIN</span></code>.</p></li>
 </ul>
 <table class="colwidths-given docutils align-default" id="id1">
 <caption><span class="caption-text">Configurations</span><a class="headerlink" href="#id1" title="Permalink to this table">¶</a></caption>
@@ -181,6 +182,14 @@
 </tr>
 </thead>
 <tbody>
+<tr class="row-even"><td><p>show_config_items</p></td>
+<td><p>false</p></td>
+<td><p>Show configurations on startup if set to true.</p></td>
+</tr>
+<tr class="row-odd"><td><p>mem_limit_gb</p></td>
+<td><p>0</p></td>
+<td><p>Set a limit per device in GB if a positive number is given.</p></td>
+</tr>
 <tr class="row-even"><td><p>mem_margin</p></td>
 <td><p>0.1</p></td>
 <td><p>Memory margin for model partitioning.</p></td>
@@ -197,37 +206,40 @@
 <td><p><code class="docutils literal notranslate"><span class="pre">/tmp/rannc_deployment.bin</span></code></p></td>
 <td><p>Path of deployment file to save/load.</p></td>
 </tr>
-<tr class="row-even"><td><p>min_pipeline</p></td>
+<tr class="row-even"><td><p>partition_num</p></td>
+<td><p>0</p></td>
+<td><p>Force the number of partitions for model parallelism if a positive value is set.</p></td>
+</tr>
+<tr class="row-odd"><td><p>min_pipeline</p></td>
 <td><p>1</p></td>
-<td><p>Minimum number of microbatches for pipeline parallelism</p></td>
+<td><p>Minimum number of microbatches for pipeline parallelism.</p></td>
 </tr>
-<tr class="row-odd"><td><p>max_pipeline</p></td>
+<tr class="row-even"><td><p>max_pipeline</p></td>
 <td><p>32</p></td>
-<td><p>Maxmum number of microbatches for pipeline parallelism</p></td>
+<td><p>Maximum number of microbatches for pipeline parallelism.</p></td>
 </tr>
-<tr class="row-even"><td><p>opt_param_factor</p></td>
+<tr class="row-odd"><td><p>opt_param_factor</p></td>
 <td><p>2</p></td>
-<td><p>Factor to estimate memory usage by an optimizer. For example, Set this item to 2 for Adam because the optimizer uses two internal data <cite>v</cite> and <cite>s</cite>, whose sizes are equivalent to parameter tensors.</p></td>
+<td><p>Factor used to estimate memory usage by an optimizer. For example, set this item to 2 for Adam because the optimizer uses two internal data <cite>v</cite> and <cite>s</cite>, whose sizes are equivalent to parameter tensors.</p></td>
 </tr>
-<tr class="row-odd"><td><p>trace_events</p></td>
+<tr class="row-even"><td><p>trace_events</p></td>
 <td><p>false</p></td>
 <td><p>Trace internal events if set to true. When true, the event tracing significantly degrades performance.</p></td>
 </tr>
-<tr class="row-even"><td><p>event_trace_file</p></td>
+<tr class="row-odd"><td><p>event_trace_file</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">/tmp/rannc_event_trace.json</span></code></p></td>
 <td><p>Path to an event trace file.</p></td>
 </tr>
 </tbody>
 </table>
-<p>The following is an example of the configuration file.</p>
+<p>The following is an example of the configuration file (<code class="docutils literal notranslate"><span class="pre">~/.pyrannc/rannc_conf.toml</span></code>).</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">opt_param_factor</span><span class="o">=</span><span class="mi">2</span>
 <span class="n">mem_margin</span><span class="o">=</span><span class="mf">0.1</span>
 <span class="n">min_pipeline</span><span class="o">=</span><span class="mi">1</span>
-<span class="n">max_pipeline</span><span class="o">=</span><span class="mi">4</span>
+<span class="n">max_pipeline</span><span class="o">=</span><span class="mi">32</span>
 <span class="n">save_deployment</span><span class="o">=</span><span class="n">true</span>
 <span class="n">load_deployment</span><span class="o">=</span><span class="n">false</span>
 <span class="n">trace_events</span><span class="o">=</span><span class="n">false</span>
-<span class="n">verify_recomp</span><span class="o">=</span><span class="n">false</span>
 </pre></div>
 </div>
 </div>
@@ -238,7 +250,8 @@
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="build.html" class="btn btn-neutral float-left" title="Building from source" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="build.html" class="btn btn-neutral float-right" title="Building from source" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="logging.html" class="btn btn-neutral float-left" title="Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>

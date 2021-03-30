@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Limitations &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>Limitations &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -89,15 +89,15 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Limitations</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#control-constructs-are-ignored">Control constructs are ignored</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#control-constructs">Control constructs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#arguments-and-return-values">Arguments and return values</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -167,19 +167,22 @@
             
   <div class="section" id="limitations">
 <h1>Limitations<a class="headerlink" href="#limitations" title="Permalink to this headline">¶</a></h1>
-<p>Although a <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> is designed to work like <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it has the following limitations.</p>
-<div class="section" id="control-constructs-are-ignored">
-<h2>Control constructs are ignored<a class="headerlink" href="#control-constructs-are-ignored" title="Permalink to this headline">¶</a></h2>
+<p>Although <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> is designed to work in the manner of <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it has the following limitations.</p>
+<div class="section" id="control-constructs">
+<h2>Control constructs<a class="headerlink" href="#control-constructs" title="Permalink to this headline">¶</a></h2>
 <p>RaNNC uses a computation graph produced by PyTorch’s <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.jit.trace.html">tracing function</a>.
-As explained in PyTorch’s document, the tracing function does not record control constructs including conditional branches and loops.</p>
+As explained in PyTorch’s documentation, the tracing function does not record control constructs, including conditional branches and loops.</p>
+<p>However, a function with <code class="docutils literal notranslate"><span class="pre">&#64;torch.jit.script</span></code> can preserve control constructs even after tracing.
+You can call such a function from your model.
+<code class="docutils literal notranslate"><span class="pre">test_function()</span></code> in <code class="docutils literal notranslate"><span class="pre">test/test_simple.py</span></code> shows an example using a function with <code class="docutils literal notranslate"><span class="pre">&#64;torch.jit.script</span></code>.</p>
 </div>
 <div class="section" id="arguments-and-return-values">
 <h2>Arguments and return values<a class="headerlink" href="#arguments-and-return-values" title="Permalink to this headline">¶</a></h2>
-<p>Arguments and outputs of a <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> must satisfy the following conditions.</p>
+<p>Arguments and outputs of <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> must satisfy the following conditions.</p>
 <ul class="simple">
 <li><p>Arguments must be (mini-)batches tensors, whose first dimension corresponds to samples in a mini-batch.</p></li>
 <li><p>Keyword arguments are not allowed.</p></li>
-<li><p>Outputs must be (mini-)batches tensors, or a loss value (scalar tensor).</p></li>
+<li><p>Outputs must be (mini-)batches tensors or a loss value (scalar tensor).</p></li>
 </ul>
 </div>
 </div>

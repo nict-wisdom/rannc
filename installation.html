@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Installation &mdash; RaNNC 0.5.0rc1 documentation</title>
+  <title>Installation &mdash; RaNNC 0.5.0 documentation</title>
   
 
   
@@ -96,8 +96,8 @@
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">API references</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
             
@@ -169,31 +169,36 @@
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
-<p>RaNNC works only with CUDA devices (CPU only/TPU environments are not supported).
+<p>RaNNC works only with CUDA devices (CPU only or TPU environments are not supported).
 RaNNC requires the following libraries and tools at runtime.</p>
 <ul class="simple">
-<li><p><em>CUDA</em>: A CUDA runtime must be available at the runtime environment. Currently RaNNC is tested with CUDA 10.2 and 11.0.</p></li>
-<li><p><em>NCCL</em>: NCCL (Version &gt;= 2.7.3 is required) must be available at the runtime environment. RaNNC uses NCCL both for allreduce and P2P communications.</p></li>
-<li><p><em>MPI</em>: A program using RaNNC must be launched with MPI. MPI libraries must also be available at runtime. RaNNC is tested with OpenMPI v4.0.5.</p></li>
-<li><p><em>libstd++</em>: <code class="docutils literal notranslate"><span class="pre">libstd++</span></code> must support <code class="docutils literal notranslate"><span class="pre">GLIBCXX_3.4.21</span></code> to use the distributed <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages (The packages are built with gcc 5.4.0).</p></li>
+<li><p><em>CUDA</em>: A CUDA runtime must be available in the runtime environment. Currently, RaNNC has been tested with CUDA 10.2 and 11.0.</p></li>
+<li><p><em>NCCL</em>: NCCL (Version &gt;= 2.7.3 is required) must be available in the runtime environment. RaNNC uses NCCL both for allreduce and P2P communications.</p></li>
+<li><p><em>MPI</em>: A program using RaNNC must be launched with MPI. MPI libraries must also be available at runtime. RaNNC has been tested with OpenMPI v4.0.5.</p></li>
+<li><p><em>libstd++</em>: <code class="docutils literal notranslate"><span class="pre">libstd++</span></code> must support <code class="docutils literal notranslate"><span class="pre">GLIBCXX_3.4.21</span></code> to use the distributed <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages (these packages are built with gcc 5.4.0).</p></li>
 </ul>
 </div>
 <div class="section" id="id1">
 <h2>Installation<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
 <p>This version of RaNNC requires PyTorch v1.8.0.
-<code class="docutils literal notranslate"><span class="pre">pip</span></code> packages for <code class="docutils literal notranslate"><span class="pre">linux_x86_64</span></code> are available from the following links.</p>
+<code class="docutils literal notranslate"><span class="pre">pip</span></code> packages for <code class="docutils literal notranslate"><span class="pre">linux_x86_64</span></code> are available from the following links.
+We tested these packages on CentOS 7.9, CentOS 8.2, and RHEL 7.6.</p>
 <ul class="simple">
-<li><p><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span></code></p></li>
-<li><p><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span></code></p></li>
+<li><p><a class="reference download external" download="" href="https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0+cu102-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0+cu102-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0+cu111-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.1</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://nict-wisdom.github.io/rannc-resources/pyrannc-0.5.0+cu111-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.1</span></code></a></p></li>
 </ul>
-<p>You can create a new conda environment and install RaNNC by the following commands.
+<p>You can create a new conda environment and install RaNNC using the following commands.
 Set a CUDA version available in your environment.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda create -n rannc <span class="nv">python</span><span class="o">=</span><span class="m">3</span>.8
 conda activate rannc
 conda install <span class="nv">pytorch</span><span class="o">==</span><span class="m">1</span>.8.0 <span class="nv">cudatoolkit</span><span class="o">=</span><span class="m">10</span>.2 -c pytorch
-pip install pyrannc-0.5-cp38-cp38m-linux_x86_64.whl
+pip install pyrannc-0.5.0+cu102-cp37-cp37m-linux_x86_64.whl
 </pre></div>
 </div>
+<p>If the above packages do not match your Python/CUDA versions, create a suitable package using <code class="docutils literal notranslate"><span class="pre">Makefile</span></code>
+in <code class="docutils literal notranslate"><span class="pre">docker/</span></code>. <code class="docutils literal notranslate"><span class="pre">make.sh</span></code> shows the commands to create wheel packages.</p>
 </div>
 </div>
 
