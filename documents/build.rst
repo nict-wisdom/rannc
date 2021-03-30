@@ -37,7 +37,7 @@ You need to set some environment variables before building RaNNC to help cmake f
    * - CUDNN_ROOT_DIR
      - Path to a cuDNN libraries directory.
    * - LD_LIBRARY_PATH
-     - Must contain the path to NCCL lib directory.
+     - Must contain the path to NCCL library directory.
 
 The building process refers to PyTorch installed with conda.
 Therefore, install PyTorch using your python and run ``setup.py``.

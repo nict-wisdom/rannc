@@ -58,8 +58,7 @@ The following is an example of the configuration file (``~/.pyrannc/rannc_conf.t
    opt_param_factor=2
    mem_margin=0.1
    min_pipeline=1
-   max_pipeline=4
+   max_pipeline=32
    save_deployment=true
    load_deployment=false
    trace_events=false
-   verify_recomp=false

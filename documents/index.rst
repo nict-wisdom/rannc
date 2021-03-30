@@ -47,8 +47,8 @@ See our IPDPS2021 paper [#f1]_ for the details of RaNNC's partitioning algorithm
    faq
    references
    logging
-   build
    config
+   build
 
 
 Reference

@@ -17,16 +17,21 @@ How to save/load a RaNNC module
 
 Use ``state_dict()`` of the RaNNC module.
 The returned *state_dict* can be saved and loaded, as with PyTorch.
-
 Make sure ``state_dict()`` is called from all ranks.
 Otherwise, the call of ``state_dict()`` would be blocked because RaNNC gathers parameters across all ranks.
+
+RaNNCModule also modifies optimizer's ``state_dict()``.
+To collect states across all ranks, set ``from_global=True``.
+Note that the returned *state_dict* can be loaded after RaNNC partitions the model.
+``load_state_dict()`` also needs the keyword argument ``from_global=True``.
+You can find typical usages in `examples <https://github.com/nict-wisdom/rannc-examples/>`_.
 
 
 How to use gradient accumulation
 --------------------------------
 
 As default, RaNNC implicitly performs allreduce (sum) of gradients on all ranks after a backward pass.
-To prevent this allreduce, you can use ``pyrannc.delay_grad_allreduce(False)``.
+To prevent this allreduce, you can use ``pyrannc.delay_grad_allreduce(True)``.
 
 After a specified number of forward/backward steps, you can explicitly perform allreduce
 using ``allreduce_grads`` of your ``RaNNCModule``.
@@ -59,7 +64,7 @@ partitioning process.
 .. -----------------------------------------------
 
 
-.. How can I save/restore the optimizer's state?
-.. -------------------------------------
+
+
 
 
