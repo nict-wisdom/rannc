@@ -1,6 +1,6 @@
 # RaNNC (Rapid Neural Network Connector)
 
-RaNNC is automatic parallelization middleware used to train very large-scale neural networks.
+[RaNNC](http://arxiv.org/abs/2103.16063) is automatic parallelization middleware used to train very large-scale neural networks.
 Since modern networks often have billions of parameters, they do not fit the memory of GPUs.
 RaNNC automatically partitions such a huge network with model parallelism and computes it using multiple GPUs.
 

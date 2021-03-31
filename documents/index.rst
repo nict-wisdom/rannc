@@ -34,7 +34,7 @@ You only need to insert the line highlighted above.
 RaNNC profiles computation times and memory usage of the components in the network and
 determines the partitioning of the network so that each partitioned fragment fits the GPU memory and the training throughput is optimized.
 
-See our IPDPS2021 paper [#f1]_ for the details of RaNNC's partitioning algorithm.
+See our IPDPS2021 paper [#f1]_ for the details of RaNNC's partitioning algorithm (`preprint <http://arxiv.org/abs/2103.16063>`_).
 
 
 .. toctree::
