@@ -224,11 +224,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     Computes a PyTorch model on multiple GPUs with a hybrid parallelism.
     """
 
-    def __init__(self, model, optimizer=None, load_deployment=None, use_amp_master_params=False,
+    def __init__(self, model, optimizer=None, gather_inputs=True, load_deployment=None, use_amp_master_params=False,
                  allreduce_amp_master_param=False, check_unused_values=True):
         r"""
         :param model: Model to distribute.
         :param optimizer: Optimizer that should work with RaNNC.
+        :param gather_inputs: Set ``False`` if model uses inputs given on rank 0.
         :param use_amp_master_params: Set ``True`` if ``model`` is processed by `Apex AMP <https://nvidia.github.io/apex/amp.html>`_.
         :param allreduce_amp_master_param: Set ``True`` to allreduce gradients of master parameters of Apex AMP.
         :param check_unused_values: If ``True``, RaNNC throws an exception when it finds unused values in a computation graph.
@@ -247,6 +248,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         # rannc module removes unnecessary parameters in optimizer
         self.optimizer = optimizer
 
+        self.gather_inputs = gather_inputs
         self.amp_master_param_registered = False
         self.load_deployment = load_deployment
         self.allreduce_amp_master_param = allreduce_amp_master_param
@@ -279,7 +281,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             # Restore rng state
             with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
                 hook_handles = _set_hooks_for_tracing(self.model, device)
-                self.used_param_ids = super().init(self.model.forward, parameters, buffers, self.var_lookup_fn, *args)
+                self.used_param_ids = super().init(self.model.forward, parameters, buffers, self.var_lookup_fn,
+                                                   self.gather_inputs, *args)
                 _unset_hooks_for_tracing(hook_handles)
 
             # Restore buffer values

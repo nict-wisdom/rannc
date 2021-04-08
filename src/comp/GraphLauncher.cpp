@@ -11,6 +11,44 @@ namespace rannc {
         return graph->getValue(value_name).isBatch();
     }
 
+    IValueMap setNone(const IValueMap &input) {
+        IValueMap none_input;
+        for (const auto &it: input) {
+            none_input[it.first] = torch::jit::IValue();
+        }
+        return none_input;
+    }
+
+    std::vector<RouteDP> doRewriteRoutes(const std::vector<RouteDP>& routes, bool gather_inputs,
+                                         const std::function<RouteDP(const RouteDP&)>& f) {
+        std::vector<RouteDP> rewritten_routes;
+
+        for (const auto& r: routes) {
+            if (gather_inputs) {
+                rewritten_routes.push_back(r);
+            } else {
+                rewritten_routes.push_back(f(r));
+            }
+        }
+        return rewritten_routes;
+    }
+
+    std::vector<RouteDP> rewriteInRoute(const std::vector<RouteDP>& routes, bool gather_inputs) {
+        return doRewriteRoutes(routes, gather_inputs, [](const RouteDP& r) {
+            RouteDP rw_r = r;
+            rw_r.sources = {0};
+            return rw_r;
+        });
+    }
+
+    std::vector<RouteDP> rewriteOutRoute(const std::vector<RouteDP>& routes, bool gather_inputs) {
+        return doRewriteRoutes(routes, gather_inputs, [](const RouteDP& r) {
+            RouteDP rw_r = r;
+            rw_r.dests = {0};
+            return rw_r;
+        });
+    }
+
     IValueMap GraphLauncher::alignBatch(const IValueMap &input, int batch_size, const std::shared_ptr<IRGraph> &graph,
             bool zero_pad) {
         IValueMap pad_input;
@@ -51,18 +89,29 @@ namespace rannc {
         );
         driver_[deployment.id]->deployGraph(deployment);
 
-//        std::atomic_bool bwd_run_flag = {false};
-//        bwd_running_.emplace(deployment.id, std::move(bwd_run_flag));
-//        bwd_running_[deployment.id].
-
         TagMap& tag_map = TagMap::get();
         tag_map.sync();
-        createRouteCommunicator(deployment.fwd_in_routes);
-        createRouteCommunicator(deployment.fwd_routes);
-        createRouteCommunicator(deployment.fwd_out_routes);
-        createRouteCommunicator(deployment.bwd_in_routes);
-        createRouteCommunicator(deployment.bwd_routes);
-        createRouteCommunicator(deployment.bwd_out_routes);
+
+        deployment_.fwd_in_routes = rewriteInRoute(deployment.fwd_in_routes, gather_inputs_);
+        deployment_.fwd_out_routes = rewriteOutRoute(deployment.fwd_out_routes, gather_inputs_);
+        deployment_.bwd_in_routes = rewriteInRoute(deployment.bwd_in_routes, gather_inputs_);
+        deployment_.bwd_out_routes = rewriteOutRoute(deployment.bwd_out_routes, gather_inputs_);
+
+        createRouteCommunicator(deployment_.fwd_in_routes);
+        createRouteCommunicator(deployment_.fwd_routes);
+        createRouteCommunicator(deployment_.fwd_out_routes);
+        createRouteCommunicator(deployment_.bwd_in_routes);
+        createRouteCommunicator(deployment_.bwd_routes);
+        createRouteCommunicator(deployment_.bwd_out_routes);
+
+        if (!gather_inputs_) {
+            int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+            int src_tag = tag_map.getRankSetTag({0});
+            RouteDP bcast_route(IValueLocation("OUTPUT_SYNC"), {0}, setToVector(mpi::getAllRanks()),
+                          tag, src_tag, RouteTypeDP::BROADCAST);
+            createRouteCommunicator({bcast_route});
+            bcast_route_ = bcast_route;
+        }
 
         logger->trace("GraphLauncher::deployGraph finished");
     }
@@ -258,29 +307,48 @@ namespace rannc {
         time_counter_.start("GraphLauncher::forward");
 
         int64_t input_batch_size = (int64_t) guessBatchSize(inputs);
-        int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
 
-        last_batch_size_ = max_local_batch_size;
-        const auto pad_inputs = alignBatch(inputs, max_local_batch_size, deployment_.graph, false);
+        config::Config& conf = config::Config::get();
+        IValueMap pad_inputs;
+        int64_t global_batch_size;
+        if (gather_inputs_) {
+            int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
+            last_batch_size_ = max_local_batch_size;
+            global_batch_size = max_local_batch_size * mpi::getSize();
+            pad_inputs = alignBatch(inputs, max_local_batch_size, deployment_.graph, false);
+        } else {
+            global_batch_size = last_batch_size_ = input_batch_size;
 
-        int64_t global_batch_size = max_local_batch_size * mpi::getSize();
+            if (mpi::getRank() == 0) {
+                pad_inputs = inputs;
+            } else {
+                pad_inputs = setNone(inputs);
+            }
+        }
+
         SComm& scomm = SComm::get();
         scomm.startFwd(global_batch_size);
 
         std::function<void(int64_t)> set_bs = [&scomm](size_t batch_size) {
                     return scomm.startFwd(batch_size);
                 };
-
         auto outputs = compute(id, false, global_batch_size, pad_inputs, set_bs, deployment_.fwd_in_routes, deployment_.fwd_out_routes);
-
-        outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);
 
         const auto &output_names = deployment_.graph->getOutputNames();
         assert(output_names.size() == 1);
-        assert(contains(outputs, output_names.front()));
-
-        auto output_value = outputs.at(output_names.front());
-
+        torch::jit::IValue output_value;
+        if (gather_inputs_) {
+            outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);
+            assert(contains(outputs, output_names.front()));
+            output_value = outputs.at(output_names.front());
+        } else {
+            if (mpi::getRank() == 0) {
+                assert(contains(outputs, output_names.front()));
+                output_value = outputs.at(output_names.front());
+            }
+            SComm& scomm = SComm::get();
+            output_value = scomm.bcastIValue(output_value, bcast_route_);
+        }
         time_counter_.stop("GraphLauncher::forward");
         logger->trace("GraphLauncher::forward finished");
 
@@ -305,25 +373,38 @@ namespace rannc {
         if (input_batch_size < 0) { // maybe loss
             input_batch_size = last_batch_size_;
         }
-        int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
-        const auto pad_inputs = alignBatch(inputs, max_local_batch_size, deployment_.graph, true);
 
-        int64_t global_batch_size = max_local_batch_size * mpi::getSize();
-
-        // Scale if a batch
-        // loss value is scaled by scommtensor
+        config::Config& conf = config::Config::get();
         IValueMap scaled_inputs;
-        for (const auto& route: deployment_.bwd_in_routes) {
-            double scale = getDpRatio(global_batch_size, mpi::getAllRanks(), mpi::getRank());
-            scaled_inputs[route.location] = transformTensorsInIValue(pad_inputs.at(route.location),
-                    [scale](const at::Tensor& t){
-                const auto& dim = getTensorDim(t);
-                if (dim.empty()) {
-                    return t;
-                }
-                torch::NoGradGuard no_grad;
-                return t.mul(scale).detach();
-            });
+        int64_t global_batch_size;
+        if (gather_inputs_) {
+            int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
+            const auto pad_inputs = alignBatch(inputs, max_local_batch_size, deployment_.graph, true);
+            global_batch_size = max_local_batch_size * mpi::getSize();
+
+            // Scale if a batch
+            // loss value is scaled by scommtensor
+            for (const auto& route: deployment_.bwd_in_routes) {
+                double scale = getDpRatio(global_batch_size, mpi::getAllRanks(), mpi::getRank());
+                scaled_inputs[route.location] = transformTensorsInIValue(
+                        pad_inputs.at(route.location),
+                        [scale](const at::Tensor& t){
+                            const auto& dim = getTensorDim(t);
+                            if (dim.empty()) {
+                                return t;
+                            }
+                            torch::NoGradGuard no_grad;
+                            return t.mul(scale).detach();
+                        });
+            }
+        } else {
+            global_batch_size = input_batch_size;
+
+            if (mpi::getRank() == 0) {
+                scaled_inputs = inputs;
+            } else {
+                scaled_inputs = setNone(inputs);
+            }
         }
 
         SComm& scomm = SComm::get();
@@ -332,7 +413,14 @@ namespace rannc {
         };
         auto outputs = compute(id, true, global_batch_size, scaled_inputs, set_bs, deployment_.bwd_in_routes, deployment_.bwd_out_routes);
 
-        outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);
+        if (gather_inputs_) {
+            outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);
+        } else {
+            if (mpi::getRank() == 0) {
+                outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);
+            }
+            outputs = scomm.bcastIValueMap(outputs, bcast_route_);
+        }
 
         time_counter_.stop("GraphLauncher::backward");
         logger->trace("GraphLauncher::backward finished");

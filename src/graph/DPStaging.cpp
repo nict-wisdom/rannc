@@ -178,6 +178,15 @@ namespace rannc {
                                  });
     }
 
+
+    std::string DPStaging::makeCommBufSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num) {
+        return doMakeNodeSummary(graph, dev_num, pipeline_num, "[Comm buf]",
+                                 [pipeline_num](const GraphProfile &prof, const MLNode &node, size_t repl) {
+                                     size_t comm_buf = calcCommBufSize(node.graph, pipeline_num);
+                                     return comm_buf / repl;
+                                 });
+    }
+
     long DPStaging::estimateTime(const AllocSolution &sol) {
 
         std::unordered_map<std::string, long> fwd_times;
@@ -252,8 +261,16 @@ namespace rannc {
         }
         int node_num_total = dev_num / dev_per_node;
 
-        logger->trace(makeNodeEvalSummary(graph, dev_num, min_pipeline_num));
-        logger->trace(makeNodeMemSummary(graph, dev_num, min_pipeline_num));
+        if (config::Config::get().getVal<bool>(config::SHOW_DP_SUMMARY)) {
+//            size_t idx = 0;
+//            for (const auto& n: graph.nodes) {
+//                logger->trace("{} {}", idx++, toString(*n.graph));
+//            }
+
+            logger->trace(makeNodeEvalSummary(graph, dev_num, min_pipeline_num));
+            logger->trace(makeNodeMemSummary(graph, dev_num, min_pipeline_num));
+//            logger->trace(makeCommBufSummary(graph, dev_num, min_pipeline_num));
+        }
 
         std::vector <AllocSolution> pl_sols;
 
@@ -372,6 +389,7 @@ namespace rannc {
         size_t layer_num = nodes.size();
         const int min_pipeline_bs = config::Config::get().getVal<int>(config::MIN_PIPELINE_BS);
         const bool limit_dev_num_pot = config::Config::get().getVal<bool>(config::LIMIT_DEV_NUM_POT);
+        const bool limit_dev_num_more_than_bs = config::Config::get().getVal<bool>(config::LIMIT_DEV_NUM_MORE_THAN_BS);
 
         // 3-dimensional table
         // table[stage][boundary][used_dev]
@@ -430,13 +448,15 @@ namespace rannc {
                         for (size_t d_prev = (s - 1); d_prev < d_prev_limit; d_prev++) {
 
                             size_t max_d = ceil(batch_size_ / (double) (replica_num * pipeline_num));
-                            if (max_d < (d - d_prev)) {
-                                logger->trace(
-                                        "Skip dev_num: stage_num={} s={} b={} d={} b_prev={} d_prev={} bs={} repl={} pl={}",
-                                        stage_num, s, b, d, b_prev, d_prev,
-                                        batch_size_, replica_num, pipeline_num);
-                                skip_small_bs = true;
-                                continue;
+                            if (limit_dev_num_more_than_bs) {
+                                if (max_d < (d - d_prev)) {
+                                    logger->trace(
+                                            "Skip dev_num: stage_num={} s={} b={} d={} b_prev={} d_prev={} bs={} repl={} pl={}",
+                                            stage_num, s, b, d, b_prev, d_prev,
+                                            batch_size_, replica_num, pipeline_num);
+                                    skip_small_bs = true;
+                                    continue;
+                                }
                             }
 
                             if (limit_dev_num_pot) {
@@ -576,8 +596,9 @@ namespace rannc {
             }
         }
 
+        logger->trace("DP summary (dev_num_per_group={} pipeline_num={})", dev_num_per_group, pipeline_num);
         for (size_t s = 1; s <= stage_num; s++) {
-            logger->trace("DPTable stage {}/{}", s, stage_num);
+            logger->trace("DP table: stage {}/{}", s, stage_num);
             size_t b_start = s == stage_num ? layer_num : s;
             for (size_t b = b_start; b <= layer_num - stage_num + s; b++) {
                 std::vector<long> evals;

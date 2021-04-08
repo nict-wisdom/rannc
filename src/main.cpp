@@ -134,9 +134,9 @@ PYBIND11_MODULE(_pyrannc, m) {
                             const py::function& fwdFunc,
                             const std::vector<py::tuple>& params, const std::vector<py::tuple>& buffers,
                             const py::function& var_lookup_fn,
-                            const py::args& args) {
+                            bool gather_inputs, const py::args& args) {
                 try {
-                    return self.init(fwdFunc, params, buffers, var_lookup_fn, args);
+                    return self.init(fwdFunc, params, buffers, var_lookup_fn, args, gather_inputs);
                 } catch (c10::Error& e) {
                     std::cerr << "Torch exception caught: " << e.what() << std::endl;
                     MPI_Abort(MPI_COMM_WORLD, -1);

@@ -98,6 +98,7 @@ namespace rannc {
         void sendIValue(const torch::jit::IValue& ivalue, const RouteDP& route);
         torch::jit::IValue recvIValue(const RouteDP& route);
         torch::jit::IValue bcastIValue(const torch::jit::IValue& ivalue, const RouteDP& route);
+        IValueMap bcastIValueMap(const IValueMap& ivalue_map, const RouteDP& route);
 
         torch::jit::IValue distribute(const torch::jit::IValue& tensor, const RouteDP& route, bool is_bwd,
                 int split_delay=0);

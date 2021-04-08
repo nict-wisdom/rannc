@@ -28,11 +28,13 @@ namespace rannc {
                 std::shared_ptr<ParamStorage> param_storage,
                 std::shared_ptr<GraphValueStorage> value_storage,
                 const FunctionStorage & function_storage,
-                int pipeline_num):
+                int pipeline_num,
+                bool gather_inputs):
                 param_storage_(std::move(param_storage)),
                 value_storage_(std::move(value_storage)),
                 function_storage_(function_storage),
-                pipeline_num_(pipeline_num) {
+                pipeline_num_(pipeline_num),
+                gather_inputs_(gather_inputs) {
             enable_profiling_ = config::Config::get().getVal<bool>(config::PROFILING);
 
             time_counter_.enable(enable_profiling_);
@@ -59,10 +61,12 @@ namespace rannc {
         Deployment deployment_;
 
         std::unordered_map<std::string, std::shared_ptr<Blob>> buffer;
+        RouteDP bcast_route_;
         int64_t last_batch_size_;
 
         TimeCounter time_counter_;
         bool enable_profiling_;
+        bool gather_inputs_;
         int pipeline_num_;
 
         const std::shared_ptr<spdlog::logger> logger = getLogger("GraphLauncher");

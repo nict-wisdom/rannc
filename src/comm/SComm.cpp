@@ -389,8 +389,8 @@ namespace rannc {
         IRType ir_type = toIRType(ivalue);
         MPI_Comm communicator = getRouteCommunicator(route);
         ObjectComm& ocomm = ObjectComm::get();
-        ir_type = ocomm.bcast(ir_type, getBcastRoot(route), communicator);
         int root = getBcastRoot(route);
+        ir_type = ocomm.bcast(ir_type, root, communicator);
 
         if (ir_type.getBaseType() == IRBaseType::SCALAR) {
             return bcastPrimitive(ivalue, ir_type, root, communicator);
@@ -402,6 +402,30 @@ namespace rannc {
             return torch::jit::IValue();
         }
         throw std::invalid_argument("bcastIValue does not support type: " + toString(ir_type.getBaseType()));
+    }
+
+    IValueMap SComm::bcastIValueMap(const IValueMap& ivalue_map, const RouteDP& route) {
+        std::vector<IValueLocation> locs;
+        locs.reserve(ivalue_map.size());
+        for (const auto& it: ivalue_map) {
+            locs.push_back(it.first);
+        }
+
+        ObjectComm& ocomm = ObjectComm::get();
+        int root = getBcastRoot(route);
+        MPI_Comm communicator = getRouteCommunicator(route);
+        locs = ocomm.bcast(locs, root, communicator);
+
+        IValueMap results;
+        assert(!route.sources.empty());
+        for (const auto& loc: locs) {
+            if (mpi::getRank() == route.sources.front()) {
+                results[loc] = bcastIValue(ivalue_map.at(loc), route);
+            } else {
+                results[loc] = bcastIValue(torch::jit::IValue(), route);
+            }
+        }
+        return results;
     }
 
     torch::jit::IValue SComm::distributeBatchTensor(const torch::jit::IValue& val, const IRType& global_type,

@@ -133,7 +133,8 @@ namespace rannc {
 
     std::vector<long> RaNNCModule::init(const py::function& fwdFunc,
                                         const std::vector<py::tuple>& py_params, const std::vector<py::tuple>& py_buffers,
-                                        const py::function& var_lookup_fn, const py::args& args) {
+                                        const py::function& var_lookup_fn, const py::args& args,
+                                        bool gather_inputs) {
 
         std::unordered_map<long, at::Tensor> param_id_map;
 
@@ -153,7 +154,7 @@ namespace rannc {
 
         std::vector<torch::jit::IValue> input_ivals = torch::jit::_toTypeInferredIValue(args).toTuple()->elements();
         int64_t local_batch_size = guessBatchSize(input_ivals);
-        int64_t batch_size = mpi::allReduceSumBatchSize(local_batch_size);
+        int64_t batch_size = gather_inputs ? mpi::allReduceSumBatchSize(local_batch_size) : local_batch_size;
 
         if (mpi::isMaster()) {
             logger->info("Tracing model ...");
@@ -377,7 +378,8 @@ namespace rannc {
         driver_ = std::make_shared<GraphLauncher>(
                         param_storage_, value_storage,
                         function_storage,
-                        deployment_.pipeline_num);
+                        deployment_.pipeline_num,
+                        gather_inputs);
         logger->debug("Calling driver->deployGraph");
         driver_->deployGraph(deployment_);
         logger->debug("Finished calling driver->deployGraph");

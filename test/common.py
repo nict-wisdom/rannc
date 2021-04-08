@@ -24,15 +24,20 @@ def get_dataset_default(dataset_size, input_dim, output_dim):
     return ds_x, ds_tgt
 
 
-def get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset):
+def get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs):
     DATASET_SIZE = pyrannc.get_world_size() * batch_size_per_proc * num_iter
     if get_dataset is None:
         get_dataset = get_dataset_default
     ds_x, ds_tgt = get_dataset(DATASET_SIZE, input_dim, output_dim)
     ds = torch.utils.data.TensorDataset(ds_x, ds_tgt)
-    sampler = torch.utils.data.distributed.DistributedSampler(ds, num_replicas=pyrannc.get_world_size(), rank=pyrannc.get_rank(), shuffle=False)
+    sampler = torch.utils.data.distributed.DistributedSampler(ds, num_replicas=pyrannc.get_world_size(), rank=pyrannc.get_rank(), shuffle=False) if gather_inputs else torch.utils.data.SequentialSampler(ds)
     data_loader = torch.utils.data.DataLoader(ds, batch_size=batch_size_per_proc, sampler=sampler)
     return data_loader
+
+
+def compare_tensors(v1, v2, rtol, atol):
+    np.testing.assert_equal(v1.size(), v2.size())
+    np.testing.assert_allclose(v1.tolist(), v2.tolist(), rtol=rtol, atol=atol)
 
 
 def do_compare_params(model_exp, model_act, f, fp16, rtol, atol):
@@ -41,8 +46,7 @@ def do_compare_params(model_exp, model_act, f, fp16, rtol, atol):
 
     for n, rp in actual_params.items():
         p = expected_params[n]
-        np.testing.assert_equal(f(rp).size(), f(p).size())
-        np.testing.assert_allclose(f(rp).tolist(), f(p).tolist(), rtol=rtol, atol=atol)
+        compare_tensors(f(rp), f(p), rtol, atol)
 
 
 def compare_params(model_exp, model_act, fp16, rtol, atol):
@@ -86,8 +90,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-    data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset)
-
     model = copy.deepcopy(model_base)
     model = model.to(device)
     ddp_model = None
@@ -118,10 +120,15 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if "check_unused_values" in kwargs:
         module_args["check_unused_values"] = kwargs["check_unused_values"]
 
+    gather_inputs = True
+    if "gather_inputs" in kwargs:
+        gather_inputs = module_args["gather_inputs"] = kwargs["gather_inputs"]
+
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=fp16, **module_args)
 
     compare_params(model, rmodel, fp16, rtol, atol)
 
+    data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for x, tgt in data_loader:
         # Create test input
         x = x.to(device)
@@ -131,8 +138,11 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             jit_model = trace(model, x, tgt)
             reset_running_stats(model)
             if has_param:
-                ddp_model = torch.nn.parallel.DistributedDataParallel(jit_model, device_ids=[device],
-                                                                      output_device=device)
+                if gather_inputs:
+                    ddp_model = torch.nn.parallel.DistributedDataParallel(jit_model, device_ids=[device],
+                                                                          output_device=device)
+                else:
+                    ddp_model = jit_model
             else:
                 ddp_model = jit_model
 
@@ -143,8 +153,8 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         r_out = fwd(rmodel, x, tgt)
 
         # Verify the equality of outputs
-        np.testing.assert_equal(r_out.size(), agg_out.size())
-        np.testing.assert_allclose(r_out.tolist(), agg_out.tolist(), rtol=rtol, atol=atol)
+        if gather_inputs or pyrannc.get_rank() == 0:
+            compare_tensors(r_out, agg_out, rtol, atol)
 
         # Create test target
         if has_param:
@@ -181,8 +191,8 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         agg_out = aggregate(p_out)
         r_out = fwd(rmodel, x, tgt)
 
-        np.testing.assert_equal(r_out.size(), agg_out.size())
-        np.testing.assert_allclose(r_out.tolist(), agg_out.tolist(), rtol=rtol, atol=atol)
+        if gather_inputs or pyrannc.get_rank() == 0:
+            compare_tensors(r_out, agg_out, rtol, atol)
 
     pyrannc.clear()
 

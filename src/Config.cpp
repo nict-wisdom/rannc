@@ -63,9 +63,11 @@ namespace rannc {
         const char MIN_PIPELINE_BS[] = "min_pipeline_bs";
         const char COARSEN_BY_TIME[] = "coarsen_by_time";
         const char LIMIT_DEV_NUM_POT[] = "limit_dev_num_pot";
+        const char LIMIT_DEV_NUM_MORE_THAN_BS[] = "limit_dev_num_more_than_bs";
         const char VERIFY_PARTITIONING[] = "verify_partitioning";
         const char ALLOC_REPL_FLAT[] = "alloc_repl_flat";
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
+        const char SHOW_DP_SUMMARY[] = "show_dp_summary";
 
         const char CONF_DIR[] = "conf_dir";
 
@@ -148,9 +150,11 @@ namespace rannc {
                     makeConfigItem(MIN_PIPELINE_BS, 1),
                     makeConfigItem(COARSEN_BY_TIME, true),
                     makeConfigItem(LIMIT_DEV_NUM_POT, true),
+                    makeConfigItem(LIMIT_DEV_NUM_MORE_THAN_BS, true),
                     makeConfigItem(VERIFY_PARTITIONING, false),
                     makeConfigItem(ALLOC_REPL_FLAT, true),
                     makeConfigItem(SYNC_ALLREDUCE, true),
+                    makeConfigItem(SHOW_DP_SUMMARY, false),
 
                     makeConfigItem(CONF_DIR, "")
             };

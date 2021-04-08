@@ -57,9 +57,11 @@ namespace rannc {
         extern const char MIN_PIPELINE_BS[];
         extern const char COARSEN_BY_TIME[];
         extern const char LIMIT_DEV_NUM_POT[];
+        extern const char LIMIT_DEV_NUM_MORE_THAN_BS[];
         extern const char VERIFY_PARTITIONING[];
         extern const char ALLOC_REPL_FLAT[];
         extern const char SYNC_ALLREDUCE[];
+        extern const char SHOW_DP_SUMMARY[];
         extern const char CONF_DIR[]; // this is special because Config itself sets this item
 
         enum class ConfigType {

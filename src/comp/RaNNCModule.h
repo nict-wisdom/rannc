@@ -38,7 +38,7 @@ namespace rannc {
 
         std::vector<long> init(const py::function& fwdFunc,
                                const std::vector<py::tuple>& py_params, const std::vector<py::tuple>& py_buffers,
-                               const py::function& var_lookup_fn, const py::args& args);
+                               const py::function& var_lookup_fn, const py::args& args, bool gather_inputs);
         bool isCheckpointingEnabled() const;
 
         void allReduceParamGrads();

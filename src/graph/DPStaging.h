@@ -37,6 +37,7 @@ namespace rannc {
                 bool checkpointing);
         std::string makeNodeEvalSummary(const MLGraph& graph, size_t dev_num, size_t pipeline_num);
         std::string makeNodeMemSummary(const MLGraph& graph, size_t dev_num, size_t pipeline_num);
+        std::string makeCommBufSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num);
         std::string doMakeNodeSummary(const MLGraph& graph, size_t dev_num, size_t pipeline_num,
                                       const std::string& label, const std::function<long(const GraphProfile& prof, const MLNode& node, size_t repl)>& f);
         ProfilerUtil prof_util_;
