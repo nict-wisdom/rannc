@@ -147,7 +147,18 @@ namespace rannc {
         // *global* batch size in the pipeline
         std::vector<int64_t> split_batch_sizes = getSplitBatchSizes(batch_size, actual_pipeline_num);
         // *local* batch size of *this split* in the pipeline
-        std::vector<int64_t> local_split_batch_sizes = getLocalSplitBatchSizes(split_batch_sizes, mpi::getSize(), mpi::getRank());
+        std::vector<int64_t> local_split_batch_sizes;
+        if (gather_inputs_) {
+            local_split_batch_sizes = getLocalSplitBatchSizes(split_batch_sizes, mpi::getSize(), mpi::getRank());
+        } else {
+            if (mpi::getRank() == 0) {
+                local_split_batch_sizes = getLocalSplitBatchSizes(split_batch_sizes, 1, 0);
+            } else {
+                for (int i=0; i<actual_pipeline_num; i++) {
+                    local_split_batch_sizes.push_back(0);
+                }
+            }
+        }
 
         /////////////////////////////////////////////////////
         // Step 1: distribute (inputs)

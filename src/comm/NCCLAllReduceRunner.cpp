@@ -217,6 +217,10 @@ namespace rannc {
     void AllReduceRunner::redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
             int64_t batch_size, const IRType& global_type, int split_index) {
 
+        if (!contains(getRanksInRoute(route), mpi::getRank())) {
+            return;
+        }
+
         const auto& global_dim = global_type.getTensorDim();
 
         assert(global_type.getBaseType() == IRBaseType::TENSOR);
