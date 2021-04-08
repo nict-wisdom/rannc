@@ -160,15 +160,20 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         if has_param:
             bwd(p_out, tgt, opt, fp16)
             bwd(r_out, tgt, r_opt, fp16)
-            compare_grads(model, rmodel, fp16, rtol, atol)
+
+            if gather_inputs or pyrannc.get_rank() == 0:
+                compare_grads(model, rmodel, fp16, rtol, atol)
+
             opt.step()
             r_opt.step()
             opt.zero_grad()
             r_opt.zero_grad()
 
-        compare_params(model, rmodel, fp16, rtol, atol)
+        if gather_inputs or pyrannc.get_rank() == 0:
+            compare_params(model, rmodel, fp16, rtol, atol)
 
-    compare_params(model, rmodel, fp16, rtol, atol)
+    if gather_inputs or pyrannc.get_rank() == 0:
+        compare_params(model, rmodel, fp16, rtol, atol)
 
     ddp_model = None
     model.eval()
