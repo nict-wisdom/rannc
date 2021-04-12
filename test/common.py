@@ -1,5 +1,4 @@
 import copy
-import random
 
 import numpy as np
 import torch
@@ -85,10 +84,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
            trace, fwd, aggregate, bwd, fp16, rtol, atol, get_dataset,
            **kwargs):
     device = torch.cuda.current_device()
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
 
     model = copy.deepcopy(model_base)
     model = model.to(device)

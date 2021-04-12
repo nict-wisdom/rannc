@@ -59,6 +59,7 @@ namespace rannc {
     int getCurrentCudaDeviceId();
     CudaDeviceInfo getCudaDeviceInfo(int id);
     void syncStream();
+    void syncDevice();
     c10::cuda::CUDAStream getStream();
     bool isDevicePointer(const void* ptr);
 }

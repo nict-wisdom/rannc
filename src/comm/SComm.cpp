@@ -641,7 +641,10 @@ namespace rannc {
         std::vector<at::Tensor> ar_buf = {src};
         TagMap& tag_map = TagMap::get();
         const auto route_ranks = getRanksInRoute(route);
-        ar.allreduce(tag_map.getRankSetTag(route_ranks), route_ranks, ar_buf);
+
+        if (contains(route_ranks, mpi::getRank())) {
+            ar.allreduce(tag_map.getRankSetTag(route_ranks), route_ranks, ar_buf);
+        }
 
         if (!contains(route.dests, mpi::getRank())) {
             return torch::jit::IValue();

@@ -92,6 +92,12 @@ namespace rannc {
         }
     }
 
+    void syncDevice() {
+        if (torch::cuda::is_available()) {
+            cudaDeviceSynchronize();
+        }
+    }
+
     c10::cuda::CUDAStream getStream() {
         if (!torch::cuda::is_available()) {
             throw std::runtime_error("Failed to get CUDA stream: CUDA is not available.");

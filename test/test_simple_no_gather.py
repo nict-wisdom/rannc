@@ -51,3 +51,4 @@ def test_loss_out(init_dist, batch_size, iteration):
     common.run_loss(models.LossOutModel(), batch_size, iteration, gather_inputs=False)
 
 
+

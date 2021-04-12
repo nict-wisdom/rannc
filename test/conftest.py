@@ -1,4 +1,6 @@
 import pytest
+import numpy as np
+import random
 import torch
 import torch.distributed as dist
 
@@ -10,6 +12,7 @@ def pytest_addoption(parser):
     parser.addoption("--world-size", action="store", default=-1)
     parser.addoption("--batch-size", action="store", default=64)
     parser.addoption("--iteration", action="store", default=2)
+    parser.addoption("--seed", action="store", default=0)
 
 
 @pytest.fixture(scope="session")
@@ -31,6 +34,12 @@ def init_dist(request):
         init_method=init_method,
         rank=rank,
         world_size=world_size)
+
+    seed = int(request.config.getoption('--seed'))
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
 
 
 @pytest.fixture

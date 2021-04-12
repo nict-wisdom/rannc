@@ -157,6 +157,7 @@ namespace rannc {
         int tag, const std::unordered_set<int>& ranks,
         const std::vector<at::Tensor>& param_grads, ncclRedOp_t red_op, bool allreduce) {
 
+        assert(contains(comm_map, tag));
         AllReduceComm* comm_info = comm_map.at(tag);
         ncclComm_t* ncomm = comm_info->comm;
 
