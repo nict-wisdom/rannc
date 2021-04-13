@@ -247,14 +247,14 @@ namespace rannc {
         return elemRoute;
     }
 
-    double getDpRatio(size_t total_batch_size, const std::unordered_set<int>& ranks, int myrank) {
-        const auto dp_split_batch_sizes = getSplitBatchSizes(total_batch_size, ranks);
+    double getDpRatio(size_t total_batch_size, const std::unordered_set<int>& ranks, int myrank, int split_index) {
+        const auto dp_split_batch_sizes = getSplitBatchSizes(total_batch_size, ranks, split_index);
         assert(contains(dp_split_batch_sizes, myrank));
         return (double) dp_split_batch_sizes.at(myrank) / total_batch_size;
     }
 
-    double getDpRatio(size_t total_batch_size, const std::vector<int>& ranks, int myrank) {
-        return getDpRatio(total_batch_size, vectorToSet(ranks), myrank);
+    double getDpRatio(size_t total_batch_size, const std::vector<int>& ranks, int myrank, int split_index) {
+        return getDpRatio(total_batch_size, vectorToSet(ranks), myrank, split_index);
     }
 
     IRType getFirstValidTensorType(const std::vector<IRType>& ir_types) {

@@ -625,12 +625,16 @@ namespace rannc {
         type.setRequiresGrad(false);
         at::Tensor src;
 
+        double src_ratio = 0;
         if (val.isNone()) {
             src = buf_cache_.get(getKey(route), type);
             src.zero_();
         } else if (val.isTensor()) {
             src = val.toTensor();
-            src = getDpRatio(batch_size, route.sources, mpi::getRank()) * src;
+            if (contains(route.sources, mpi::getRank())) {
+                src_ratio = getDpRatio(batch_size, route.sources, mpi::getRank(), split_index_);
+            }
+            src = src_ratio * src;
         } else {
             throw std::runtime_error("Unsupported tensor type for loss distribution: " + toString(toIRType(val)));
         }
@@ -652,7 +656,7 @@ namespace rannc {
 
         double ratio = 1.0;
         if (weight) {
-            ratio *= getDpRatio(batch_size, route.dests, mpi::getRank());
+            ratio *= getDpRatio(batch_size, route.dests, mpi::getRank(), split_index_);
         }
 
         return ratio * src;
