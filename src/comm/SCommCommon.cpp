@@ -30,6 +30,7 @@ namespace rannc {
             case c10::ScalarType::Float: return MPI_FLOAT;
             case c10::ScalarType::Double: return MPI_DOUBLE;
             case c10::ScalarType::Half: return MPI_SHORT;
+            case c10::ScalarType::BFloat16: return MPI_SHORT;
             default:
                 std::stringstream ss;
                 ss << "Unsupported tensor elem type: " << toString(scalarType);

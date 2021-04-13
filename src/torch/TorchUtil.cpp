@@ -34,7 +34,7 @@ namespace rannc {
 
         size_t size = std::min(max_elem, productDim(t.sizes()));
 
-        if (t.scalar_type() == c10::ScalarType::Half) {
+        if (t.scalar_type() == c10::ScalarType::Half || t.scalar_type() == c10::ScalarType::BFloat16) {
             auto float_ten = t_cpu.to(c10::ScalarType::Float, false, true).contiguous();
             return tensorPtrToString((float*)float_ten.data_ptr(), size, max_str_len);
         } else if (t.scalar_type() == c10::ScalarType::Float) {
@@ -83,7 +83,7 @@ namespace rannc {
             return tensorPtrToString(static_cast<double*>(ptr), elem_size, max_str_len);
         } else if (datatype == c10::ScalarType::Float) {
             return tensorPtrToString(static_cast<float*>(ptr), elem_size, max_str_len);
-        } else if (datatype == c10::ScalarType::Half) {
+        } else if (datatype == c10::ScalarType::Half || datatype == c10::ScalarType::BFloat16) {
             const auto ten = torch::from_blob(ptr, {(int64_t)elem_size}, datatype);
             auto float_ten = ten.to(c10::ScalarType::Float, false, true).contiguous();
             return tensorPtrToString((float*)float_ten.data_ptr(), elem_size, max_str_len);
@@ -312,6 +312,8 @@ namespace rannc {
                 return IRTensorElemType::FLOAT;
             case c10::ScalarType::Half:
                 return IRTensorElemType::HALF;
+            case c10::ScalarType::BFloat16:
+                return IRTensorElemType::BFLOAT16;
             case c10::ScalarType::Double:
                 return IRTensorElemType::DOUBLE;
             case c10::ScalarType::Byte:
@@ -521,6 +523,8 @@ namespace rannc {
                 return at::ScalarType::Float;
             case IRTensorElemType::HALF:
                 return at::ScalarType::Half;
+            case IRTensorElemType::BFLOAT16:
+                return at::ScalarType::BFloat16;
             case IRTensorElemType::LONG:
                 return at::ScalarType::Long;
             case IRTensorElemType::BOOL:

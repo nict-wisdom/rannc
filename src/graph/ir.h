@@ -29,6 +29,7 @@ namespace rannc {
         DOUBLE,
         FLOAT,
         HALF,
+        BFLOAT16,
         LONG,
         BOOL
     };

@@ -284,7 +284,8 @@ namespace rannc {
                             assert(in_v.getType().getBaseType() == IRBaseType::TENSOR);
                             if (in_v.getType().getTensorElemType() == IRTensorElemType::FLOAT) {
                                 fp32params += in_v.getSizeInByte();
-                            } else if (in_v.getType().getTensorElemType() == IRTensorElemType::HALF) {
+                            } else if (in_v.getType().getTensorElemType() == IRTensorElemType::HALF
+                                    || in_v.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
                                 fp16params += in_v.getSizeInByte();
                             } else {
                                 logger->debug("Unknown elem type of parameter {}: {}", in_name,

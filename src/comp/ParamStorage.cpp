@@ -35,7 +35,9 @@ namespace rannc {
         for (long pid: param_ids_) {
             const auto p = param_storage_->getParamTensor(pid);
             const auto stype = p.scalar_type();
-            assert(stype == at::ScalarType::Float || stype == at::ScalarType::Half);
+            assert(stype == at::ScalarType::Float
+                || stype == at::ScalarType::Half
+                || stype == at::ScalarType::BFloat16);
 
             offsets[stype][pid] = grad_elem_sum[stype];
             grad_elem_sum[stype] += p.numel();
@@ -112,12 +114,7 @@ namespace rannc {
 
         for (long pid: param_ids_) {
             auto p = param_storage_->getParamTensor(pid);
-//<<<<<<< HEAD
             const auto stype = p.scalar_type();
-//=======
-//            auto& grad = getMutableGradRef(p);
-//            auto& con_grad = grad_tensors_.at(pid);
-//>>>>>>> 460e873f383b414d65f7a0c8a6d922b2be7c19c6
 
             if (consolidate_master_params_ && stype == at::ScalarType::Half) {
                 // set to master grad

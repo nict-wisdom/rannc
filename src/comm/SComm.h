@@ -27,7 +27,7 @@ namespace rannc {
     using GroupMap = std::unordered_map<int, unique_group_ptr>;
     using CommMap = std::unordered_map<int, unique_comm_ptr>;
 
-    RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim, size_t elem_size,
+    RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim,
                              const std::unordered_set<int>& src_ranks,
                              const std::unordered_set<int>& dest_ranks, int split_index);
 

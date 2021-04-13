@@ -33,6 +33,7 @@ namespace rannc {
             case IRTensorElemType::DOUBLE: return "DOUBLE";
             case IRTensorElemType::FLOAT: return "FLOAT";
             case IRTensorElemType::HALF: return "HALF";
+            case IRTensorElemType::BFLOAT16: return "BFLOAT16";
             case IRTensorElemType::LONG: return "LONG";
             case IRTensorElemType::BOOL: return "BOOL";
         }
@@ -54,6 +55,7 @@ namespace rannc {
             case IRTensorElemType::DOUBLE: return sizeof(double);
             case IRTensorElemType::FLOAT: return sizeof(float);
             case IRTensorElemType::HALF: return sizeof(float) / 2;
+            case IRTensorElemType::BFLOAT16: return sizeof(float) / 2;
             case IRTensorElemType::LONG: return sizeof(long);
             case IRTensorElemType::BOOL: return sizeof(bool);
             case IRTensorElemType::UNDEF: break;
@@ -588,7 +590,8 @@ namespace rannc {
                         sum += val.getSizeInByte()
                                * 2 // FP32
                                * opt_param_factor;
-                    } else if (val.getType().getTensorElemType() == IRTensorElemType::FLOAT) {
+                    } else if (val.getType().getTensorElemType() == IRTensorElemType::FLOAT
+                                || val.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
                             // we have to keep memory for stashed gradients
                         sum += val.getSizeInByte() * (opt_param_factor + 1);
                     } else {

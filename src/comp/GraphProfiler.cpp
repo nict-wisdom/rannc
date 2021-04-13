@@ -354,6 +354,7 @@ namespace rannc {
 
                 if (out_t.scalar_type() == c10::ScalarType::Float
                     || out_t.scalar_type() == c10::ScalarType::Half
+                    || out_t.scalar_type() == c10::ScalarType::BFloat16
                     || out_t.scalar_type() == c10::ScalarType::Double) {
 
                     IValueLocation loc(out_name, path);

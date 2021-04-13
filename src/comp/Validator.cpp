@@ -30,7 +30,9 @@ namespace rannc {
         switch (t1.scalar_type()) {
             case c10::ScalarType::Float: return almostEqualTensorsWithTolerance<float>(t1, t2, tolerance, tolerance_ratio);
             case c10::ScalarType::Double: return almostEqualTensorsWithTolerance<double>(t1, t2, tolerance, tolerance_ratio);
-            case c10::ScalarType::Half: return almostEqualTensorsWithTolerance<float>(
+            case c10::ScalarType::Half:
+            case c10::ScalarType::BFloat16:
+                return almostEqualTensorsWithTolerance<float>(
                     t1.to(c10::ScalarType::Float, false, true),
                     t2.to(c10::ScalarType::Float, false, true),
                     tolerance, tolerance_ratio);

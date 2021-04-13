@@ -81,7 +81,7 @@ def bwd_loss_output(loss, tgt, optimizer, fp16):
 
 
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
-           trace, fwd, aggregate, bwd, fp16, rtol, atol, get_dataset,
+           trace, fwd, aggregate, bwd, dtype, use_amp, rtol, atol, get_dataset,
            **kwargs):
     device = torch.cuda.current_device()
 
@@ -93,7 +93,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     has_param = len(list(model.parameters())) > 0
     if has_param:
         opt = optim.Adam(model.parameters(), lr=lr)
-        if fp16:
+        if use_amp:
             model, opt = amp.initialize(model, opt, opt_level="O2",
                                               max_loss_scale=2.**4,
                                               min_loss_scale=1)
@@ -101,11 +101,12 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     # We copy the model for verification of parameter update.
     # You may not need to copy the model in your application.
     rmodel = copy.deepcopy(model_base)
+    rmodel.to(dtype)
 
     r_opt = None
     if has_param:
         r_opt = optim.Adam(rmodel.parameters(), lr=lr)
-        if fp16:
+        if use_amp:
             rmodel = rmodel.to(device)
             rmodel, r_opt = amp.initialize(rmodel, r_opt, opt_level="O2",
                                             max_loss_scale=2.**4,
@@ -119,9 +120,9 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if "gather_inputs" in kwargs:
         gather_inputs = module_args["gather_inputs"] = kwargs["gather_inputs"]
 
-    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=fp16, **module_args)
+    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=use_amp, **module_args)
 
-    compare_params(model, rmodel, fp16, rtol, atol)
+    compare_params(model, rmodel, use_amp, rtol, atol)
 
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for x, tgt in data_loader:
@@ -145,7 +146,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             p_out = fwd(ddp_model, x, tgt)
             agg_out = aggregate(p_out)
 
-        r_out = fwd(rmodel, x, tgt)
+        r_out = fwd(rmodel, x.to(dtype), tgt.to(dtype))
 
         # Verify the equality of outputs
         if gather_inputs or pyrannc.get_rank() == 0:
@@ -153,11 +154,11 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         # Create test target
         if has_param:
-            bwd(p_out, tgt, opt, fp16)
-            bwd(r_out, tgt, r_opt, fp16)
+            bwd(p_out, tgt, opt, use_amp)
+            bwd(r_out, tgt.to(dtype), r_opt, use_amp)
 
             if gather_inputs or pyrannc.get_rank() == 0:
-                compare_grads(model, rmodel, fp16, rtol, atol)
+                compare_grads(model, rmodel, use_amp, rtol, atol)
 
             opt.step()
             r_opt.step()
@@ -165,10 +166,10 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             r_opt.zero_grad()
 
         if gather_inputs or pyrannc.get_rank() == 0:
-            compare_params(model, rmodel, fp16, rtol, atol)
+            compare_params(model, rmodel, use_amp, rtol, atol)
 
     if gather_inputs or pyrannc.get_rank() == 0:
-        compare_params(model, rmodel, fp16, rtol, atol)
+        compare_params(model, rmodel, use_amp, rtol, atol)
 
     ddp_model = None
     model.eval()
@@ -189,7 +190,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         p_out = fwd(ddp_model, x, tgt)
         agg_out = aggregate(p_out)
-        r_out = fwd(rmodel, x, tgt)
+        r_out = fwd(rmodel, x.to(dtype), tgt.to(dtype))
 
         if gather_inputs or pyrannc.get_rank() == 0:
             compare_tensors(r_out, agg_out, rtol, atol)
@@ -198,18 +199,20 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        fp16=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
+        dtype=torch.float, use_amp=False,
+        rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
     do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
            lambda model, x, tgt: torch.jit.trace(model, (x,)),
            lambda model, x, tgt: model(x),
            lambda out: out,
            bwd_with_criterion,
-           fp16, rtol, atol, get_dataset, **kwargs)
+           dtype, use_amp, rtol, atol, get_dataset, **kwargs)
 
 
 def run_loss(model_base, batch_size_per_proc, num_iter,
-             fp16=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
+             dtype=torch.float, use_amp=False,
+             rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
              get_dataset=None, **kwargs):
     def aggregate_out_loss(out):
         tmp_loss = out.clone()
@@ -221,4 +224,4 @@ def run_loss(model_base, batch_size_per_proc, num_iter,
            lambda model, x, tgt: model(x, tgt),
            aggregate_out_loss,
            bwd_loss_output,
-           fp16, rtol, atol, get_dataset, **kwargs)
+           dtype, use_amp, rtol, atol, get_dataset, **kwargs)

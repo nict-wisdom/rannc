@@ -13,7 +13,7 @@
 
 
 namespace {
-    rannc::RedistArgs getRedistArgsSend(int my_rank, const std::vector<int64_t> &dim, size_t elem_size,
+    rannc::RedistArgs getRedistArgsSend(int my_rank, const std::vector<int64_t> &dim,
                                         const std::unordered_map<int, std::vector<int64_t>> &src_dist,
                                         const std::unordered_map<int, std::vector<int64_t>> &dest_dist,
                                         const std::vector<int> &src_ranks,
@@ -87,7 +87,7 @@ namespace {
     }
 
 
-    rannc::RedistArgs getRedistArgsRecv(int my_rank, const std::vector<int64_t> &dim, size_t elem_size,
+    rannc::RedistArgs getRedistArgsRecv(int my_rank, const std::vector<int64_t> &dim,
                                         const std::unordered_map<int, std::vector<int64_t>> &src_dist,
                                         const std::unordered_map<int, std::vector<int64_t>> &dest_dist,
                                         const std::vector<int> &src_ranks,
@@ -245,7 +245,7 @@ namespace rannc {
         assert(send_val.isTensor());
         at::Tensor send_ten = send_val.toTensor();
 
-        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim, elementSize(send_ten.scalar_type()),
+        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim,
                                                vectorToSet(route.sources), vectorToSet(route.dests), split_index_);
 
         syncStream();
@@ -292,7 +292,7 @@ namespace rannc {
         if (batch_size_ < 1) {
             batch_size_ = global_dim.front();
         }
-        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim, getTensorElemSize(global_type.getTensorElemType()),
+        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim,
                                                vectorToSet(route.sources), vectorToSet(route.dests), split_index_);
 
         at::ScalarType stype = fromIRTensorElemTypeToScalarType(global_type.getTensorElemType());
@@ -564,7 +564,7 @@ namespace rannc {
         return doDistribute(val, global_type, route, is_bwd, split_delay);
     }
 
-    rannc::RedistArgs getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim, size_t elem_size,
+    rannc::RedistArgs getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim,
                                     const std::unordered_set<int>& src_ranks,
                                     const std::unordered_set<int>& dest_ranks,
                                     int split_index) {
@@ -597,13 +597,13 @@ namespace rannc {
         bool both = send && recv;
         rannc::RedistArgs sendArgs, recvArgs, bothArgs;
         if (send) {
-            sendArgs = getRedistArgsSend(my_rank, global_dim, elem_size, src_dist, dest_dist, vec_src_ranks, vec_dest_ranks);
+            sendArgs = getRedistArgsSend(my_rank, global_dim, src_dist, dest_dist, vec_src_ranks, vec_dest_ranks);
             if (!both) {
                 return sendArgs;
             }
         }
         if (recv) {
-            recvArgs = getRedistArgsRecv(my_rank, global_dim, elem_size, src_dist, dest_dist, vec_src_ranks, vec_dest_ranks);
+            recvArgs = getRedistArgsRecv(my_rank, global_dim, src_dist, dest_dist, vec_src_ranks, vec_dest_ranks);
             if (!both) {
                 return recvArgs;
             }

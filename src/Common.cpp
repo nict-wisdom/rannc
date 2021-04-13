@@ -95,6 +95,7 @@ namespace rannc {
         switch (tensor_elem_type) {
             case IRTensorElemType::FLOAT:
             case IRTensorElemType::HALF:
+            case IRTensorElemType::BFLOAT16:
             case IRTensorElemType::DOUBLE:
             case IRTensorElemType::UNDEF:
                 return true;

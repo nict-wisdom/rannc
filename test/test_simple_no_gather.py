@@ -41,11 +41,6 @@ def test_function(init_dist, batch_size, iteration):
     common.run(models.FunctionModel(), batch_size, iteration, get_dataset=models.FunctionModel.get_dataset, gather_inputs=False)
 
 
-# def test_identity(init_dist, batch_size, iteration):
-#     print("test_identity")
-#     common.run(models.IdentityModel(), batch_size, iteration)
-
-
 def test_loss_out(init_dist, batch_size, iteration):
     print("test_loss_out")
     common.run_loss(models.LossOutModel(), batch_size, iteration, gather_inputs=False)

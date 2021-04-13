@@ -125,6 +125,7 @@ namespace rannc {
         ncclDataType_t datatype;
         switch (t.scalar_type()) {
             case at::ScalarType::Half: datatype = ncclFloat16; break;
+            case at::ScalarType::BFloat16: datatype = ncclFloat16; break;
             case at::ScalarType::Float: datatype = ncclFloat32; break;
             case at::ScalarType::Double: datatype = ncclFloat64; break;
             case at::ScalarType::Int: datatype = ncclInt32; break;
@@ -141,6 +142,7 @@ namespace rannc {
         ncclDataType_t datatype;
         switch (t) {
             case IRTensorElemType::HALF: datatype = ncclFloat16; break;
+            case IRTensorElemType::BFLOAT16: datatype = ncclFloat16; break;
             case IRTensorElemType::FLOAT: datatype = ncclFloat32; break;
             case IRTensorElemType::DOUBLE: datatype = ncclFloat64; break;
             case IRTensorElemType::INT: datatype = ncclInt32; break;
@@ -174,8 +176,22 @@ namespace rannc {
         ss << "nccl_allreduce_tag_" << tag << "_elem_" << elem_sum;
         recordStart(ss.str());
 
+        std::vector<at::Tensor> param_grads_buf;
+        param_grads_buf.reserve(param_grads.size());
+        std::unordered_set<size_t> bf16_idx;
+        for (size_t i=0; i<param_grads.size() ;i++) {
+            const auto& grad = param_grads.at(i);
+            if (grad.scalar_type() == c10::ScalarType::BFloat16) {
+                const auto f_grad = grad.to(c10::ScalarType::Float);
+                param_grads_buf.push_back(f_grad);
+                bf16_idx.insert(i);
+            } else {
+                param_grads_buf.push_back(grad);
+            }
+        }
+
         ncclGroupStart();
-        for (const auto& grad: param_grads) {
+        for (const auto& grad: param_grads_buf) {
             assert(grad.is_contiguous());
             void* ptr = grad.data_ptr();
             ncclDataType_t datatype = getNcclDataType(grad);
@@ -191,6 +207,14 @@ namespace rannc {
         }
         ncclGroupEnd();
         syncStream();
+
+        for (size_t i=0; i<param_grads.size() ;i++) {
+            if (contains(bf16_idx, i)) {
+                auto& grad = param_grads.at(i);
+                auto& grad_buf = param_grads_buf.at(i);
+                grad.copy_(grad_buf);
+            }
+        }
 
         recordEnd(ss.str());
     }
@@ -228,12 +252,10 @@ namespace rannc {
 
         // Special case for bool
         bool convert_bool = global_type.getTensorElemType() == IRTensorElemType::BOOL;
-        const auto& elem_type = convert_bool ?
-                    IRTensorElemType::INT : global_type.getTensorElemType();
+        const auto& elem_type = convert_bool ? IRTensorElemType::INT : global_type.getTensorElemType();
 
-        const auto elem_size = getTensorElemSize(elem_type);
         const auto redist_args = getRedistArgs(mpi::getRank(), batch_size, global_dim,
-               elem_size, vectorToSet(route.sources), vectorToSet(route.dests), split_index);
+               vectorToSet(route.sources), vectorToSet(route.dests), split_index);
 
         void* tmp_send_ptr = send_ptr;
         void* tmp_recv_ptr = recv_ptr;
@@ -272,6 +294,7 @@ namespace rannc {
         ncclComm_t* ncomm = comm_info->comm;
         ncclDataType_t datatype = getNcclDataType(elem_type);
 
+        const auto elem_size = getTensorElemSize(elem_type);
         job_executor_.addCommJob([n_ranks, redist_args, my_local_rank, tmp_send_ptr, tmp_recv_ptr, datatype,
                                   elem_size, ncomm, split_index, send_count_sum]() {
 
@@ -300,7 +323,6 @@ namespace rannc {
 
         int sc_local = redist_args.sendcounts[my_local_rank];
         if (sc_local > 0) {
-            int rc_local = redist_args.recvcounts[my_local_rank];
             cudaMemcpyAsync((char *) tmp_recv_ptr + redist_args.rdispls[my_local_rank] * elem_size,
                        (char *) tmp_send_ptr + redist_args.sdispls[my_local_rank] * elem_size,
                        sc_local * elem_size, cudaMemcpyDeviceToDevice, (cudaStream_t) getStream());
@@ -330,11 +352,11 @@ namespace rannc {
     void AllReduceRunner::startBulk() {
         job_executor_.setRunImmediate(false);
     }
+
     void AllReduceRunner::endBulk() {
         job_executor_.flush();
         job_executor_.setRunImmediate(true);
     }
-
 
     std::string AllReduceRunner::getImplName() {
         return "NCCL";
