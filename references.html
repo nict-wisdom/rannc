@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>API references &mdash; RaNNC 0.5.0 documentation</title>
+  <title>API references &mdash; RaNNC 0.5.1 documentation</title>
   
 
   
@@ -165,13 +165,14 @@
 <span id="api-references"></span><h1>API references<a class="headerlink" href="#module-pyrannc" title="Permalink to this headline">¶</a></h1>
 <dl class="py class">
 <dt id="pyrannc.RaNNCModule">
-<em class="property">class </em><code class="sig-prename descclassname">pyrannc.</code><code class="sig-name descname">RaNNCModule</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model</span></em>, <em class="sig-param"><span class="n">optimizer</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">load_deployment</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">use_amp_master_params</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">allreduce_amp_master_param</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">check_unused_values</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">pyrannc.</code><code class="sig-name descname">RaNNCModule</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model</span></em>, <em class="sig-param"><span class="n">optimizer</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">gather_inputs</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">load_deployment</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">use_amp_master_params</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">allreduce_amp_master_param</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">check_unused_values</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule" title="Permalink to this definition">¶</a></dt>
 <dd><p>Computes a PyTorch model on multiple GPUs with a hybrid parallelism.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>model</strong> – Model to distribute.</p></li>
 <li><p><strong>optimizer</strong> – Optimizer that should work with RaNNC.</p></li>
+<li><p><strong>gather_inputs</strong> – Set <code class="docutils literal notranslate"><span class="pre">False</span></code> if model uses inputs given on rank 0.</p></li>
 <li><p><strong>use_amp_master_params</strong> – Set <code class="docutils literal notranslate"><span class="pre">True</span></code> if <code class="docutils literal notranslate"><span class="pre">model</span></code> is processed by <a class="reference external" href="https://nvidia.github.io/apex/amp.html">Apex AMP</a>.</p></li>
 <li><p><strong>allreduce_amp_master_param</strong> – Set <code class="docutils literal notranslate"><span class="pre">True</span></code> to allreduce gradients of master parameters of Apex AMP.</p></li>
 <li><p><strong>check_unused_values</strong> – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, RaNNC throws an exception when it finds unused values in a computation graph.</p></li>
