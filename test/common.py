@@ -80,6 +80,12 @@ def bwd_loss_output(loss, tgt, optimizer, fp16):
     backward_loss(loss, optimizer, fp16)
 
 
+def convert_dtype(t, dtype):
+    if t.is_floating_point():
+        return t.to(dtype)
+    return t
+
+
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
            trace, fwd, aggregate, bwd, dtype, use_amp, rtol, atol, get_dataset,
            **kwargs):
@@ -146,7 +152,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             p_out = fwd(ddp_model, x, tgt)
             agg_out = aggregate(p_out)
 
-        r_out = fwd(rmodel, x.to(dtype), tgt.to(dtype))
+        r_out = fwd(rmodel, convert_dtype(x, dtype), convert_dtype(tgt, dtype))
 
         # Verify the equality of outputs
         if gather_inputs or pyrannc.get_rank() == 0:
@@ -155,7 +161,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         # Create test target
         if has_param:
             bwd(p_out, tgt, opt, use_amp)
-            bwd(r_out, tgt.to(dtype), r_opt, use_amp)
+            bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
             if gather_inputs or pyrannc.get_rank() == 0:
                 compare_grads(model, rmodel, use_amp, rtol, atol)
@@ -190,7 +196,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         p_out = fwd(ddp_model, x, tgt)
         agg_out = aggregate(p_out)
-        r_out = fwd(rmodel, x.to(dtype), tgt.to(dtype))
+        r_out = fwd(rmodel, convert_dtype(x, dtype), convert_dtype(tgt, dtype))
 
         if gather_inputs or pyrannc.get_rank() == 0:
             compare_tensors(r_out, agg_out, rtol, atol)
