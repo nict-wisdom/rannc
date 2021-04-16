@@ -94,14 +94,15 @@ set(RANNC_SRCS
         src/comm/SComm.cpp
         src/comm/SCommCommon.cpp
         src/comm/SCommPrimitive.cpp
+        src/comm/NCCLAllReduceRunner.cpp
         src/torch/IValueLocation.cpp
         src/torch/TorchDriver.cpp
         src/torch/TorchUtil.cpp)
 
-if(NO_NCCL)
-    list(APPEND RANNC_SRCS src/comm/MPIAllReduceRunner.cpp)
-else()
-    list(APPEND RANNC_SRCS src/comm/NCCLAllReduceRunner.cpp)
+option(NCCL_SUPPORTS_BFLOAT16 "Enable Bfloat16 support of NCCL." off)
+if(NCCL_SUPPORTS_BFLOAT16)
+    message("Enabling NCCL's Bfloat16 support.")
+    add_definitions(-D__NCCL_SUPPORTS_BFLOAT16__)
 endif()
 
 pybind11_add_module(_pyrannc ${RANNC_SRCS})

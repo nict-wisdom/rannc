@@ -121,15 +121,20 @@ namespace rannc {
         buf_cache_.clear();
     }
 
-    ncclDataType_t getNcclDataType(const at::Tensor& t) {
+    ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
         ncclDataType_t datatype;
         switch (t.scalar_type()) {
             case at::ScalarType::Half: datatype = ncclFloat16; break;
-            case at::ScalarType::BFloat16: datatype = ncclFloat16; break;
             case at::ScalarType::Float: datatype = ncclFloat32; break;
             case at::ScalarType::Double: datatype = ncclFloat64; break;
             case at::ScalarType::Int: datatype = ncclInt32; break;
             case at::ScalarType::Long: datatype = ncclInt64; break;
+
+#if defined(__NCCL_SUPPORTS_BFLOAT16__)
+            case at::ScalarType::BFloat16: datatype = ncclBfloat16; break;
+#else
+            case at::ScalarType::BFloat16: datatype = ncclFloat32; break;
+#endif
             default:
                 std::stringstream ss;
                 ss << "Unsupported type given to NCCL: " << toString(t.scalar_type());
@@ -138,15 +143,21 @@ namespace rannc {
         return datatype;
     }
 
-    ncclDataType_t getNcclDataType(const IRTensorElemType t) {
+    ncclDataType_t getRedistNcclDataType(const IRTensorElemType t) {
         ncclDataType_t datatype;
         switch (t) {
             case IRTensorElemType::HALF: datatype = ncclFloat16; break;
-            case IRTensorElemType::BFLOAT16: datatype = ncclFloat16; break;
             case IRTensorElemType::FLOAT: datatype = ncclFloat32; break;
             case IRTensorElemType::DOUBLE: datatype = ncclFloat64; break;
             case IRTensorElemType::INT: datatype = ncclInt32; break;
             case IRTensorElemType::LONG: datatype = ncclInt64; break;
+
+#if defined(__NCCL_SUPPORTS_BFLOAT16__)
+            case IRTensorElemType::BFLOAT16: datatype = ncclBfloat16; break;
+#else
+            case IRTensorElemType::BFLOAT16: datatype = ncclFloat16; break;
+#endif
+
             default:
                 std::stringstream ss;
                 ss << "Unsupported type given to NCCL: " << toString(t);
@@ -176,6 +187,9 @@ namespace rannc {
         ss << "nccl_allreduce_tag_" << tag << "_elem_" << elem_sum;
         recordStart(ss.str());
 
+#if defined(__NCCL_SUPPORTS_BFLOAT16__)
+        const std::vector<at::Tensor>& param_grads_buf = param_grads;
+#else
         std::vector<at::Tensor> param_grads_buf;
         param_grads_buf.reserve(param_grads.size());
         std::unordered_set<size_t> bf16_idx;
@@ -189,12 +203,12 @@ namespace rannc {
                 param_grads_buf.push_back(grad);
             }
         }
-
+#endif
         ncclGroupStart();
         for (const auto& grad: param_grads_buf) {
             assert(grad.is_contiguous());
             void* ptr = grad.data_ptr();
-            ncclDataType_t datatype = getNcclDataType(grad);
+            ncclDataType_t datatype = getReduceNcclDataType(grad);
             if (allreduce) {
 //                spdlog::info("nccl_allreduce calling tag={} count={} stype={}", tag, getTensorElemCount(grad), toString(grad.scalar_type()));
                 ncclAllReduce(ptr, ptr, getTensorElemCount(grad), datatype, red_op, *ncomm,
@@ -208,6 +222,7 @@ namespace rannc {
         ncclGroupEnd();
         syncStream();
 
+#if not defined(__NCCL_SUPPORTS_BFLOAT16__)
         for (size_t i=0; i<param_grads.size() ;i++) {
             if (contains(bf16_idx, i)) {
                 auto& grad = param_grads.at(i);
@@ -215,6 +230,7 @@ namespace rannc {
                 grad.copy_(grad_buf);
             }
         }
+#endif
 
         recordEnd(ss.str());
     }
@@ -292,7 +308,7 @@ namespace rannc {
         assert(contains(comm_map_, tag));
         AllReduceComm* comm_info = comm_map_.at(tag);
         ncclComm_t* ncomm = comm_info->comm;
-        ncclDataType_t datatype = getNcclDataType(elem_type);
+        ncclDataType_t datatype = getRedistNcclDataType(elem_type);
 
         const auto elem_size = getTensorElemSize(elem_type);
         job_executor_.addCommJob([n_ranks, redist_args, my_local_rank, tmp_send_ptr, tmp_recv_ptr, datatype,
