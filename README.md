@@ -18,7 +18,7 @@ the number of processes matches the number of available GPUs.
 
 ```python
 model = Net()                  # Define a network
-model.to(torch.device("cuda")) # Move paramsters to a cuda device
+model.to(torch.device("cuda")) # Move parameters to a cuda device
 optimizer = optim.Adam(model.parameters(), lr=0.01) # Define an optimizer
 model = pyrannc.RaNNCModule(model, optimizer)  ##### Wrap by RaNNCModule #####
 loss = model(input)            # Run a forward pass

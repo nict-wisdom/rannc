@@ -63,7 +63,7 @@ namespace rannc {
     std::vector<IValueLocation> getKeys(const IValueMap &map);
 
     enum class IRTensorElemType;
-    IRTensorElemType toTensorElemType(const at::ScalarType& scalarType);
+    IRTensorElemType toTensorElemType(const c10::ScalarType& scalarType);
     class IRType;
     IRType toIRType(const torch::jit::TypePtr& type);
     IRType toIRType(const torch::jit::IValue& ivalue);

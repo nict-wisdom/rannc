@@ -83,7 +83,6 @@ namespace rannc {
 
             grad_tensors_[pid] = consolidated_grads_[stype].narrow(0, offset, p.numel())
                     .view(p.sizes()).detach();
-
             if (stype == at::ScalarType::Float
                     && use_amp_master_params_
                     && contains(consolidated_grads_, at::ScalarType::Float)) {

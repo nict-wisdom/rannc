@@ -300,7 +300,7 @@ namespace rannc {
         return locs;
     }
 
-    IRTensorElemType toTensorElemType(const at::ScalarType &scalarType) {
+    IRTensorElemType toTensorElemType(const c10::ScalarType &scalarType) {
         switch (scalarType) {
             case c10::ScalarType::Int:
                 return IRTensorElemType::INT;
@@ -336,7 +336,7 @@ namespace rannc {
                 break;
         }
         std::stringstream ss;
-        ss << "Failed to convert at::ScalarType to IRTensorElemType: " << c10::toString(scalarType);
+        ss << "Failed to convert c10::ScalarType to IRTensorElemType: " << c10::toString(scalarType);
         throw std::invalid_argument(ss.str());
     }
 
