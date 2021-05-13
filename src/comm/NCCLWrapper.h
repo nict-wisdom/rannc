@@ -50,6 +50,8 @@ namespace rannc {
         void reduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads);
         void redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
                     int64_t batch_size, const IRType& global_type, int split_index);
+        void bcast(int tag, const std::unordered_set<int>& ranks, int root,
+                                const std::vector<at::Tensor>& tensors);
         void startBulk();
         void endBulk();
 
@@ -74,7 +76,7 @@ namespace rannc {
         BufferTensorCache buf_cache_;
         NCCLBulkJobExecutor job_executor_;
 
-        std::shared_ptr<spdlog::logger> logger = getLogger("AllReduceRunner");
+        std::shared_ptr<spdlog::logger> logger = getLogger("NCCLWrapper");
     };
 }
 

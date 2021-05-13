@@ -7,6 +7,8 @@
 
 #include <torch/torch.h>
 
+#include "graph/ir.h"
+
 namespace rannc {
 
     class ZeroParamLocator {
@@ -31,6 +33,9 @@ namespace rannc {
         std::unordered_map<long, at::Tensor> params_;
         std::unordered_map<int, int64_t> sizes_;
         std::unordered_map<long, int> owners_;
+
+        std::unordered_map<long, std::vector<int64_t>> shapes_;
+        std::unordered_map<long, IRTensorElemType> elem_types_;
     };
 }
 

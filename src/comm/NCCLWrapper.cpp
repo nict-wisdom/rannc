@@ -249,6 +249,40 @@ namespace rannc {
         doReduce(comm_map_, tag, ranks, param_grads, ncclMin, true);
     }
 
+    void NCCLWrapper::bcast(int tag, const std::unordered_set<int>& ranks, int root,
+                                const std::vector<at::Tensor>& tensors) {
+
+        assert(contains(comm_map_, tag));
+        AllReduceComm* comm_info = comm_map_.at(tag);
+        ncclComm_t* ncomm = comm_info->comm;
+
+        // NCCL's limitation
+        assert(tensors.size() < 2048);
+
+        syncStream();
+
+        std::stringstream ss;
+        size_t elem_sum = 0;
+        for (const auto& t: tensors) {
+            elem_sum += getTensorElemCount(t);
+        }
+        ss << "nccl_bcast_tag_" << tag << "_elem_" << elem_sum;
+        recordStart(ss.str());
+
+        ncclGroupStart();
+        for (const auto& t: tensors) {
+            assert(t.is_contiguous());
+            void* ptr = t.data_ptr();
+            ncclDataType_t datatype = getReduceNcclDataType(t);
+            ncclBcast(ptr, getTensorElemCount(t), datatype, root, *ncomm, (cudaStream_t) nullptr);
+//            ncclBroadcast(ptr, ptr, getTensorElemCount(t), datatype, *ncomm, (cudaStream_t) nullptr);
+        }
+        ncclGroupEnd();
+        syncStream();
+
+        recordEnd(ss.str());
+    }
+
     std::string getBoolBufKey(const RouteDP& route, const std::string& action, int split_index) {
         std::stringstream ss;
         ss << toString(route) << "_" << action << "_" << split_index;

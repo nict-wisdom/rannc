@@ -136,8 +136,12 @@ PYBIND11_MODULE(_pyrannc, m) {
         spdlog::info("@store_zero_param pid={} t={}", pid, join_as_str(getTensorDim(ten)));
 
         ZeroParamLocator& zpl = ZeroParamLocator::get();
-        zpl.store(pid, ten);
+        return zpl.store(pid, ten);
+    });
 
+    m.def("load_zero_param", [](long pid) {
+        ZeroParamLocator& zpl = ZeroParamLocator::get();
+        return zpl.load(pid);
     });
 
     py::class_<RaNNCModule, std::shared_ptr<RaNNCModule>>(m, "RaNNCModule")

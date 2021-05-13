@@ -6,6 +6,8 @@
 
 #include "comm/ObjectComm.h"
 #include "comm/MPIUtil.h"
+#include "comm/NCCLWrapper.h"
+#include "comm/SComm.h"
 
 
 namespace rannc {
@@ -35,6 +37,11 @@ namespace rannc {
 
         sizes_[min_idx] += param_size;
         owners_[pid] = min_idx;
+        shapes_[pid] = getTensorDim(param);
+
+        IRType ir_type = toIRType(param);
+        assert(ir_type.getBaseType() == IRBaseType::TENSOR);
+        elem_types_[pid] = ir_type.getTensorElemType();
 
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -43,8 +50,36 @@ namespace rannc {
 
     at::Tensor ZeroParamLocator::load(long pid) {
 
+        if (!contains(owners_, pid)) {
+            std::stringstream ss;
+            ss << "Parameter not found in ZeroParamLocator: " << pid;
+            throw std::invalid_argument(ss.str());
+        }
 
-        return at::Tensor();
+        int owner = owners_.at(pid);
+
+        assert(contains(shapes_, pid));
+        assert(contains(elem_types_, pid));
+
+        NCCLWrapper& nccl = NCCLWrapper::get();
+
+        at::TensorOptions options;
+        at::Tensor buf;
+        if (mpi::getRank() == owner) {
+            assert(contains(params_, pid));
+            buf = params_.at(pid);
+        } else {
+            options = options.dtype(fromIRTensorElemTypeToScalarType(elem_types_.at(pid)))
+                    .device(c10::Device(c10::DeviceType::CUDA));
+            buf = torch::zeros(shapes_.at(pid), options);
+        }
+
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+        nccl.createCommunicator(tag, mpi::getAllRanks());
+        nccl.bcast(tag, mpi::getAllRanks(), owner, {buf});
+
+        return buf.detach().cpu();
     }
 
 
