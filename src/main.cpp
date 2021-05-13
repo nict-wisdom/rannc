@@ -132,9 +132,6 @@ PYBIND11_MODULE(_pyrannc, m) {
     m.def("store_zero_param", [](py::object& param) {
         long pid = getPythonObjId(param);
         const auto ten = py::cast<at::Tensor>(param);
-
-        spdlog::info("@store_zero_param pid={} t={}", pid, join_as_str(getTensorDim(ten)));
-
         ZeroParamLocator& zpl = ZeroParamLocator::get();
         return zpl.store(pid, ten);
     });

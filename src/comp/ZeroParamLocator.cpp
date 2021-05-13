@@ -27,7 +27,7 @@ namespace rannc {
 
         int64_t param_size = 0;
         if (mpi::getRank() == min_idx) {
-            spdlog::info("Placed {} on rank {}", pid, min_idx);
+            spdlog::info("Placed {} on rank {}: {}", pid, min_idx, join_as_str(getTensorDim(param)));
             param_size = param.numel() * param.element_size();
             params_[pid] = param;
         }
