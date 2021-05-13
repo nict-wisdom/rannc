@@ -2,7 +2,7 @@
 // Created by Masahiro Tanaka on 2019-06-13.
 //
 
-#include <comm/AllReduceRunner.h>
+#include <comm/NCCLWrapper.h>
 #include <comm/ObjectComm.h>
 #include <graph/Decomposition.h>
 #include <cuda/CudaUtil.h>
@@ -263,7 +263,7 @@ namespace rannc {
         ss << "ParamStorage::allReduceParamGrads_graph_" << graph_id;
         recordStart(ss.str());
 
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
         bool sync_allreduce = config::Config::get().getVal<bool>(config::SYNC_ALLREDUCE);
 
         std::vector<int> sorted_tags = keys(graph_grouped_params, true);
@@ -522,7 +522,7 @@ namespace rannc {
                           param_name, param_id, join_as_str(param_ranks),
                           i, sorted_param_ids.size());
 
-            AllReduceRunner& ar = AllReduceRunner::get();
+            NCCLWrapper& ar = NCCLWrapper::get();
             int comm_tag = tag_map.getRankSetTag(param_ranks);
 
             if (!contains(tag_rank_set_, comm_tag)) {

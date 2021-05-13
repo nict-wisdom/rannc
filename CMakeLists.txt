@@ -95,7 +95,7 @@ set(RANNC_SRCS
         src/comm/SComm.cpp
         src/comm/SCommCommon.cpp
         src/comm/SCommPrimitive.cpp
-        src/comm/NCCLAllReduceRunner.cpp
+        src/comm/NCCLWrapper.cpp
         src/torch/IValueLocation.cpp
         src/torch/TorchDriver.cpp
         src/torch/TorchUtil.cpp)

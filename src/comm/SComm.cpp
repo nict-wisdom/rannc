@@ -9,7 +9,7 @@
 #include <comp/EventRecorder.h>
 #include "SCommCommon.h"
 #include "SCommPrimitive.h"
-#include "AllReduceRunner.h"
+#include "NCCLWrapper.h"
 
 
 namespace {
@@ -466,7 +466,7 @@ namespace rannc {
             }
         }
 
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
         ar.redist(send_ptr, recv_ptr, route, batch_size_, global_type, split_index_-split_delay);
 
         recordEnd("distributeBatchTensor_" + toString(route));
@@ -641,7 +641,7 @@ namespace rannc {
 
         syncStream();
 
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
         std::vector<at::Tensor> ar_buf = {src};
         TagMap& tag_map = TagMap::get();
         const auto route_ranks = getRanksInRoute(route);

@@ -85,7 +85,7 @@ The following shows an example of the logging configuration file.
     level = "info"
 
     [[logger]]
-    name = "AllReduceRunner"
+    name = "NCCLWrapper"
     sinks = ["stderr_st"]
     level = "info"
 

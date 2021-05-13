@@ -66,7 +66,7 @@ namespace rannc {
 
     void createRouteCommunicator(const std::vector<RouteDP>& routes) {
         TagMap& tag_map = TagMap::get();
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
 
         for (const auto& r: routes) {
             const auto ranks = getRanksInRoute(r);
@@ -165,7 +165,7 @@ namespace rannc {
         /////////////////////////////////////////////////////
         std::vector<std::unordered_map<std::string, IValueMap>> graph_inputs;
         graph_inputs.reserve(actual_pipeline_num);
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
 //        ar.startBulk();
         for (int i=0; i<actual_pipeline_num; i++) {
             std::unordered_map<std::string, IValueMap> split_inputs;

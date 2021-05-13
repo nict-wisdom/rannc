@@ -4,7 +4,7 @@
 #include <mpi.h>
 #include <torch/csrc/jit/passes/onnx.h>
 
-#include <comm/AllReduceRunner.h>
+#include <comm/NCCLWrapper.h>
 #include <comp/Backward.h>
 #include <comm/SComm.h>
 #include <bind/PybindUtil.h>
@@ -69,7 +69,7 @@ PYBIND11_MODULE(_pyrannc, m) {
         auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
         assert(iv.isTensor());
 
-        AllReduceRunner& ar = AllReduceRunner::get();
+        NCCLWrapper& ar = NCCLWrapper::get();
         std::vector<at::Tensor> t = {iv.toTensor()};
 
         TagMap& tag_map = TagMap::get();

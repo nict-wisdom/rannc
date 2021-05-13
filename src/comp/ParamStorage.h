@@ -8,7 +8,7 @@
 #include <torch/torch.h>
 
 #include <Logging.h>
-#include <comm/AllReduceRunner.h>
+#include <comm/NCCLWrapper.h>
 #include <graph/Decomposition.h>
 
 namespace rannc {

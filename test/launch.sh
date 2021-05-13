@@ -32,27 +32,27 @@ for PART in "${PARTITION_NUMS[@]}" ; do
 done
 
 ## test_half
-HALF_TESTS=(
-    "test_half_amp"
-    "test_half_loss_amp"
-    "test_half_loss_amp_layernorm"
-    "test_half_loss_amp_save"
-)
-for PART in "${PARTITION_NUMS[@]}" ; do
-  ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
-  ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
-
-  for TEST in "${HALF_TESTS[@]}" ; do
-    mpirun --tag-output -np 4 ${MPI_OPTS} \
-      -x PYTEST \
-      ${ENVS} \
-      ./ompi_helper \
-      "$(uname -n)" "$(get_port_unused_random)" \
-      ${TEST}.py \
-      --batch-size 64
-    sleep 10
-  done
-done
+#HALF_TESTS=(
+#    "test_half_amp"
+#    "test_half_loss_amp"
+#    "test_half_loss_amp_layernorm"
+#    "test_half_loss_amp_save"
+#)
+#for PART in "${PARTITION_NUMS[@]}" ; do
+#  ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+#  ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
+#
+#  for TEST in "${HALF_TESTS[@]}" ; do
+#    mpirun --tag-output -np 4 ${MPI_OPTS} \
+#      -x PYTEST \
+#      ${ENVS} \
+#      ./ompi_helper \
+#      "$(uname -n)" "$(get_port_unused_random)" \
+#      ${TEST}.py \
+#      --batch-size 64
+#    sleep 10
+#  done
+#done
 
 #pytest --co test_simple_amp.py | grep "Function" | while read -r LINE
 #do
@@ -90,21 +90,21 @@ done
 #  --batch-size 64
 
 # test_native
-if ninja --version 1> /dev/null 2> /dev/null ; then
-  for PART in "${PARTITION_NUMS[@]}" ; do
-
-    ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
-    ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
-
-    mpirun ${MPI_OPTS} \
-      -x PYTEST \
-      ${ENVS} \
-      ./ompi_helper \
-      "$(uname -n)" "$(get_port_unused_random)" \
-      test_native.py \
-      --batch-size 64
-
-  done
-else
-  echo  "No ninja found. Skipping test of native call."  1>&2
-fi
+#if ninja --version 1> /dev/null 2> /dev/null ; then
+#  for PART in "${PARTITION_NUMS[@]}" ; do
+#
+#    ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
+#    ENVS+=" -x RANNC_PARTITION_NUM=${PART}"
+#
+#    mpirun ${MPI_OPTS} \
+#      -x PYTEST \
+#      ${ENVS} \
+#      ./ompi_helper \
+#      "$(uname -n)" "$(get_port_unused_random)" \
+#      test_native.py \
+#      --batch-size 64
+#
+#  done
+#else
+#  echo  "No ninja found. Skipping test of native call."  1>&2
+#fi

@@ -110,7 +110,7 @@ namespace rannc {
 
     void RaNNCProcess::clear() {
         SComm::get().destroy();
-        AllReduceRunner::get().destroy();
+        NCCLWrapper::get().destroy();
 
         if (param_storage_) {
             param_storage_->clear();

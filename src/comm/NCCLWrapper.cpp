@@ -4,7 +4,7 @@
 
 #include <nccl.h>
 
-#include "AllReduceRunner.h"
+#include "NCCLWrapper.h"
 #include "ObjectComm.h"
 
 #include <comm/SComm.h>
@@ -73,7 +73,7 @@ namespace rannc {
         ncclComm_t* comm;
     };
 
-    void AllReduceRunner::createCommunicator(int tag, const std::unordered_set<int>& ranks) {
+    void NCCLWrapper::createCommunicator(int tag, const std::unordered_set<int>& ranks) {
         if (contains(comm_map_, tag)) return;
 
         std::vector<int> rank_vec = setToVector(ranks);
@@ -109,7 +109,7 @@ namespace rannc {
         logger->trace("Finished creating nccl comm. tag={}", tag);
     }
 
-    void AllReduceRunner::destroy() {
+    void NCCLWrapper::destroy() {
         for (const auto& it: comm_map_) {
             AllReduceComm *comm_info = it.second;
             ncclCommDestroy(*comm_info->comm);
@@ -235,17 +235,17 @@ namespace rannc {
         recordEnd(ss.str());
     }
 
-    void AllReduceRunner::allreduce(int tag, const std::unordered_set<int>& ranks,
-            const std::vector<at::Tensor> &param_grads) {
+    void NCCLWrapper::allreduce(int tag, const std::unordered_set<int>& ranks,
+                                const std::vector<at::Tensor> &param_grads) {
         doReduce(comm_map_, tag, ranks, param_grads, ncclSum, true);
     }
 
-    void AllReduceRunner::reduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads) {
+    void NCCLWrapper::reduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads) {
         doReduce(comm_map_, tag, ranks, param_grads, ncclSum, false);
     }
 
-    void AllReduceRunner::allreduceMin(int tag, const std::unordered_set<int>& ranks,
-                                    const std::vector<at::Tensor> &param_grads) {
+    void NCCLWrapper::allreduceMin(int tag, const std::unordered_set<int>& ranks,
+                                   const std::vector<at::Tensor> &param_grads) {
         doReduce(comm_map_, tag, ranks, param_grads, ncclMin, true);
     }
 
@@ -255,8 +255,8 @@ namespace rannc {
         return ss.str();
     }
 
-    void AllReduceRunner::redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
-            int64_t batch_size, const IRType& global_type, int split_index) {
+    void NCCLWrapper::redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
+                             int64_t batch_size, const IRType& global_type, int split_index) {
 
         if (!contains(getRanksInRoute(route), mpi::getRank())) {
             return;
@@ -365,16 +365,16 @@ namespace rannc {
         }
     }
 
-    void AllReduceRunner::startBulk() {
+    void NCCLWrapper::startBulk() {
         job_executor_.setRunImmediate(false);
     }
 
-    void AllReduceRunner::endBulk() {
+    void NCCLWrapper::endBulk() {
         job_executor_.flush();
         job_executor_.setRunImmediate(true);
     }
 
-    std::string AllReduceRunner::getImplName() {
+    std::string NCCLWrapper::getImplName() {
         return "NCCL";
     }
 }

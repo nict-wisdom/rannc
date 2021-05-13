@@ -35,10 +35,10 @@ namespace rannc {
         std::vector<std::function<void(void)>> post_comm_jobs_;
     };
 
-    class AllReduceRunner {
+    class NCCLWrapper {
     public:
-        static AllReduceRunner& get() {
-            static AllReduceRunner instance;
+        static NCCLWrapper& get() {
+            static NCCLWrapper instance;
             return instance;
         }
 
@@ -60,13 +60,13 @@ namespace rannc {
 
         std::string getImplName();
 
-        AllReduceRunner(const AllReduceRunner&) = delete;
-        AllReduceRunner& operator=(const AllReduceRunner&) = delete;
-        AllReduceRunner(AllReduceRunner&&) = delete;
-        AllReduceRunner& operator=(AllReduceRunner&&) = delete;
+        NCCLWrapper(const NCCLWrapper&) = delete;
+        NCCLWrapper& operator=(const NCCLWrapper&) = delete;
+        NCCLWrapper(NCCLWrapper&&) = delete;
+        NCCLWrapper& operator=(NCCLWrapper&&) = delete;
 
     private:
-        AllReduceRunner() = default;
+        NCCLWrapper() = default;
 
         bool initialized = false;
         std::unordered_map<int, AllReduceComm*> comm_map_;
