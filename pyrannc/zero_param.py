@@ -5,10 +5,15 @@ import torch
 from . import _pyrannc
 
 
+def _remove_param_if_unnecessary(p):
+    if _pyrannc.get_rank() != p.owner:
+        p.data = torch.ones(1, dtype=p.dtype).to(p.device)
+
+
 def store_zero_param(p):
     owner = _pyrannc.store_zero_param(p)
-    if _pyrannc.get_rank() != owner:
-        p.data = torch.ones(1, dtype=p.dtype).to(p.device)
+    p.owner = owner
+    _remove_param_if_unnecessary(p)
 
 
 def load_zero_param(pid):
@@ -27,6 +32,7 @@ class DistributeModelParams(object):
             def wrapper(model, *args, **kwargs):
                 f(model, *args, **kwargs)
                 self._store_zero_params(model)
+                self._set_hooks(model)
 
             return wrapper
 
@@ -41,4 +47,25 @@ class DistributeModelParams(object):
         print("Storing params by DistributeModelParams: {}".format(model.__class__.__name__))
         for p in model.parameters(recurse=False):
             store_zero_param(p)
+        for b in model.buffers(recurse=False):
+            store_zero_param(b)
+        model.zero_enabled = True
 
+    def _set_hooks(self, model):
+        # Get param tensors
+        def _pre_hook_for_tracing(_model, input):
+            for p in _model.parameters(recurse=False):
+                p.data = load_zero_param(id(p))
+            for b in _model.buffers(recurse=False):
+                b.data = load_zero_param(id(b))
+            return input
+
+        # Remove param tensors
+        def _post_hook_for_tracing(_model, input, output):
+            for p in _model.parameters(recurse=False):
+                _remove_param_if_unnecessary(p)
+            for b in _model.buffers(recurse=False):
+                _remove_param_if_unnecessary(b)
+
+        model.register_forward_pre_hook(_pre_hook_for_tracing)
+        model.register_forward_hook(_post_hook_for_tracing)
