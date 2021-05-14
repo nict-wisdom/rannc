@@ -34,7 +34,6 @@ namespace {
      */
     std::unordered_map<std::string, long> matchParamNames(const std::shared_ptr<torch::jit::Graph>& graph,
                                                           const size_t real_input,
-                                                          const std::unordered_map<long, at::Tensor>& param_tensors,
                                                           const std::vector<py::tuple> &py_params,
                                                           const std::vector<py::tuple> &py_buffers) {
 
@@ -131,26 +130,27 @@ namespace rannc {
         return ordered_locs;
     }
 
+
+    void RaNNCModule::doRegisterParams(const std::vector<py::tuple>& py_params, bool is_buffer) {
+        for (const py::tuple& p: py_params) {
+            bool zero_enabled = false;
+            if (pybind11::hasattr(p[1], "zero_enabled")) {
+                zero_enabled = py::cast<bool>(pybind11::getattr(p[1], "zero_enabled"));
+            }
+
+            const auto ten = py::cast<at::Tensor>(p[1]);
+            long pid = getPythonObjId(p[1]);
+            param_storage_->registerParam(pid, ten, is_buffer, zero_enabled);
+        }
+    }
+
     std::vector<long> RaNNCModule::init(const py::function& fwdFunc,
                                         const std::vector<py::tuple>& py_params, const std::vector<py::tuple>& py_buffers,
                                         const py::function& var_lookup_fn, const py::args& args,
                                         bool gather_inputs) {
 
-        std::unordered_map<long, at::Tensor> param_id_map;
-
-        for (const py::tuple& p: py_params) {
-            const auto ten = py::cast<at::Tensor>(p[1]);
-            long pid = getPythonObjId(p[1]);
-            param_id_map[pid] = ten;
-            param_storage_->registerParam(pid, ten);
-        }
-
-        for (const py::tuple& b: py_buffers) {
-            const at::Tensor ten = py::cast<at::Tensor>(b[1]);
-            long pid = getPythonObjId(b[1]);
-            param_id_map[pid] = ten;
-            param_storage_->registerParam(pid, ten, true);
-        }
+        doRegisterParams(py_params, false);
+        doRegisterParams(py_buffers, true);
 
         std::vector<torch::jit::IValue> input_ivals = torch::jit::_toTypeInferredIValue(args).toTuple()->elements();
         int64_t local_batch_size = guessBatchSize(input_ivals);
@@ -162,7 +162,7 @@ namespace rannc {
         std::shared_ptr<torch::jit::Graph> graph = trace(args, fwdFunc, py_params, py_buffers, var_lookup_fn, 2);
         syncDebugName(graph);
 
-        std::unordered_map<std::string, long> graph_params = matchParamNames(graph, input_ivals.size(), param_id_map, py_params, py_buffers);
+        std::unordered_map<std::string, long> graph_params = matchParamNames(graph, input_ivals.size(), py_params, py_buffers);
         for (const auto &it: graph_params) {
             auto p = param_storage_->getParamTensor(it.second);
             toCPUInPlace(p);

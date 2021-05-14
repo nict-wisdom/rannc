@@ -399,6 +399,28 @@ namespace rannc {
         }
     }
 
+    void NCCLWrapper::send(int tag, int dest, const at::Tensor& tensor) {
+
+        assert(contains(comm_map_, tag));
+        AllReduceComm* comm_info = comm_map_.at(tag);
+        ncclComm_t* ncomm = comm_info->comm;
+
+        ncclDataType_t datatype = getReduceNcclDataType(tensor);
+        ncclSend(tensor.data_ptr(), tensor.numel(), datatype, dest, *ncomm, (cudaStream_t) nullptr);
+        syncStream();
+    }
+
+    void NCCLWrapper::recv(int tag, int dest, const at::Tensor& tensor) {
+
+        assert(contains(comm_map_, tag));
+        AllReduceComm* comm_info = comm_map_.at(tag);
+        ncclComm_t* ncomm = comm_info->comm;
+
+        ncclDataType_t datatype = getReduceNcclDataType(tensor);
+        ncclRecv(tensor.data_ptr(), tensor.numel(), datatype, dest, *ncomm, (cudaStream_t) nullptr);
+        syncStream();
+    }
+
     void NCCLWrapper::startBulk() {
         job_executor_.setRunImmediate(false);
     }

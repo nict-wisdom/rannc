@@ -6,6 +6,7 @@
 #define PYRANNC_ZEROPARAMLOCATOR_H
 
 #include <torch/torch.h>
+#include <comm/NCCLWrapper.h>
 
 #include "graph/ir.h"
 
@@ -26,16 +27,25 @@ namespace rannc {
         int store(long pid, const at::Tensor& param);
         at::Tensor load(long pid);
 
+        void fetchStart();
+        at::Tensor fetch(long pid);
+        void fetchEnd();
+
     private:
-        ZeroParamLocator() = default;
+        ZeroParamLocator() : nccl_(NCCLWrapper::get()) {};
         ~ZeroParamLocator() = default;
+
+        NCCLWrapper& nccl_;
 
         std::unordered_map<long, at::Tensor> params_;
         std::unordered_map<int, int64_t> sizes_;
         std::unordered_map<long, int> owners_;
+        std::unordered_map<long, long> global_id_to_local_;
 
-        std::unordered_map<long, std::vector<int64_t>> shapes_;
-        std::unordered_map<long, IRTensorElemType> elem_types_;
+        std::unordered_map<long, IRType> ir_types_;
+        std::unordered_map<long, c10::DeviceType> device_types_;
+
+        static const int FETCH_TAG;
     };
 }
 

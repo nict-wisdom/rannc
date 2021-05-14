@@ -171,7 +171,7 @@ namespace rannc {
 
     bool ParamStorage::sync_on_init_ = true;
 
-    void ParamStorage::registerParam(long param_id, const at::Tensor& param_tensor, bool buffer) {
+    void ParamStorage::registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool zero_enabled) {
         assert(!contains(params_, param_id));
 
         params_[param_id] = param_tensor;
@@ -184,6 +184,10 @@ namespace rannc {
 
         if (buffer) {
             buffer_ids_.insert(param_id);
+        }
+
+        if (zero_enabled) {
+            zero_ids_.insert(param_id);
         }
     }
 

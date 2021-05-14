@@ -13,6 +13,7 @@ def _remove_param_if_unnecessary(p):
 def store_zero_param(p):
     owner = _pyrannc.store_zero_param(p)
     p.owner = owner
+    p.zero_enabled = True
     _remove_param_if_unnecessary(p)
 
 

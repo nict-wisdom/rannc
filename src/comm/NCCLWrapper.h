@@ -52,6 +52,8 @@ namespace rannc {
                     int64_t batch_size, const IRType& global_type, int split_index);
         void bcast(int tag, const std::unordered_set<int>& ranks, int root,
                                 const std::vector<at::Tensor>& tensors);
+        void send(int tag, int dest, const at::Tensor& tensor);
+        void recv(int tag, int dest, const at::Tensor& tensor);
         void startBulk();
         void endBulk();
 

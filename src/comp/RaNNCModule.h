@@ -91,6 +91,7 @@ namespace rannc {
         std::unordered_map<std::string, BufferTensorCache> buffer_cache_;
         void setGradFn(torch::jit::IValue& out, const std::string& graph_id, const std::string& name,
                 const std::vector<IValueLocation>& ordered_inputs);
+        void doRegisterParams(const std::vector<py::tuple>& py_params, bool is_buffer);
 
         const std::shared_ptr<spdlog::logger> logger = getLogger("RaNNCModule");
     };

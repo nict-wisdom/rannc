@@ -11,6 +11,7 @@
 
 
 namespace rannc {
+    const int ZeroParamLocator::FETCH_TAG = 10;
 
     int ZeroParamLocator::store(long pid, const at::Tensor& param) {
 
@@ -25,23 +26,24 @@ namespace rannc {
             }
         }
 
-        int64_t param_size = 0;
+        int64_t param_size = param.numel() * param.element_size();
         if (mpi::getRank() == min_idx) {
             spdlog::info("Placed {} on rank {}: {}", pid, min_idx, join_as_str(getTensorDim(param)));
-            param_size = param.numel() * param.element_size();
             params_[pid] = param;
         }
 
         ObjectComm& ocomm = ObjectComm::get();
-        param_size = ocomm.bcast(param_size, min_idx);
+        long global_id = pid;
+        global_id = ocomm.bcast(global_id);
+        global_id_to_local_[global_id] = pid;
 
         sizes_[min_idx] += param_size;
         owners_[pid] = min_idx;
-        shapes_[pid] = getTensorDim(param);
+        ir_types_[pid] = toIRType(param);
 
-        IRType ir_type = toIRType(param);
-        assert(ir_type.getBaseType() == IRBaseType::TENSOR);
-        elem_types_[pid] = ir_type.getTensorElemType();
+//        IRType ir_type = toIRType(param);
+//        assert(ir_type.getBaseType() == IRBaseType::TENSOR);
+//        elem_types_[pid] = ir_type.getTensorElemType();
 
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -58,29 +60,71 @@ namespace rannc {
 
         int owner = owners_.at(pid);
 
-        assert(contains(shapes_, pid));
-        assert(contains(elem_types_, pid));
-
-        NCCLWrapper& nccl = NCCLWrapper::get();
+        assert(contains(ir_types_, pid));
 
         at::TensorOptions options;
         at::Tensor buf;
         if (mpi::getRank() == owner) {
             assert(contains(params_, pid));
-            buf = params_.at(pid);
+            buf = params_.at(pid).cuda();
         } else {
-            options = options.dtype(fromIRTensorElemTypeToScalarType(elem_types_.at(pid)))
+            options = options.dtype(fromIRTensorElemTypeToScalarType(ir_types_.at(pid).getTensorElemType()))
                     .device(c10::Device(c10::DeviceType::CUDA));
-            buf = torch::zeros(shapes_.at(pid), options);
+            buf = torch::zeros(ir_types_.at(pid).getTensorDim(), options);
         }
 
         TagMap& tag_map = TagMap::get();
         int tag = tag_map.getRankSetTag(mpi::getAllRanks());
-        nccl.createCommunicator(tag, mpi::getAllRanks());
-        nccl.bcast(tag, mpi::getAllRanks(), owner, {buf});
+        nccl_.createCommunicator(tag, mpi::getAllRanks());
+        nccl_.bcast(tag, mpi::getAllRanks(), owner, {buf});
 
         return buf.detach().cpu();
     }
 
+    void ZeroParamLocator::fetchStart() {
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+        nccl_.createCommunicator(tag, mpi::getAllRanks());
 
+        if (mpi::getRank() != 0) {
+            long global_pid;
+            MPI_Status status;
+            MPI_Recv(&global_pid, 1, MPI_LONG, 0, FETCH_TAG, MPI_COMM_WORLD, &status);
+
+            while (global_pid != 0) {
+                assert(contains(global_id_to_local_, global_pid));
+                long pid = global_id_to_local_.at(global_pid);
+                assert(contains(params_, pid));
+                const auto param = params_.at(pid).cuda();
+                nccl_.send(tag, 0, param);
+
+                MPI_Recv(&global_pid, 1, MPI_LONG, 0, FETCH_TAG, MPI_COMM_WORLD, &status);
+            }
+        }
+    }
+
+    at::Tensor ZeroParamLocator::fetch(long pid) {
+        assert(contains(owners_, pid));
+        int owner = owners_.at(pid);
+
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+
+        at::TensorOptions options;
+        options = options.dtype(fromIRTensorElemTypeToScalarType(ir_types_.at(pid).getTensorElemType()))
+                .device(c10::Device(c10::DeviceType::CUDA))
+                .requires_grad(true);
+        auto buf = torch::zeros(ir_types_.at(pid).getTensorDim(), options);
+        nccl_.recv(tag, owner, buf);
+        return buf;
+    }
+
+    void ZeroParamLocator::fetchEnd() {
+        if (mpi::getRank() == 0) {
+            long pid = 0;
+            for (int i=1; i<mpi::getSize(); i++) {
+                MPI_Send(&pid, 1, MPI_LONG, i, FETCH_TAG, MPI_COMM_WORLD);
+            }
+        }
+    }
 }

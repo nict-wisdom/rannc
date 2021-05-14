@@ -44,7 +44,7 @@ namespace rannc {
     public:
         ParamStorage() {}
 
-        void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer=false);
+        void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool zero_enabled);
         void unregisterParam(long param_id);
         const std::unordered_map<std::string, long> getParamIDs(const std::string& graph_id, bool buffer=false);
         long getParamID(const std::string& graph_id, const std::string& name);
@@ -113,6 +113,7 @@ namespace rannc {
         std::unordered_map<std::string, std::unordered_map<std::string, long>> unused_params_; // used to calc global norm, the value is a global id
         std::unordered_map<long, at::Tensor> params_;
         std::unordered_set<long> buffer_ids_;
+        std::unordered_set<long> zero_ids_;
         std::unordered_map<long, std::unordered_set<int>> ranks_;
 
         // For param sharing
