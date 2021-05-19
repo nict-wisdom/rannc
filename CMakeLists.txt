@@ -67,7 +67,7 @@ set(RANNC_SRCS
         src/comp/GraphLauncher.cpp
         src/comp/GraphValueStorage.cpp
         src/comp/ParamStorage.cpp
-        src/comp/ZeroParamLocator.cpp
+        src/comp/DistributedParamLocator.cpp
         src/comp/NodeProfiler.cpp
         src/comp/GraphProfiler.cpp
         src/comp/RaNNCModule.cpp

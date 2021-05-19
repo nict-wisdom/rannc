@@ -16,7 +16,7 @@
 #include "comp/RaNNCModule.h"
 #include "bind/Tracer.h"
 #include "bind/RaNNCFactory.h"
-#include "comp/ZeroParamLocator.h"
+#include "comp/DistributedParamLocator.h"
 
 
 namespace py = pybind11;
@@ -129,15 +129,15 @@ PYBIND11_MODULE(_pyrannc, m) {
         param_storage->registerAmpMasterParam(model_param_id, master_param_id, ten);
     });
 
-    m.def("store_zero_param", [](py::object& param) {
+    m.def("store_dist_param", [](py::object& param) {
         long pid = getPythonObjId(param);
         const auto ten = py::cast<at::Tensor>(param);
-        ZeroParamLocator& zpl = ZeroParamLocator::get();
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
         return zpl.store(pid, ten);
     });
 
-    m.def("load_zero_param", [](long pid) {
-        ZeroParamLocator& zpl = ZeroParamLocator::get();
+    m.def("load_dist_param", [](long pid) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
         return zpl.load(pid);
     });
 

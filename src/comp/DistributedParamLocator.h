@@ -2,8 +2,8 @@
 // Created by Masahiro Tanaka on 2021/05/13.
 //
 
-#ifndef PYRANNC_ZEROPARAMLOCATOR_H
-#define PYRANNC_ZEROPARAMLOCATOR_H
+#ifndef PYRANNC_DISTRIBUTEDPARAMLOCATOR_H
+#define PYRANNC_DISTRIBUTEDPARAMLOCATOR_H
 
 #include <torch/torch.h>
 #include <comm/NCCLWrapper.h>
@@ -12,15 +12,15 @@
 
 namespace rannc {
 
-    class ZeroParamLocator {
+    class DistributedParamLocator {
     public:
-        ZeroParamLocator(const ZeroParamLocator&) = delete;
-        ZeroParamLocator& operator=(const ZeroParamLocator&) = delete;
-        ZeroParamLocator(ZeroParamLocator&&) = delete;
-        ZeroParamLocator& operator=(ZeroParamLocator&&) = delete;
+        DistributedParamLocator(const DistributedParamLocator&) = delete;
+        DistributedParamLocator& operator=(const DistributedParamLocator&) = delete;
+        DistributedParamLocator(DistributedParamLocator&&) = delete;
+        DistributedParamLocator& operator=(DistributedParamLocator&&) = delete;
 
-        static ZeroParamLocator& get() {
-            static ZeroParamLocator instance;
+        static DistributedParamLocator& get() {
+            static DistributedParamLocator instance;
             return instance;
         }
 
@@ -35,8 +35,8 @@ namespace rannc {
         void fetchEnd();
 
     private:
-        ZeroParamLocator() : nccl_(NCCLWrapper::get()) {};
-        ~ZeroParamLocator() = default;
+        DistributedParamLocator() : nccl_(NCCLWrapper::get()) {};
+        ~DistributedParamLocator() = default;
 
         NCCLWrapper& nccl_;
         int comm_tag_;
@@ -52,4 +52,4 @@ namespace rannc {
     };
 }
 
-#endif //PYRANNC_ZEROPARAMLOCATOR_H
+#endif //PYRANNC_DISTRIBUTEDPARAMLOCATOR_H

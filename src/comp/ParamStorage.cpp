@@ -10,7 +10,7 @@
 #include "ConfiguredTorch.h"
 #include "ParamStorage.h"
 #include "comm/SComm.h"
-#include "ZeroParamLocator.h"
+#include "DistributedParamLocator.h"
 #include "EventRecorder.h"
 
 namespace rannc {
@@ -172,7 +172,7 @@ namespace rannc {
 
     bool ParamStorage::sync_on_init_ = true;
 
-    void ParamStorage::registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool zero_enabled) {
+    void ParamStorage::registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool distributed) {
         assert(!contains(params_, param_id));
 
         params_[param_id] = param_tensor;
@@ -187,8 +187,8 @@ namespace rannc {
             buffer_ids_.insert(param_id);
         }
 
-        if (zero_enabled) {
-            zero_ids_.insert(param_id);
+        if (distributed) {
+            dist_ids_.insert(param_id);
         }
     }
 
@@ -246,8 +246,8 @@ namespace rannc {
             throw std::invalid_argument(ss.str());
         }
 
-        if (zeroEnabled(param_id)) {
-            ZeroParamLocator& zpl = ZeroParamLocator::get();
+        if (distributed(param_id)) {
+            DistributedParamLocator& zpl = DistributedParamLocator::get();
             return zpl.fetch(param_id);
         }
 
@@ -275,12 +275,12 @@ namespace rannc {
         return getParamType(getParamID(graph_id, name));
     }
 
-    bool ParamStorage::zeroEnabled(long param_id) const {
-        return contains(zero_ids_, param_id);
+    bool ParamStorage::distributed(long param_id) const {
+        return contains(dist_ids_, param_id);
     }
 
-    int ParamStorage::zeroOwner(long param_id) const {
-        ZeroParamLocator& zpl = ZeroParamLocator::get();
+    int ParamStorage::distParamOwner(long param_id) const {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
         return zpl.getOwner(param_id);
     }
 
@@ -539,15 +539,15 @@ namespace rannc {
             }
             const auto &param_ranks = ranks_.at(param_id);
 
-            if (zeroEnabled(param_id)) {
-                ZeroParamLocator& zpl = ZeroParamLocator::get();
+            if (distributed(param_id)) {
+                DistributedParamLocator& zpl = DistributedParamLocator::get();
                 at::Tensor zero_param_tensor = zpl.load(param_id);
                 if (contains(param_ranks, mpi::getRank())) {
                     at::Tensor &param_tensor = params_.at(param_id);
                     param_tensor.set_data(zero_param_tensor);
                 }
                 zpl.disable(param_id);
-                zero_ids_.erase(param_id);
+                dist_ids_.erase(param_id);
             } else {
                 syncParam(param_id, param_ranks);
             }

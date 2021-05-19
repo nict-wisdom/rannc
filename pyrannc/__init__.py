@@ -12,7 +12,7 @@ import torch.random
 from . import _pyrannc
 from .opt.util import gather_optimizer_state_dict
 
-from .zero_param import store_zero_param, load_zero_param, DistributeModelParams
+from .zero_param import store_dist_param, load_dist_param, DistributeModelParams
 
 # Run backward to set python engine as the default engine
 x = torch.randn(2, 2, requires_grad=True)

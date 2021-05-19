@@ -44,7 +44,7 @@ namespace rannc {
     public:
         ParamStorage() = default;
 
-        void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool zero_enabled);
+        void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool distributed);
         void unregisterParam(long param_id);
         const std::unordered_map<std::string, long> getParamIDs(const std::string& graph_id, bool buffer=false);
         long getParamID(const std::string& graph_id, const std::string& name);
@@ -52,8 +52,8 @@ namespace rannc {
         at::Tensor getParamTensor(long param_id) const;
         at::Tensor getAmpMasterParamTensor(long param_id) const;
         bool hasAmpMasterParam(long param_id) const;
-        bool zeroEnabled(long param_id) const;
-        int zeroOwner(long param_id) const;
+        bool distributed(long param_id) const;
+        int distParamOwner(long param_id) const;
 
         const std::unordered_set<int>& getRanks(long param_id);
 
@@ -118,7 +118,7 @@ namespace rannc {
         std::unordered_map<std::string, std::unordered_map<std::string, long>> unused_params_; // used to calc global norm, the value is a global id
         std::unordered_map<long, at::Tensor> params_;
         std::unordered_set<long> buffer_ids_;
-        std::unordered_set<long> zero_ids_;
+        std::unordered_set<long> dist_ids_;
         std::unordered_map<long, std::unordered_set<int>> ranks_;
 
         // For param sharing

@@ -17,7 +17,7 @@
 #include <graph/ConvertGraph.h>
 #include <bind/Tracer.h>
 #include <comp/FunctionStorage.h>
-#include <comp/ZeroParamLocator.h>
+#include <comp/DistributedParamLocator.h>
 #include <graph/GuessValueTypes.h>
 #include <graph/MetaDecomposer.h>
 #include <graph/Partitioner.h>
@@ -134,14 +134,14 @@ namespace rannc {
 
     void RaNNCModule::doRegisterParams(const std::vector<py::tuple>& py_params, bool is_buffer) {
         for (const py::tuple& p: py_params) {
-            bool zero_enabled = false;
-            if (pybind11::hasattr(p[1], "zero_enabled")) {
-                zero_enabled = py::cast<bool>(pybind11::getattr(p[1], "zero_enabled"));
+            bool distributed = false;
+            if (pybind11::hasattr(p[1], "distributed")) {
+                distributed = py::cast<bool>(pybind11::getattr(p[1], "distributed"));
             }
 
             const auto ten = py::cast<at::Tensor>(p[1]);
             long pid = getPythonObjId(p[1]);
-            param_storage_->registerParam(pid, ten, is_buffer, zero_enabled);
+            param_storage_->registerParam(pid, ten, is_buffer, distributed);
         }
     }
 
@@ -164,10 +164,10 @@ namespace rannc {
         syncDebugName(graph);
 
         std::unordered_map<std::string, long> graph_params = matchParamNames(graph, input_ivals.size(), py_params, py_buffers);
-        bool zero_enabled = false;
+        bool distributed = false;
         for (const auto &it: graph_params) {
-            if (param_storage_->zeroEnabled(it.second)) {
-                zero_enabled = true;
+            if (param_storage_->distributed(it.second)) {
+                distributed = true;
             } else {
                 auto p = param_storage_->getParamTensor(it.second);
                 toCPUInPlace(p);
@@ -196,7 +196,7 @@ namespace rannc {
         }
 
         std::unordered_map<std::string, torch::jit::IValue> param_inputs;
-        if (!zero_enabled) {
+        if (!distributed) {
             for (const auto &it: graph_params) {
                 param_inputs[it.first] = param_storage_->getParamTensor(it.second);
             }
@@ -209,7 +209,7 @@ namespace rannc {
         FunctionStorage function_storage;
         function_storage.deploy(graph);
 
-        ZeroParamLocator& zpl = ZeroParamLocator::get();
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
         zpl.fetchStart();
         if (mpi::isMaster()) {
             const int min_pipeline = config::Config::get().getVal<int>(config::MIN_PIPELINE);
@@ -361,7 +361,7 @@ namespace rannc {
             }
 
             if (config::Config::get().getVal<bool>(config::VERIFY_PARTITIONING)) {
-                if (zero_enabled) {
+                if (distributed) {
                     logger->warn("Verification was disabled because zero param distribution is enabled.");
                 } else {
                     Validator validator;

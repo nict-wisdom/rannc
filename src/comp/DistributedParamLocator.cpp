@@ -2,7 +2,7 @@
 // Created by Masahiro Tanaka on 2021/05/13.
 //
 
-#include "ZeroParamLocator.h"
+#include "DistributedParamLocator.h"
 
 #include "comm/ObjectComm.h"
 #include "comm/MPIUtil.h"
@@ -11,9 +11,9 @@
 
 
 namespace rannc {
-    const int ZeroParamLocator::FETCH_TAG = 10;
+    const int DistributedParamLocator::FETCH_TAG = 10;
 
-    int ZeroParamLocator::store(long pid, const at::Tensor& param) {
+    int DistributedParamLocator::store(long pid, const at::Tensor& param) {
 
         int np = mpi::getSize();
 
@@ -50,11 +50,11 @@ namespace rannc {
         return min_idx;
     }
 
-    at::Tensor ZeroParamLocator::load(long pid) {
+    at::Tensor DistributedParamLocator::load(long pid) {
 
         if (!contains(owners_, pid)) {
             std::stringstream ss;
-            ss << "Parameter not found in ZeroParamLocator: " << pid;
+            ss << "Parameter not found in DistributedParamLocator: " << pid;
             throw std::invalid_argument(ss.str());
         }
 
@@ -81,13 +81,13 @@ namespace rannc {
         return buf.detach().cpu();
     }
 
-    void ZeroParamLocator::disable(long pid) {
+    void DistributedParamLocator::disable(long pid) {
         owners_.erase(pid);
         params_.erase(pid);
         ir_types_.erase(pid);
     }
 
-    void ZeroParamLocator::fetchStart() {
+    void DistributedParamLocator::fetchStart() {
         TagMap& tag_map = TagMap::get();
         comm_tag_ = tag_map.getRankSetTag(mpi::getAllRanks());
         nccl_.createCommunicator(comm_tag_, mpi::getAllRanks());
@@ -109,7 +109,7 @@ namespace rannc {
         }
     }
 
-    at::Tensor ZeroParamLocator::fetch(long pid) {
+    at::Tensor DistributedParamLocator::fetch(long pid) {
         assert(contains(owners_, pid));
         int owner = owners_.at(pid);
 
@@ -129,7 +129,7 @@ namespace rannc {
         return buf;
     }
 
-    void ZeroParamLocator::fetchEnd() {
+    void DistributedParamLocator::fetchEnd() {
         if (mpi::getRank() == 0) {
             long pid = 0;
             for (int i=1; i < mpi::getSize(); i++) {
@@ -138,7 +138,7 @@ namespace rannc {
         }
     }
 
-    int ZeroParamLocator::getOwner(long pid) {
+    int DistributedParamLocator::getOwner(long pid) {
         assert(contains(owners_, pid));
         return owners_.at(pid);
     }
