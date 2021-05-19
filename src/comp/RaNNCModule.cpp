@@ -201,7 +201,6 @@ namespace rannc {
                 param_inputs[it.first] = param_storage_->getParamTensor(it.second);
             }
         }
-        logger->info("init 4");
 
         auto value_storage = std::make_shared<GraphValueStorage>();
         value_storage->deploy(graph);

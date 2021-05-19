@@ -11,43 +11,13 @@
 
 
 namespace rannc {
-    const int DistributedParamLocator::FETCH_TAG = 10;
-
     int DistributedParamLocator::store(long pid, const at::Tensor& param) {
-
-        int np = mpi::getSize();
-
-        int64_t min_size = INT64_MAX;
-        int min_idx = -1;
-        for (int i=0; i<np; i++) {
-            if (sizes_[i] < min_size) {
-                min_size = sizes_[i];
-                min_idx = i;
-            }
-        }
-
-        int64_t param_size = param.numel() * param.element_size();
-        if (mpi::getRank() == min_idx) {
-            spdlog::info("Placed {} on rank {}: {}", pid, min_idx, join_as_str(getTensorDim(param)));
+        int owner = doRegister(pid, param);
+        if (mpi::getRank() == owner) {
+            spdlog::info("Placed {} on rank {}: {}", pid, owner, join_as_str(getTensorDim(param)));
             params_[pid] = param;
         }
-
-        ObjectComm& ocomm = ObjectComm::get();
-        long global_id = pid;
-        global_id = ocomm.bcast(global_id);
-        global_id_to_local_[global_id] = pid;
-
-        sizes_[min_idx] += param_size;
-        owners_[pid] = min_idx;
-        ir_types_[pid] = toIRType(param);
-
-//        IRType ir_type = toIRType(param);
-//        assert(ir_type.getBaseType() == IRBaseType::TENSOR);
-//        elem_types_[pid] = ir_type.getTensorElemType();
-
-        MPI_Barrier(MPI_COMM_WORLD);
-
-        return min_idx;
+        return owner;
     }
 
     at::Tensor DistributedParamLocator::load(long pid) {
@@ -136,10 +106,5 @@ namespace rannc {
                 MPI_Send(&pid, 1, MPI_LONG, i, FETCH_TAG, MPI_COMM_WORLD);
             }
         }
-    }
-
-    int DistributedParamLocator::getOwner(long pid) {
-        assert(contains(owners_, pid));
-        return owners_.at(pid);
     }
 }
