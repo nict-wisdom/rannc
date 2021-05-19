@@ -10,6 +10,7 @@
 #include "ConfiguredTorch.h"
 #include "ParamStorage.h"
 #include "comm/SComm.h"
+#include "ZeroParamLocator.h"
 #include "EventRecorder.h"
 
 namespace rannc {
@@ -244,6 +245,12 @@ namespace rannc {
             ss << "Parameter not found. ID=" << param_id;
             throw std::invalid_argument(ss.str());
         }
+
+        if (zeroEnabled(param_id)) {
+            ZeroParamLocator& zpl = ZeroParamLocator::get();
+            return zpl.fetch(param_id);
+        }
+
         return params_.at(param_id);
     }
 
@@ -258,6 +265,23 @@ namespace rannc {
 
     bool ParamStorage::hasAmpMasterParam(long param_id) const {
         return contains(amp_master_params_, param_id);
+    }
+
+    IRType ParamStorage::getParamType(long param_id) {
+        return toIRType(getParamTensor(param_id));
+    }
+
+    IRType ParamStorage::getParamType(const std::string& graph_id, const std::string& name) {
+        return getParamType(getParamID(graph_id, name));
+    }
+
+    bool ParamStorage::zeroEnabled(long param_id) const {
+        return contains(zero_ids_, param_id);
+    }
+
+    int ParamStorage::zeroOwner(long param_id) const {
+        ZeroParamLocator& zpl = ZeroParamLocator::get();
+        return zpl.getOwner(param_id);
     }
 
     void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
@@ -515,7 +539,19 @@ namespace rannc {
             }
             const auto &param_ranks = ranks_.at(param_id);
 
-            initParam(param_id, param_ranks);
+            if (zeroEnabled(param_id)) {
+                ZeroParamLocator& zpl = ZeroParamLocator::get();
+                at::Tensor zero_param_tensor = zpl.load(param_id);
+                if (contains(param_ranks, mpi::getRank())) {
+                    at::Tensor &param_tensor = params_.at(param_id);
+                    param_tensor.set_data(zero_param_tensor);
+                }
+                zpl.disable(param_id);
+                zero_ids_.erase(param_id);
+            } else {
+                syncParam(param_id, param_ranks);
+            }
+
             if (mpi::getRank() == 0 && sync_on_init_) {
                 logger->debug("Synchronized param {}/{}", i, sorted_param_ids.size());
             }
@@ -565,7 +601,7 @@ namespace rannc {
         logger->trace("ParamStorage::deployGraph deployed all params. graph_id={}", decomp.id);
     }
 
-    void ParamStorage::initParam(long param_id, const std::unordered_set<int>& ranks) {
+    void ParamStorage::syncParam(long param_id, const std::unordered_set<int>& ranks) {
         at::Tensor &param_tensor = params_.at(param_id);
 
         assert(param_tensor.is_contiguous());

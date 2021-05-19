@@ -7,6 +7,7 @@
 #include <graph/GuessValueTypes.h>
 #include "GraphProfiler.h"
 #include "graph/ConvertGraph.h"
+#include "comp/ParamStorage.h"
 #include "ConfiguredTorch.h"
 
 namespace rannc {
@@ -100,6 +101,17 @@ namespace rannc {
             }
         }
         return cuda_params;
+    }
+
+    std::vector<IRValue> getParamValues(const std::shared_ptr<IRGraph>& graph) {
+        std::vector<IRValue> results;
+        for (const auto& in: graph->getInputNames()) {
+            const auto& v = graph->getValue(in);
+            if (v.isParam()) {
+                results.push_back(v);
+            }
+        }
+        return results;
     }
 
     ProfilingResult GraphProfiler::compute(
@@ -371,10 +383,8 @@ namespace rannc {
         std::unordered_map<std::string, at::Tensor> graph_param_tensors;
         auto ir_params = graphParamValues(graph);
         for (const auto &irp: ir_params) {
-            assert(contains(param_inputs_, irp.getName()));
-            const auto& param_iv = param_inputs_.at(irp.getName());
-            assert(param_iv.isTensor());
-            graph_param_tensors[irp.getName()] = param_iv.toTensor();
+            assert(contains(graph_params_, irp.getName()));
+            graph_param_tensors[irp.getName()] = param_storage_->getParamTensor(graph_params_.at(irp.getName()));
         }
         return graph_param_tensors;
     }
@@ -502,9 +512,10 @@ namespace rannc {
                 ret.value_types[np.first] = toIRType(np.second);
             }
         }
-        for (const auto &p: param_inputs_) {
-            if (!contains(ret.value_types, p.first)) {
-                ret.value_types[p.first] = toIRType(p.second);
+
+        for (const auto& v: getParamValues(base_graph_)) {
+            if (!contains(ret.value_types, v.getName())) {
+                ret.value_types[v.getName()] = param_storage_->getParamType(base_graph_->getName(), v.getName());
             }
         }
 
@@ -547,9 +558,17 @@ namespace rannc {
     void GraphProfiler::clear() {
         driver_.destroy();
 
-        for (auto& it: param_inputs_) {
-            if (it.second.isTensor()) {
-                getMutableGradRef( it.second.toTensor() ) = at::Tensor();
+        for (const auto& v: getParamValues(base_graph_)) {
+            assert(contains(graph_params_, v.getName()));
+            long pid = graph_params_.at(v.getName());
+
+            if (param_storage_->zeroEnabled(pid)) {
+                int owner = param_storage_->zeroOwner(pid);
+                if (mpi::getRank() == owner) {
+                    getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
+                }
+            } else {
+                getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
             }
         }
     }

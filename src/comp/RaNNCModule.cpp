@@ -17,6 +17,7 @@
 #include <graph/ConvertGraph.h>
 #include <bind/Tracer.h>
 #include <comp/FunctionStorage.h>
+#include <comp/ZeroParamLocator.h>
 #include <graph/GuessValueTypes.h>
 #include <graph/MetaDecomposer.h>
 #include <graph/Partitioner.h>
@@ -163,9 +164,14 @@ namespace rannc {
         syncDebugName(graph);
 
         std::unordered_map<std::string, long> graph_params = matchParamNames(graph, input_ivals.size(), py_params, py_buffers);
+        bool zero_enabled = false;
         for (const auto &it: graph_params) {
-            auto p = param_storage_->getParamTensor(it.second);
-            toCPUInPlace(p);
+            if (param_storage_->zeroEnabled(it.second)) {
+                zero_enabled = true;
+            } else {
+                auto p = param_storage_->getParamTensor(it.second);
+                toCPUInPlace(p);
+            }
         }
 
         if (mpi::isMaster()) {
@@ -190,9 +196,12 @@ namespace rannc {
         }
 
         std::unordered_map<std::string, torch::jit::IValue> param_inputs;
-        for (const auto& it: graph_params) {
-            param_inputs[it.first] = param_storage_->getParamTensor(it.second);
+        if (!zero_enabled) {
+            for (const auto &it: graph_params) {
+                param_inputs[it.first] = param_storage_->getParamTensor(it.second);
+            }
         }
+        logger->info("init 4");
 
         auto value_storage = std::make_shared<GraphValueStorage>();
         value_storage->deploy(graph);
@@ -200,15 +209,15 @@ namespace rannc {
         FunctionStorage function_storage;
         function_storage.deploy(graph);
 
+        ZeroParamLocator& zpl = ZeroParamLocator::get();
+        zpl.fetchStart();
         if (mpi::isMaster()) {
-            const int max_mp_num = config::Config::get().getVal<int>(config::MAX_MP_NUM);
-            const int min_dp_num = std::max(mpi::getSize() / max_mp_num, 1);
             const int min_pipeline = config::Config::get().getVal<int>(config::MIN_PIPELINE);
             std::shared_ptr<GraphProfiler> sg_prof =
-                    std::make_shared<GraphProfiler>(ir_graph_, non_param_inputs, param_inputs,
+                    std::make_shared<GraphProfiler>(param_storage_, ir_graph_, non_param_inputs, graph_params,
                                                     value_storage->getValues(),
                                                     function_storage,
-                                                    batch_size, mpi::getSize(), min_dp_num, min_pipeline);
+                                                    batch_size, mpi::getSize(), min_pipeline);
 
             bool load_profile = config::Config::get().getVal<bool>(config::LOAD_GRAPH_PROFILE);
             std::string graph_profile_file = config::Config::get().getVal<std::string>(config::GRAPH_PROFILE_FILE);
@@ -352,15 +361,21 @@ namespace rannc {
             }
 
             if (config::Config::get().getVal<bool>(config::VERIFY_PARTITIONING)) {
-                Validator validator;
-                if (!validator.validate(graph, input_ivals, param_inputs, value_storage->getValues(), function_storage, deployment_)) {
-                    throw std::runtime_error("Partitioning verification failed.");
+                if (zero_enabled) {
+                    logger->warn("Verification was disabled because zero param distribution is enabled.");
+                } else {
+                    Validator validator;
+                    if (!validator.validate(graph, input_ivals, param_inputs, value_storage->getValues(),
+                                            function_storage, deployment_)) {
+                        throw std::runtime_error("Partitioning verification failed.");
+                    }
+                    logger->info("Partitioning verification passed.");
                 }
-                logger->info("Partitioning verification passed.");
             }
         }
 
         emptyCache();
+        zpl.fetchEnd();
         MPI_Barrier(MPI_COMM_WORLD);
 
         ObjectComm& ocomm = ObjectComm::get();

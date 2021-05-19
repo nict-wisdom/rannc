@@ -81,10 +81,16 @@ namespace rannc {
         return buf.detach().cpu();
     }
 
+    void ZeroParamLocator::disable(long pid) {
+        owners_.erase(pid);
+        params_.erase(pid);
+        ir_types_.erase(pid);
+    }
+
     void ZeroParamLocator::fetchStart() {
         TagMap& tag_map = TagMap::get();
-        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
-        nccl_.createCommunicator(tag, mpi::getAllRanks());
+        comm_tag_ = tag_map.getRankSetTag(mpi::getAllRanks());
+        nccl_.createCommunicator(comm_tag_, mpi::getAllRanks());
 
         if (mpi::getRank() != 0) {
             long global_pid;
@@ -96,7 +102,7 @@ namespace rannc {
                 long pid = global_id_to_local_.at(global_pid);
                 assert(contains(params_, pid));
                 const auto param = params_.at(pid).cuda();
-                nccl_.send(tag, 0, param);
+                nccl_.send(comm_tag_, 0, param);
 
                 MPI_Recv(&global_pid, 1, MPI_LONG, 0, FETCH_TAG, MPI_COMM_WORLD, &status);
             }
@@ -107,24 +113,33 @@ namespace rannc {
         assert(contains(owners_, pid));
         int owner = owners_.at(pid);
 
-        TagMap& tag_map = TagMap::get();
-        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+        if (mpi::getRank() == owner) {
+            assert(contains(params_, pid));
+            return params_.at(pid);
+        }
+
+        MPI_Send(&pid, 1, MPI_LONG, owner, FETCH_TAG, MPI_COMM_WORLD);
 
         at::TensorOptions options;
         options = options.dtype(fromIRTensorElemTypeToScalarType(ir_types_.at(pid).getTensorElemType()))
                 .device(c10::Device(c10::DeviceType::CUDA))
                 .requires_grad(true);
         auto buf = torch::zeros(ir_types_.at(pid).getTensorDim(), options);
-        nccl_.recv(tag, owner, buf);
+        nccl_.recv(comm_tag_, owner, buf);
         return buf;
     }
 
     void ZeroParamLocator::fetchEnd() {
         if (mpi::getRank() == 0) {
             long pid = 0;
-            for (int i=1; i<mpi::getSize(); i++) {
+            for (int i=1; i < mpi::getSize(); i++) {
                 MPI_Send(&pid, 1, MPI_LONG, i, FETCH_TAG, MPI_COMM_WORLD);
             }
         }
+    }
+
+    int ZeroParamLocator::getOwner(long pid) {
+        assert(contains(owners_, pid));
+        return owners_.at(pid);
     }
 }

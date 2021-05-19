@@ -42,7 +42,7 @@ namespace rannc {
 
     class ParamStorage {
     public:
-        ParamStorage() {}
+        ParamStorage() = default;
 
         void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool zero_enabled);
         void unregisterParam(long param_id);
@@ -52,12 +52,14 @@ namespace rannc {
         at::Tensor getParamTensor(long param_id) const;
         at::Tensor getAmpMasterParamTensor(long param_id) const;
         bool hasAmpMasterParam(long param_id) const;
+        bool zeroEnabled(long param_id) const;
+        int zeroOwner(long param_id) const;
 
         const std::unordered_set<int>& getRanks(long param_id);
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);
-        void initParam(long param_id, const std::unordered_set<int>& ranks);
+        void syncParam(long param_id, const std::unordered_set<int>& ranks);
 
         long globalToLocal(long global_param_id);
         long localToGlobal(long local_param_id);
@@ -76,6 +78,9 @@ namespace rannc {
         at::Tensor gatherParam(long param_id, int dest);
         at::Tensor syncParamGrad(long param_id);
         at::Tensor gatherParamGrad(long param_id, int dest);
+
+        IRType getParamType(long param_id);
+        IRType getParamType(const std::string& graph_id, const std::string& name);
 
         bool isConsolidate() const {
             return consolidate_;

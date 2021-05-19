@@ -26,6 +26,9 @@ namespace rannc {
 
         int store(long pid, const at::Tensor& param);
         at::Tensor load(long pid);
+        void disable(long pid);
+
+        int getOwner(long pid);
 
         void fetchStart();
         at::Tensor fetch(long pid);
@@ -36,6 +39,7 @@ namespace rannc {
         ~ZeroParamLocator() = default;
 
         NCCLWrapper& nccl_;
+        int comm_tag_;
 
         std::unordered_map<long, at::Tensor> params_;
         std::unordered_map<int, int64_t> sizes_;
@@ -43,7 +47,6 @@ namespace rannc {
         std::unordered_map<long, long> global_id_to_local_;
 
         std::unordered_map<long, IRType> ir_types_;
-        std::unordered_map<long, c10::DeviceType> device_types_;
 
         static const int FETCH_TAG;
     };

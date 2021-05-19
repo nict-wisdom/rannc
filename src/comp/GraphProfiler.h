@@ -13,11 +13,8 @@
 
 namespace rannc {
 
-    //
-    //    Forward declarations
-    //
+    class ParamStorage;
     class FunctionStorage;
-
 
     struct GraphProfile {
         std::string name;
@@ -74,20 +71,21 @@ namespace rannc {
 
     class GraphProfiler {
     public:
-        GraphProfiler(std::shared_ptr<IRGraph> base_graph,
+        GraphProfiler(std::shared_ptr<ParamStorage> param_storage,
+                      std::shared_ptr<IRGraph> base_graph,
                       std::unordered_map<std::string, torch::jit::IValue> non_param_inputs,
-                      std::unordered_map<std::string, torch::jit::IValue> param_inputs,
+                      const std::unordered_map<std::string, long>& graph_params,
                       IValueMap constants,
                       const FunctionStorage &functions,
-                      size_t batch_size, int dev_num, size_t min_dp_num, size_t min_pipeline_num)
-                :base_graph_(std::move(base_graph)),
+                      size_t batch_size, int dev_num, size_t min_pipeline_num)
+                :param_storage_(std::move(param_storage)),
+                 base_graph_(std::move(base_graph)),
                  non_param_inputs_(std::move(non_param_inputs)),
-                 param_inputs_(std::move(param_inputs)),
+                 graph_params_(std::move(graph_params)),
                  constants_(std::move(constants)),
                  functions_(functions),
                  batch_size_(batch_size),
                  dev_num_(dev_num),
-                 min_dp_num_(min_dp_num),
                  min_pipeline_num_(min_pipeline_num) {
         }
 
@@ -104,15 +102,15 @@ namespace rannc {
         void save(const std::string& file);
 
     private:
+        std::shared_ptr<ParamStorage> param_storage_;
         TorchDriver driver_;
         std::shared_ptr<IRGraph> base_graph_;
         std::unordered_map<std::string, torch::jit::IValue> non_param_inputs_;
-        std::unordered_map<std::string, torch::jit::IValue> param_inputs_;
+        std::unordered_map<std::string, long> graph_params_;
         IValueMap constants_;
         const FunctionStorage & functions_;
         size_t batch_size_;
         int dev_num_;
-        size_t min_dp_num_;
         size_t min_pipeline_num_;
 
         IValueMap values_;
