@@ -398,7 +398,7 @@ namespace rannc {
     void ParamStorage::prepareBackward(const std::string& graph_id) {
         if (contains(zero_grad_locators_, graph_id)) {
             for (const auto& it: getParamIDs(graph_id, false)) {
-                zero_grad_locators_.at(graph_id)->setGrad(it.second);
+                zero_grad_locators_.at(graph_id)->stashGrad(it.second);
             }
         } else if (consolidate_) {
             consolidateGrads(graph_id);

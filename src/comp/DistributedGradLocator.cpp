@@ -14,7 +14,7 @@ namespace rannc {
         return owner;
     }
 
-    void DistributedGradLocator::setGrad(long pid) {
+    void DistributedGradLocator::stashGrad(long pid) {
         assert(contains(params_, pid));
         assert(contains(grad_buffers_, pid));
 

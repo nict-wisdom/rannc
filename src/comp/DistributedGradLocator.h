@@ -13,7 +13,7 @@ namespace rannc {
     class DistributedGradLocator : public DistributedParamLocatorBase {
     public:
         int registerGrad(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
-        void setGrad(long pid);
+        void stashGrad(long pid);
         void unstashGrad(long pid);
         at::Tensor getGradBuffer(long pid);
 
