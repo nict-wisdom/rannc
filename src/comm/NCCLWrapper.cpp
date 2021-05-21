@@ -166,58 +166,51 @@ namespace rannc {
         return datatype;
     }
 
-    void doReduce(std::unordered_map<int, AllReduceComm*>& comm_map,
-        int tag, const std::unordered_set<int>& ranks,
-        const std::vector<at::Tensor>& param_grads, ncclRedOp_t red_op, bool allreduce) {
+    void runCollectiveComm(std::unordered_map<int, AllReduceComm*>& comm_map, int tag,
+                           const std::vector<at::Tensor>& tensors, const std::string& op_name,
+                           const std::function<void(void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index)>& f) {
 
         assert(contains(comm_map, tag));
         AllReduceComm* comm_info = comm_map.at(tag);
         ncclComm_t* ncomm = comm_info->comm;
 
         // NCCL's limitation
-        assert(param_grads.size() < 2048);
+        assert(tensors.size() < 2048);
 
         syncStream();
 
         std::stringstream ss;
         size_t elem_sum = 0;
-        for (const auto& grad: param_grads) {
+        for (const auto& grad: tensors) {
             elem_sum += getTensorElemCount(grad);
         }
-        ss << "nccl_allreduce_tag_" << tag << "_elem_" << elem_sum;
+        ss << "nccl_" << op_name << "_tag_" << tag << "_elem_" << elem_sum;
         recordStart(ss.str());
 
 #if defined(__NCCL_SUPPORTS_BFLOAT16__)
-        const std::vector<at::Tensor>& param_grads_buf = param_grads;
+        const std::vector<at::Tensor>& tensors_buf = tensors;
 #else
-        std::vector<at::Tensor> param_grads_buf;
-        param_grads_buf.reserve(param_grads.size());
+        std::vector<at::Tensor> tensors_buf;
+        tensors_buf.reserve(tensors.size());
         std::unordered_set<size_t> bf16_idx;
-        for (size_t i=0; i<param_grads.size() ;i++) {
-            const auto& grad = param_grads.at(i);
+        for (size_t i=0; i<tensors.size() ;i++) {
+            const auto& ten = tensors.at(i);
             if (grad.scalar_type() == c10::ScalarType::BFloat16) {
-                const auto f_grad = grad.to(c10::ScalarType::Float);
-                param_grads_buf.push_back(f_grad);
+                const auto f_ten = ten.to(c10::ScalarType::Float);
+                tensors_buf.push_back(ten);
                 bf16_idx.insert(i);
             } else {
-                param_grads_buf.push_back(grad);
+                tensors_buf.push_back(grad);
             }
         }
 #endif
         ncclGroupStart();
-        for (const auto& grad: param_grads_buf) {
-            assert(grad.is_contiguous());
-            void* ptr = grad.data_ptr();
-            ncclDataType_t datatype = getReduceNcclDataType(grad);
-            if (allreduce) {
-//                spdlog::info("nccl_allreduce calling tag={} count={} stype={}", tag, getTensorElemCount(grad), toString(grad.scalar_type()));
-                ncclAllReduce(ptr, ptr, getTensorElemCount(grad), datatype, red_op, *ncomm,
-                              (cudaStream_t) nullptr);
-//                spdlog::info("nccl_allreduce finished tag={} count={} stype={}", tag, getTensorElemCount(grad), toString(grad.scalar_type()));
-            } else {
-                ncclReduce(ptr, ptr, getTensorElemCount(grad), datatype, red_op, 0, *ncomm,
-                           (cudaStream_t) nullptr);
-            }
+        size_t index = 0;
+        for (const auto& ten: tensors_buf) {
+            assert(ten.is_contiguous());
+            void* ptr = ten.data_ptr();
+            ncclDataType_t datatype = getReduceNcclDataType(ten);
+            f(ptr, getTensorElemCount(ten), datatype, ncomm, index++);
         }
         ncclGroupEnd();
         syncStream();
@@ -231,56 +224,50 @@ namespace rannc {
             }
         }
 #endif
-
         recordEnd(ss.str());
+
     }
 
-    void NCCLWrapper::allreduce(int tag, const std::unordered_set<int>& ranks,
-                                const std::vector<at::Tensor> &param_grads) {
-        doReduce(comm_map_, tag, ranks, param_grads, ncclSum, true);
+    void NCCLWrapper::doAllreduce(int tag, const std::vector<at::Tensor> &tensors,
+                                  ncclRedOp_t red_op) {
+        runCollectiveComm(comm_map_, tag, tensors, "allreduce",
+                          [red_op](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                              ncclAllReduce(ptr, ptr, count, datatype, red_op, *ncomm,
+                                            (cudaStream_t) nullptr);
+                          });
     }
 
-    void NCCLWrapper::reduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads) {
-        doReduce(comm_map_, tag, ranks, param_grads, ncclSum, false);
+    void NCCLWrapper::allreduce(int tag, const std::vector<at::Tensor> &tensors) {
+        doAllreduce(tag, tensors, ncclSum);
     }
 
-    void NCCLWrapper::allreduceMin(int tag, const std::unordered_set<int>& ranks,
-                                   const std::vector<at::Tensor> &param_grads) {
-        doReduce(comm_map_, tag, ranks, param_grads, ncclMin, true);
+    void NCCLWrapper::allreduceMin(int tag, const std::vector<at::Tensor> &tensors) {
+        doAllreduce(tag, tensors, ncclMin);
+    }
+
+    void NCCLWrapper::reduce(int tag, const std::vector<at::Tensor> &tensors,
+                             const std::vector<at::Tensor>& out_bufs, const std::vector<int>& roots) {
+
+        assert(tensors.size() == roots.size());
+        runCollectiveComm(comm_map_, tag, tensors, "reduce",
+                          [&out_bufs, &roots](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                              assert(index < roots.size());
+                              assert(index < out_bufs.size());
+                              int root = roots.at(index);
+                              void* recv_buf = nullptr;
+                              if (mpi::getRank() == root) {
+                                  recv_buf = out_bufs.at(index).data_ptr();
+                              }
+                              ncclReduce(ptr, recv_buf, count, datatype, ncclSum, root, *ncomm, (cudaStream_t) nullptr);
+                          });
     }
 
     void NCCLWrapper::bcast(int tag, const std::unordered_set<int>& ranks, int root,
                                 const std::vector<at::Tensor>& tensors) {
-
-        assert(contains(comm_map_, tag));
-        AllReduceComm* comm_info = comm_map_.at(tag);
-        ncclComm_t* ncomm = comm_info->comm;
-
-        // NCCL's limitation
-        assert(tensors.size() < 2048);
-
-        syncStream();
-
-        std::stringstream ss;
-        size_t elem_sum = 0;
-        for (const auto& t: tensors) {
-            elem_sum += getTensorElemCount(t);
-        }
-        ss << "nccl_bcast_tag_" << tag << "_elem_" << elem_sum;
-        recordStart(ss.str());
-
-        ncclGroupStart();
-        for (const auto& t: tensors) {
-            assert(t.is_contiguous());
-            void* ptr = t.data_ptr();
-            ncclDataType_t datatype = getReduceNcclDataType(t);
-            ncclBcast(ptr, getTensorElemCount(t), datatype, root, *ncomm, (cudaStream_t) nullptr);
-//            ncclBroadcast(ptr, ptr, getTensorElemCount(t), datatype, *ncomm, (cudaStream_t) nullptr);
-        }
-        ncclGroupEnd();
-        syncStream();
-
-        recordEnd(ss.str());
+        runCollectiveComm(comm_map_, tag, tensors, "reduce",
+                          [root](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                              ncclBcast(ptr, count, datatype, root, *ncomm, (cudaStream_t) nullptr);
+                          });
     }
 
     std::string getBoolBufKey(const RouteDP& route, const std::string& action, int split_index) {

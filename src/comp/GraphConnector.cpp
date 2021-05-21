@@ -439,7 +439,7 @@ namespace rannc {
         recordStart(getFuncKey("backward", id, split_index, false));
 
         if (split_index == 0) {
-            param_storage_->consolidateGrads(id);
+            param_storage_->prepareBackward(id);
         }
 
         const auto func = [this](const std::string& id, const IValueMap& inputs, int split_index) {

@@ -647,7 +647,7 @@ namespace rannc {
         const auto route_ranks = getRanksInRoute(route);
 
         if (contains(route_ranks, mpi::getRank())) {
-            ar.allreduce(tag_map.getRankSetTag(route_ranks), route_ranks, ar_buf);
+            ar.allreduce(tag_map.getRankSetTag(route_ranks), ar_buf);
         }
 
         if (!contains(route.dests, mpi::getRank())) {

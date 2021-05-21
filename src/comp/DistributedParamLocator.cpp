@@ -11,8 +11,9 @@
 
 
 namespace rannc {
+
     int DistributedParamLocator::store(long pid, const at::Tensor& param) {
-        int owner = doRegister(pid, param);
+        int owner = doRegister(pid, param, mpi::getAllRanks());
         if (mpi::getRank() == owner) {
             spdlog::info("Placed {} on rank {}: {}", pid, owner, join_as_str(getTensorDim(param)));
             params_[pid] = param;

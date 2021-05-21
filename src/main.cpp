@@ -77,9 +77,9 @@ PYBIND11_MODULE(_pyrannc, m) {
 
         ar.createCommunicator(tag, mpi::getAllRanks());
         if (sum) {
-            ar.allreduce(tag, mpi::getAllRanks(), t);
+            ar.allreduce(tag, t);
         } else {
-            ar.allreduceMin(tag, mpi::getAllRanks(), t);
+            ar.allreduceMin(tag, t);
         }
     });
 
@@ -142,7 +142,7 @@ PYBIND11_MODULE(_pyrannc, m) {
     });
 
     py::class_<RaNNCModule, std::shared_ptr<RaNNCModule>>(m, "RaNNCModule")
-            .def(py::init<bool, bool, bool>())
+            .def(py::init<bool, bool, bool, bool>())
             .def("init", [](RaNNCModule& self,
                             const py::function& fwdFunc,
                             const std::vector<py::tuple>& params, const std::vector<py::tuple>& buffers,

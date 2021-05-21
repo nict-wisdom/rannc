@@ -3,12 +3,13 @@
 //
 
 #include <comm/ObjectComm.h>
+#include <comm/SComm.h>
 #include "DistributedParamLocatorBase.h"
 
 namespace rannc {
     const int DistributedParamLocatorBase::FETCH_TAG = 10;
 
-    int DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param) {
+    int DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
 
         int np = mpi::getSize();
 
@@ -21,9 +22,14 @@ namespace rannc {
             }
         }
 
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(ranks);
+        SComm& scomm = SComm::get();
+        MPI_Comm communicator = scomm.getCommunicator(tag, ranks);
+
         ObjectComm& ocomm = ObjectComm::get();
         long global_id = pid;
-        global_id = ocomm.bcast(global_id);
+        global_id = ocomm.bcast(global_id, 0, communicator);
         global_id_to_local_[global_id] = pid;
 
         int64_t param_size = param.numel() * param.element_size();
@@ -31,7 +37,7 @@ namespace rannc {
         owners_[pid] = min_idx;
         ir_types_[pid] = toIRType(param);
 
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(communicator);
 
         return min_idx;
     }

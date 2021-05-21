@@ -10,6 +10,7 @@
 #include <Logging.h>
 #include <comm/NCCLWrapper.h>
 #include <graph/Decomposition.h>
+#include "DistributedGradLocator.h"
 
 namespace rannc {
 
@@ -57,7 +58,7 @@ namespace rannc {
 
         const std::unordered_set<int>& getRanks(long param_id);
 
-        void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params);
+        void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);
         void syncParam(long param_id, const std::unordered_set<int>& ranks);
 
@@ -66,7 +67,7 @@ namespace rannc {
 
         void allReduceParamGrads(const std::string& graph_id);
         void clearParamGrads(const std::string& graph_id);
-        void consolidateGrads(const std::string& graph_id);
+        void prepareBackward(const std::string& graph_id);
         void scaleGrads(const std::string& graph_id, bool amp_master_grads);
         void unscaleGrads(const std::string& graph_id, bool amp_master_grads);
 
@@ -113,6 +114,7 @@ namespace rannc {
         void doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads);
         at::Tensor doSyncParam(long param_id, bool grad);
         at::Tensor doGatherParam(long param_id, int dest, bool grad);
+        void consolidateGrads(const std::string& graph_id);
 
         std::unordered_map<std::string, std::unordered_map<std::string, long>> graph_params_;
         std::unordered_map<std::string, std::unordered_map<std::string, long>> unused_params_; // used to calc global norm, the value is a global id
@@ -140,6 +142,7 @@ namespace rannc {
         std::unordered_map<std::string, std::unordered_map<int,  std::vector<long>>> grouped_params_;
         std::unordered_map<int,  std::unordered_set<int>> tag_rank_set_;
         std::unordered_map<std::string, bool> use_amp_master_params_;
+        std::unordered_map<std::string, std::shared_ptr<DistributedGradLocator>> zero_grad_locators_;
 
         static bool sync_on_init_;
 

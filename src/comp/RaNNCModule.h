@@ -21,10 +21,11 @@ namespace rannc {
     class IRGraph;
     class RaNNCProcess;
     class GraphLauncher;
+    class DistributedGradLocator;
 
     class RaNNCModule {
     public:
-        RaNNCModule(bool use_amp_master_params, bool allreduce_amp_master_param, bool check_unused_values);
+        RaNNCModule(bool use_amp_master_params, bool allreduce_amp_master_param, bool enable_zero, bool check_unused_values);
         ~RaNNCModule();
 
         /**
@@ -73,6 +74,7 @@ namespace rannc {
 
         std::shared_ptr<GraphLauncher> driver_;
         std::shared_ptr<ParamStorage> param_storage_;
+        std::shared_ptr<DistributedGradLocator> zero_grad_locator_;
         std::vector<long> param_ids_on_rank_;
 
         Deployment deployment_;
@@ -85,6 +87,7 @@ namespace rannc {
         bool check_unused_values_;
         bool skip_grad_scaling_;
         bool allreduce_amp_master_param_;
+        bool enable_zero_;
 
         bool destroyed_ = false;
 

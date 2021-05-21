@@ -307,20 +307,42 @@ namespace rannc {
             if (contains(ranks, mpi::getRank())) {
                 if (consolidate_) {
                     const auto& graph_grad_cons = grad_cons_[graph_id];
-                    ar.allreduce(tag, ranks, graph_grad_cons.at(tag)->getConsolidatedGrads());
+                    ar.allreduce(tag, graph_grad_cons.at(tag)->getConsolidatedGrads());
                 } else {
                     const auto &param_ids = graph_grouped_params.at(tag);
                     std::vector<at::Tensor> grads;
                     grads.reserve(param_ids.size());
                     for (long pid: param_ids) {
                         auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
-                                ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
+                                     ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
                         auto& grad = param.grad();
                         if (grad.defined()) {
                             grads.push_back(grad);
                         }
                     }
-                    ar.allreduce(tag, ranks, grads);
+
+                    if (contains(zero_grad_locators_, graph_id)) {
+                        auto locator = zero_grad_locators_.at(graph_id);
+                        std::vector<int> roots;
+                        roots.reserve(param_ids.size());
+                        std::vector<at::Tensor> out_bufs;
+                        out_bufs.reserve(param_ids.size());
+                        for (long pid: param_ids) {
+                            int owner = locator->getOwner(pid);
+                            roots.push_back(owner);
+                            at::Tensor out_buf;
+                            if (mpi::getRank() == owner) {
+                                out_buf = locator->getGradBuffer(pid);
+                            }
+                            out_bufs.push_back(out_buf);
+                        }
+                        ar.reduce(tag, grads, out_bufs, roots);
+                        for (long pid: param_ids) {
+                            locator->unstashGrad(pid);
+                        }
+                    } else {
+                        ar.allreduce(tag, grads);
+                    }
                 }
             }
             if (sync_allreduce) {
@@ -373,15 +395,23 @@ namespace rannc {
         doScaleGrads(graph_id, true, amp_master_grads);
     }
 
+    void ParamStorage::prepareBackward(const std::string& graph_id) {
+        if (contains(zero_grad_locators_, graph_id)) {
+            for (const auto& it: getParamIDs(graph_id, false)) {
+                zero_grad_locators_.at(graph_id)->setGrad(it.second);
+            }
+        } else if (consolidate_) {
+            consolidateGrads(graph_id);
+        }
+    }
+
     void ParamStorage::consolidateGrads(const std::string& graph_id) {
-        if (consolidate_) {
-            if (!contains(grad_cons_, graph_id)) {
-                return;
-            }
-            const auto graph_grad_cons = grad_cons_.at(graph_id);
-            for (auto &it: graph_grad_cons) {
-                it.second->consolidate();
-            }
+        if (!contains(grad_cons_, graph_id)) {
+            return;
+        }
+        const auto graph_grad_cons = grad_cons_.at(graph_id);
+        for (auto &it: graph_grad_cons) {
+            it.second->consolidate();
         }
     }
 
@@ -471,7 +501,8 @@ namespace rannc {
         ref_counts_[param_id]++;
     }
 
-    void ParamStorage::deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params) {
+    void ParamStorage::deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params,
+                              bool enable_zero) {
         logger->trace("ParamStorage::deployGraph starting: graph_id={}", decomp.id);
 
         auto& graph_id = decomp.id;
@@ -587,7 +618,19 @@ namespace rannc {
             i++;
         }
 
-        if (consolidate_) {
+        if (enable_zero) {
+            zero_grad_locators_[graph_id] = std::make_shared<DistributedGradLocator>();
+
+            for (const auto &param_id: sorted_param_ids) {
+                if (!contains(ranks_, param_id)) {
+                    continue;
+                }
+                at::Tensor &param_tensor = params_.at(param_id);
+                const auto &param_ranks = ranks_.at(param_id);
+                int owner = zero_grad_locators_[graph_id]->registerGrad(param_id, param_tensor, param_ranks);
+                logger->trace("Registered param for zero: pid={} ranks={} owner={}", param_id, join_as_str(param_ranks), owner);
+            }
+        } else if (consolidate_) {
             for (const auto &it: graph_grouped_params) {
                 const auto &ranks = tag_rank_set_.at(it.first);
                 if (contains(ranks, mpi::getRank())) {

@@ -68,6 +68,7 @@ set(RANNC_SRCS
         src/comp/GraphValueStorage.cpp
         src/comp/ParamStorage.cpp
         src/comp/DistributedParamLocatorBase.cpp
+        src/comp/DistributedGradLocator.cpp
         src/comp/DistributedParamLocator.cpp
         src/comp/NodeProfiler.cpp
         src/comp/GraphProfiler.cpp

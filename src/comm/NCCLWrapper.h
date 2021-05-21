@@ -45,9 +45,9 @@ namespace rannc {
         void createCommunicator(int tag, const std::unordered_set<int> &ranks);
         void destroy();
 
-        void allreduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads);
-        void allreduceMin(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads);
-        void reduce(int tag, const std::unordered_set<int>& ranks, const std::vector<at::Tensor> &param_grads);
+        void allreduce(int tag, const std::vector<at::Tensor> &tensors);
+        void allreduceMin(int tag, const std::vector<at::Tensor> &tensors);
+        void reduce(int tag, const std::vector<at::Tensor> &tensors, const std::vector<at::Tensor>& out_bufs, const std::vector<int>& roots);
         void redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
                     int64_t batch_size, const IRType& global_type, int split_index);
         void bcast(int tag, const std::unordered_set<int>& ranks, int root,
@@ -71,6 +71,8 @@ namespace rannc {
 
     private:
         NCCLWrapper() = default;
+
+        void doAllreduce(int tag, const std::vector<at::Tensor> &tensors, ncclRedOp_t red_op);
 
         bool initialized = false;
         std::unordered_map<int, AllReduceComm*> comm_map_;

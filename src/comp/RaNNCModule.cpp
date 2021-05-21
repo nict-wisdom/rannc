@@ -18,6 +18,7 @@
 #include <bind/Tracer.h>
 #include <comp/FunctionStorage.h>
 #include <comp/DistributedParamLocator.h>
+#include <comp/DistributedGradLocator.h>
 #include <graph/GuessValueTypes.h>
 #include <graph/MetaDecomposer.h>
 #include <graph/Partitioner.h>
@@ -93,10 +94,11 @@ namespace rannc {
     }
 
     RaNNCModule::RaNNCModule(bool use_amp_master_params, bool allreduce_amp_master_param,
-                             bool check_unused_values):
+                             bool enable_zero, bool check_unused_values):
             id_(generateName("mod_")), master_(RaNNCFactory::get()),
             use_amp_master_params_(use_amp_master_params),
             allreduce_amp_master_param_(allreduce_amp_master_param),
+            enable_zero_(enable_zero),
             check_unused_values_(check_unused_values) {
 
         ObjectComm& ocomm = ObjectComm::get();
@@ -388,7 +390,7 @@ namespace rannc {
         if (mpi::getRank() == 0) {
             logger->debug("Deploying parameters ...");
         }
-        param_storage_->deploy(deployment_, graph_params);
+        param_storage_->deploy(deployment_, graph_params, enable_zero_);
 
         driver_ = std::make_shared<GraphLauncher>(
                         param_storage_, value_storage,
