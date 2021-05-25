@@ -5,16 +5,9 @@ import torch
 from . import _pyrannc
 
 
-def _remove_param_if_unnecessary(p):
-    if _pyrannc.get_rank() != p.owner:
-        p.data = torch.ones(1, dtype=p.dtype).to(p.device)
-
-
 def store_dist_param(p):
-    owner = _pyrannc.store_dist_param(p)
-    p.owner = owner
+    _pyrannc.store_dist_param(p)
     p.distributed = True
-    _remove_param_if_unnecessary(p)
 
 
 def load_dist_param(pid):
@@ -60,12 +53,4 @@ class DistributeModelParams(object):
                 b.data = load_dist_param(id(b))
             return input
 
-        # Remove param tensors
-        def _post_hook_for_tracing(_model, input, output):
-            for p in _model.parameters(recurse=False):
-                _remove_param_if_unnecessary(p)
-            for b in _model.buffers(recurse=False):
-                _remove_param_if_unnecessary(b)
-
         model.register_forward_pre_hook(_pre_hook_for_tracing)
-        model.register_forward_hook(_post_hook_for_tracing)

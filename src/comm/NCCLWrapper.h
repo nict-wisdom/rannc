@@ -50,8 +50,8 @@ namespace rannc {
         void reduce(int tag, const std::vector<at::Tensor> &tensors, const std::vector<at::Tensor>& out_bufs, const std::vector<int>& roots);
         void redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
                     int64_t batch_size, const IRType& global_type, int split_index);
-        void bcast(int tag, const std::unordered_set<int>& ranks, int root,
-                                const std::vector<at::Tensor>& tensors);
+        void bcast(int tag,  int root, const std::vector<at::Tensor>& tensors);
+        void allgather(int tag, const std::vector<at::Tensor> &tensors, const std::vector<at::Tensor>& out_bufs);
         void send(int tag, int dest, const at::Tensor& tensor);
         void recv(int tag, int dest, const at::Tensor& tensor);
         void startBulk();

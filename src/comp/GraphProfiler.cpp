@@ -562,12 +562,7 @@ namespace rannc {
             assert(contains(graph_params_, v.getName()));
             long pid = graph_params_.at(v.getName());
 
-            if (param_storage_->distributed(pid)) {
-                int owner = param_storage_->distParamOwner(pid);
-                if (mpi::getRank() == owner) {
-                    getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
-                }
-            } else {
+            if (!param_storage_->distributed(pid)) {
                 getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
             }
         }

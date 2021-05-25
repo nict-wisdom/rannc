@@ -195,15 +195,16 @@ namespace rannc {
         std::unordered_set<size_t> bf16_idx;
         for (size_t i=0; i<tensors.size() ;i++) {
             const auto& ten = tensors.at(i);
-            if (grad.scalar_type() == c10::ScalarType::BFloat16) {
+            if (ten.scalar_type() == c10::ScalarType::BFloat16) {
                 const auto f_ten = ten.to(c10::ScalarType::Float);
                 tensors_buf.push_back(ten);
                 bf16_idx.insert(i);
             } else {
-                tensors_buf.push_back(grad);
+                tensors_buf.push_back(ten);
             }
         }
 #endif
+
         ncclGroupStart();
         size_t index = 0;
         for (const auto& ten: tensors_buf) {
@@ -216,16 +217,15 @@ namespace rannc {
         syncStream();
 
 #if not defined(__NCCL_SUPPORTS_BFLOAT16__)
-        for (size_t i=0; i<param_grads.size() ;i++) {
+        for (size_t i=0; i<tensors.size() ;i++) {
             if (contains(bf16_idx, i)) {
-                auto& grad = param_grads.at(i);
-                auto& grad_buf = param_grads_buf.at(i);
+                auto& grad = tensors.at(i);
+                auto& grad_buf = tensors_buf.at(i);
                 grad.copy_(grad_buf);
             }
         }
 #endif
         recordEnd(ss.str());
-
     }
 
     void NCCLWrapper::doAllreduce(int tag, const std::vector<at::Tensor> &tensors,
@@ -262,11 +262,20 @@ namespace rannc {
                           });
     }
 
-    void NCCLWrapper::bcast(int tag, const std::unordered_set<int>& ranks, int root,
+    void NCCLWrapper::bcast(int tag, int root,
                                 const std::vector<at::Tensor>& tensors) {
         runCollectiveComm(comm_map_, tag, tensors, "reduce",
                           [root](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
                               ncclBcast(ptr, count, datatype, root, *ncomm, (cudaStream_t) nullptr);
+                          });
+    }
+
+    void NCCLWrapper::allgather(int tag, const std::vector<at::Tensor> &tensors, const std::vector<at::Tensor>& out_bufs) {
+        runCollectiveComm(comm_map_, tag, tensors, "allgather",
+                          [&out_bufs](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                              assert(index < out_bufs.size());
+                              void* recv_buf = out_bufs.at(index).data_ptr();
+                              ncclAllGather(ptr, recv_buf, count, datatype, *ncomm, (cudaStream_t) nullptr);
                           });
     }
 

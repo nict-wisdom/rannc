@@ -14,22 +14,25 @@ namespace rannc {
 
     class DistributedParamLocatorBase {
     public:
-        int getOwner(long pid);
+        void remove(long pid);
+        size_t getSegmentNum(long pid);
+        size_t getOwner(long pid, int index);
 
     protected:
         NCCLWrapper& nccl_;
         int comm_tag_;
 
-        std::unordered_map<int, int64_t> sizes_;
-        std::unordered_map<long, int> owners_;
+        std::unordered_map<long, std::vector<int64_t>> offsets_;
+        std::unordered_map<long, std::vector<int64_t>> src_sizes_;
         std::unordered_map<long, long> global_id_to_local_;
         std::unordered_map<long, IRType> ir_types_;
-        std::unordered_map<long, at::Tensor> params_;
+        std::unordered_map<long, int64_t> segment_sizes_;
+        std::unordered_map<long, std::unordered_set<int>> ranks_;
 
         DistributedParamLocatorBase() : nccl_(NCCLWrapper::get()) {};
         ~DistributedParamLocatorBase() = default;
 
-        int doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
+        void doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
 
         static const int FETCH_TAG;
     };

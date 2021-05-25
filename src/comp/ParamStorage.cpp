@@ -279,11 +279,6 @@ namespace rannc {
         return contains(dist_ids_, param_id);
     }
 
-    int ParamStorage::distParamOwner(long param_id) const {
-        DistributedParamLocator& zpl = DistributedParamLocator::get();
-        return zpl.getOwner(param_id);
-    }
-
     void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
         auto& graph_grouped_params = grouped_params_[graph_id];
 
@@ -311,36 +306,34 @@ namespace rannc {
                 } else {
                     const auto &param_ids = graph_grouped_params.at(tag);
                     std::vector<at::Tensor> grads;
-                    grads.reserve(param_ids.size());
-                    for (long pid: param_ids) {
-                        auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
-                                     ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
-                        auto& grad = param.grad();
-                        if (grad.defined()) {
-                            grads.push_back(grad);
-                        }
-                    }
 
                     if (contains(zero_grad_locators_, graph_id)) {
                         auto locator = zero_grad_locators_.at(graph_id);
                         std::vector<int> roots;
                         roots.reserve(param_ids.size());
                         std::vector<at::Tensor> out_bufs;
-                        out_bufs.reserve(param_ids.size());
                         for (long pid: param_ids) {
-                            int owner = locator->getOwner(pid);
-                            roots.push_back(owner);
-                            at::Tensor out_buf;
-                            if (mpi::getRank() == owner) {
-                                out_buf = locator->getGradBuffer(pid);
+                            for (int i=0; i<locator->getSegmentNum(pid); i++) {
+                                const auto segment = locator->getSegment(pid, i);
+                                grads.push_back(segment);
+                                out_bufs.push_back(segment);
+                                roots.push_back(locator->getOwner(pid, i));
                             }
-                            out_bufs.push_back(out_buf);
                         }
                         ar.reduce(tag, grads, out_bufs, roots);
                         for (long pid: param_ids) {
                             locator->unstashGrad(pid);
                         }
                     } else {
+                        grads.reserve(param_ids.size());
+                        for (long pid: param_ids) {
+                            auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
+                                         ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
+                            auto& grad = param.grad();
+                            if (grad.defined()) {
+                                grads.push_back(grad);
+                            }
+                        }
                         ar.allreduce(tag, grads);
                     }
                 }
@@ -577,7 +570,7 @@ namespace rannc {
                     at::Tensor &param_tensor = params_.at(param_id);
                     param_tensor.set_data(zero_param_tensor);
                 }
-                zpl.disable(param_id);
+                zpl.remove(param_id);
                 dist_ids_.erase(param_id);
             } else {
                 syncParam(param_id, param_ranks);
@@ -627,8 +620,8 @@ namespace rannc {
                 }
                 at::Tensor &param_tensor = params_.at(param_id);
                 const auto &param_ranks = ranks_.at(param_id);
-                int owner = zero_grad_locators_[graph_id]->registerGrad(param_id, param_tensor, param_ranks);
-                logger->trace("Registered param for zero: pid={} ranks={} owner={}", param_id, join_as_str(param_ranks), owner);
+                zero_grad_locators_[graph_id]->registerGrad(param_id, param_tensor, param_ranks);
+                logger->trace("Registered param for zero: pid={} ranks={}}", param_id, join_as_str(param_ranks));
             }
         } else if (consolidate_) {
             for (const auto &it: graph_grouped_params) {

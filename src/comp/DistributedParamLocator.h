@@ -20,9 +20,9 @@ namespace rannc {
         DistributedParamLocator(DistributedParamLocator&&) = delete;
         DistributedParamLocator& operator=(DistributedParamLocator&&) = delete;
 
-        int store(long pid, const at::Tensor& param);
+        void store(long pid, const at::Tensor& param);
         at::Tensor load(long pid);
-        void disable(long pid);
+        void remove(long pid);
 
         void fetchStart();
         at::Tensor fetch(long pid);
@@ -35,6 +35,8 @@ namespace rannc {
 
     private:
         DistributedParamLocator() = default;
+
+        std::unordered_map<long, at::Tensor> param_parts_;
     };
 }
 

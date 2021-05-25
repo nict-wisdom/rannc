@@ -9,18 +9,20 @@
 namespace rannc {
     const int DistributedParamLocatorBase::FETCH_TAG = 10;
 
-    int DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
+    void DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
 
-        int np = mpi::getSize();
+        int64_t segment_size = ceil(param.numel() / (double) ranks.size());
+        int local_rank = getLocalRank(ranks, mpi::getRank());
 
-        int64_t min_size = INT64_MAX;
-        int min_idx = -1;
-        for (int i=0; i<np; i++) {
-            if (sizes_[i] < min_size) {
-                min_size = sizes_[i];
-                min_idx = i;
-            }
+        int64_t offset = 0;
+        for (size_t i=0; i<ranks.size(); i++) {
+            offsets_[pid].push_back(offset);
+            int64_t src_size = std::min((int64_t) (param.numel() - offset), segment_size);
+            src_sizes_[pid].push_back(src_size);
         }
+
+        segment_sizes_[pid] = segment_size;
+        ranks_[pid] = ranks;
 
         TagMap& tag_map = TagMap::get();
         int tag = tag_map.getRankSetTag(ranks);
@@ -32,18 +34,30 @@ namespace rannc {
         global_id = ocomm.bcast(global_id, 0, communicator);
         global_id_to_local_[global_id] = pid;
 
-        int64_t param_size = param.numel() * param.element_size();
-        sizes_[min_idx] += param_size;
-        owners_[pid] = min_idx;
         ir_types_[pid] = toIRType(param);
 
         MPI_Barrier(communicator);
-
-        return min_idx;
     }
 
-    int DistributedParamLocatorBase::getOwner(long pid) {
-        assert(contains(owners_, pid));
-        return owners_.at(pid);
+    void DistributedParamLocatorBase::remove(long pid) {
+        global_id_to_local_.erase(pid);
+        ir_types_.erase(pid);
+        segment_sizes_.erase(pid);
+        ir_types_.erase(pid);
+    }
+
+    size_t DistributedParamLocatorBase::getSegmentNum(long pid) {
+        assert(contains(ranks_, pid));
+        return ranks_.at(pid).size();
+    }
+
+    size_t DistributedParamLocatorBase::getOwner(long pid, int index) {
+        assert(contains(ranks_, pid));
+
+        auto ranks_buf = setToVector(ranks_.at(pid));
+        assert(ranks_buf.size() > index);
+        std::sort(ranks_buf.begin(), ranks_buf.end());
+
+        return ranks_buf.at(index);
     }
 }
