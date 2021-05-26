@@ -25,11 +25,18 @@ namespace rannc {
         getMutableGradRef(param) = grad_buffers_.at(pid);
     }
 
-    at::Tensor DistributedGradLocator::getSegment(long pid, int index) {
+    at::Tensor DistributedGradLocator::getParamSegment(long pid, int index) {
+        return getSegment(pid, index, false);
+    }
+
+    at::Tensor DistributedGradLocator::getGradSegment(long pid, int index) {
+        return getSegment(pid, index, true);
+    }
+
+    at::Tensor DistributedGradLocator::getSegment(long pid, int index, bool grad) {
         assert(contains(params_, pid));
 
         auto &param = params_.at(pid);
-        assert(param.grad().defined());
 
         assert(contains(offsets_, pid));
         assert(offsets_.at(pid).size() > index);
@@ -37,12 +44,16 @@ namespace rannc {
 
         assert(contains(src_sizes_, pid));
         assert(src_sizes_.at(pid).size() > index);
-        size_t src_size = offsets_.at(pid).at(index);
+        size_t src_size = src_sizes_.at(pid).at(index);
 
-        auto &grad = param.grad();
-        assert(grad.numel() > offset + src_size);
+        auto &ten = grad ? param.grad() : param;
 
-        return grad.flatten().slice(0, offset, offset+src_size);
+        if (grad) {
+            assert(param.grad().defined());
+        }
+
+        assert(ten.numel() >= offset + src_size);
+        return ten.flatten().slice(0, offset, offset+src_size);
     }
 
     void DistributedGradLocator::unstashGrad(long pid) {

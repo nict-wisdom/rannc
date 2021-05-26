@@ -30,7 +30,9 @@ namespace rannc {
 
         if (src_size > 0) {
             torch::NoGradGuard no_grad;
-            part_tensor.copy_(torch::flatten(param).slice(0, offset, offset + src_size));
+            auto src_buf = torch::flatten(param).slice(0, offset, offset + src_size);
+            auto dst_buf = torch::flatten(part_tensor).slice(0, 0, src_size);
+            dst_buf.copy_(src_buf);
         }
         param_parts_[pid] = part_tensor;
     }

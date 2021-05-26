@@ -262,11 +262,11 @@ namespace rannc {
                           });
     }
 
-    void NCCLWrapper::bcast(int tag, int root,
-                                const std::vector<at::Tensor>& tensors) {
-        runCollectiveComm(comm_map_, tag, tensors, "reduce",
-                          [root](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
-                              ncclBcast(ptr, count, datatype, root, *ncomm, (cudaStream_t) nullptr);
+    void NCCLWrapper::bcast(int tag, const std::vector<at::Tensor>& tensors, const std::vector<int>& roots) {
+        runCollectiveComm(comm_map_, tag, tensors, "bcast",
+                          [&roots](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                              assert(index < roots.size());
+                              ncclBcast(ptr, count, datatype, roots.at(index), *ncomm, (cudaStream_t) nullptr);
                           });
     }
 

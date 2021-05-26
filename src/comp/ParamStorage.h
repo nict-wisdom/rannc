@@ -55,6 +55,7 @@ namespace rannc {
         bool hasAmpMasterParam(long param_id) const;
         bool distributed(long param_id) const;
         int distParamOwner(long param_id) const;
+        bool zeroEnabled(const std::string& graph_id) const;
 
         const std::unordered_set<int>& getRanks(long param_id);
 
@@ -67,6 +68,7 @@ namespace rannc {
 
         void allReduceParamGrads(const std::string& graph_id);
         void clearParamGrads(const std::string& graph_id);
+        void bcastParams(const std::string& graph_id);
         void prepareBackward(const std::string& graph_id);
         void scaleGrads(const std::string& graph_id, bool amp_master_grads);
         void unscaleGrads(const std::string& graph_id, bool amp_master_grads);
@@ -115,6 +117,7 @@ namespace rannc {
         at::Tensor doSyncParam(long param_id, bool grad);
         at::Tensor doGatherParam(long param_id, int dest, bool grad);
         void consolidateGrads(const std::string& graph_id);
+        std::vector<int> sortCommTags(const std::string& graph_id);
 
         std::unordered_map<std::string, std::unordered_map<std::string, long>> graph_params_;
         std::unordered_map<std::string, std::unordered_map<std::string, long>> unused_params_; // used to calc global norm, the value is a global id

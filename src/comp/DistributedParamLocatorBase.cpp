@@ -12,17 +12,19 @@ namespace rannc {
     void DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
 
         int64_t segment_size = ceil(param.numel() / (double) ranks.size());
-        int local_rank = getLocalRank(ranks, mpi::getRank());
-
         int64_t offset = 0;
         for (size_t i=0; i<ranks.size(); i++) {
             offsets_[pid].push_back(offset);
             int64_t src_size = std::min((int64_t) (param.numel() - offset), segment_size);
             src_sizes_[pid].push_back(src_size);
+            offset += src_size;
         }
 
         segment_sizes_[pid] = segment_size;
         ranks_[pid] = ranks;
+
+        spdlog::info("doRegister pid={} param={} segment_size={} ranks={} offset={}, src_size={}",
+                     pid, toString(toIRType(param)), segment_size, join_as_str(ranks), join_as_str(offsets_[pid]), join_as_str(src_sizes_[pid]));
 
         TagMap& tag_map = TagMap::get();
         int tag = tag_map.getRankSetTag(ranks);

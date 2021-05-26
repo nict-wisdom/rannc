@@ -279,8 +279,19 @@ namespace rannc {
         return contains(dist_ids_, param_id);
     }
 
-    void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
+    std::vector<int> ParamStorage::sortCommTags(const std::string& graph_id) {
         auto& graph_grouped_params = grouped_params_[graph_id];
+        std::vector<int> sorted_tags = keys(graph_grouped_params, true);
+        std::sort(sorted_tags.begin(), sorted_tags.end(), [this](int t1, int t2) {
+            const auto& ranks1 = this->tag_rank_set_.at(t1);
+            const auto& ranks2 = this->tag_rank_set_.at(t2);
+            return ranks1.size() < ranks2.size();
+        });
+        return sorted_tags;
+    }
+
+    void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
+        const auto& graph_grouped_params = grouped_params_[graph_id];
 
         std::stringstream ss;
         ss << "ParamStorage::allReduceParamGrads_graph_" << graph_id;
@@ -289,13 +300,7 @@ namespace rannc {
         NCCLWrapper& ar = NCCLWrapper::get();
         bool sync_allreduce = config::Config::get().getVal<bool>(config::SYNC_ALLREDUCE);
 
-        std::vector<int> sorted_tags = keys(graph_grouped_params, true);
-        std::sort(sorted_tags.begin(), sorted_tags.end(), [this](int t1, int t2) {
-            const auto& ranks1 = this->tag_rank_set_.at(t1);
-            const auto& ranks2 = this->tag_rank_set_.at(t2);
-           return ranks1.size() < ranks2.size();
-        });
-
+        std::vector<int> sorted_tags = sortCommTags(graph_id);
         for (int tag: sorted_tags) {
             assert(contains(tag_rank_set_, tag));
             const auto& ranks = tag_rank_set_.at(tag);
@@ -307,14 +312,14 @@ namespace rannc {
                     const auto &param_ids = graph_grouped_params.at(tag);
                     std::vector<at::Tensor> grads;
 
-                    if (contains(zero_grad_locators_, graph_id)) {
+                    if (zeroEnabled(graph_id)) {
                         auto locator = zero_grad_locators_.at(graph_id);
                         std::vector<int> roots;
                         roots.reserve(param_ids.size());
                         std::vector<at::Tensor> out_bufs;
                         for (long pid: param_ids) {
                             for (int i=0; i<locator->getSegmentNum(pid); i++) {
-                                const auto segment = locator->getSegment(pid, i);
+                                const auto segment = locator->getGradSegment(pid, i);
                                 grads.push_back(segment);
                                 out_bufs.push_back(segment);
                                 roots.push_back(locator->getOwner(pid, i));
@@ -361,6 +366,39 @@ namespace rannc {
         }
     }
 
+    void ParamStorage::bcastParams(const std::string& graph_id) {
+        assert(zeroEnabled(graph_id));
+        const auto &graph_grouped_params = grouped_params_[graph_id];
+        auto locator = zero_grad_locators_.at(graph_id);
+
+        std::stringstream ss;
+        ss << "ParamStorage::bcastParams_graph_" << graph_id;
+        recordStart(ss.str());
+
+        NCCLWrapper &ar = NCCLWrapper::get();
+        std::vector<int> sorted_tags = sortCommTags(graph_id);
+        for (int tag: sorted_tags) {
+            assert(contains(tag_rank_set_, tag));
+            const auto &ranks = tag_rank_set_.at(tag);
+            if (contains(ranks, mpi::getRank())) {
+                const auto &param_ids = graph_grouped_params.at(tag);
+                std::vector<at::Tensor> params;
+
+                std::vector<int> roots;
+                roots.reserve(param_ids.size());
+                for (long pid: param_ids) {
+                    for (int i = 0; i < locator->getSegmentNum(pid); i++) {
+                        const auto segment = locator->getParamSegment(pid, i);
+                        params.push_back(segment);
+                        roots.push_back(locator->getOwner(pid, i));
+                    }
+                }
+                ar.bcast(tag, params, roots);
+            }
+            recordEnd(ss.str());
+        }
+    }
+
     void ParamStorage::doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads) {
         SComm& scomm = SComm::get();
         int64_t batch_size = scomm.getBatchSize();
@@ -389,13 +427,17 @@ namespace rannc {
     }
 
     void ParamStorage::prepareBackward(const std::string& graph_id) {
-        if (contains(zero_grad_locators_, graph_id)) {
+        if (zeroEnabled(graph_id)) {
             for (const auto& it: getParamIDs(graph_id, false)) {
                 zero_grad_locators_.at(graph_id)->stashGrad(it.second);
             }
         } else if (consolidate_) {
             consolidateGrads(graph_id);
         }
+    }
+
+    bool ParamStorage::zeroEnabled(const std::string& graph_id) const {
+        return contains(zero_grad_locators_, graph_id);
     }
 
     void ParamStorage::consolidateGrads(const std::string& graph_id) {
@@ -565,10 +607,12 @@ namespace rannc {
 
             if (distributed(param_id)) {
                 DistributedParamLocator& zpl = DistributedParamLocator::get();
-                at::Tensor zero_param_tensor = zpl.load(param_id);
+                at::Tensor &param_tensor = params_.at(param_id);
                 if (contains(param_ranks, mpi::getRank())) {
-                    at::Tensor &param_tensor = params_.at(param_id);
+                    at::Tensor zero_param_tensor = zpl.load(param_id);
                     param_tensor.set_data(zero_param_tensor);
+                } else {
+                    param_tensor.set_data(torch::zeros({1}));
                 }
                 zpl.remove(param_id);
                 dist_ids_.erase(param_id);
