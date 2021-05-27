@@ -319,7 +319,7 @@ namespace rannc {
                         std::vector<at::Tensor> out_bufs;
                         for (long pid: param_ids) {
                             for (int i=0; i<locator->getSegmentNum(pid); i++) {
-                                const auto segment = locator->getGradSegment(pid, i);
+                                const auto segment = locator->getSegment(pid, i, true);
                                 grads.push_back(segment);
                                 out_bufs.push_back(segment);
                                 roots.push_back(locator->getOwner(pid, i));
@@ -363,7 +363,7 @@ namespace rannc {
         }
     }
 
-    void ParamStorage::bcastParams(const std::string& graph_id) {
+    void ParamStorage::bcastParamsZero(const std::string& graph_id, bool grad) {
         assert(zeroEnabled(graph_id));
         const auto &graph_grouped_params = grouped_params_[graph_id];
         auto locator = zero_grad_locators_.at(graph_id);
@@ -385,7 +385,7 @@ namespace rannc {
                 roots.reserve(param_ids.size());
                 for (long pid: param_ids) {
                     for (int i = 0; i < locator->getSegmentNum(pid); i++) {
-                        const auto segment = locator->getParamSegment(pid, i);
+                        const auto segment = locator->getSegment(pid, i, grad);
                         params.push_back(segment);
                         roots.push_back(locator->getOwner(pid, i));
                     }

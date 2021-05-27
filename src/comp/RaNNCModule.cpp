@@ -520,8 +520,8 @@ namespace rannc {
         return param_storage_->gatherParamGrad(param_id, dest);
     }
 
-    void RaNNCModule::syncParamZero() {
-        param_storage_->bcastParams(id_);
+    void RaNNCModule::syncParamZero(bool grad) {
+        param_storage_->bcastParamsZero(id_, grad);
     }
 
     void RaNNCModule::destroy() {

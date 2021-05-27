@@ -124,7 +124,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     # Save model & opt
     # state_dict should run on all ranks
-    model_state_dict = rmodel.state_dict(sync_all_ranks=True)
+    model_state_dict = rmodel.state_dict()
     global_opt_state_dict = ropt.state_dict(from_global=True)
 
     if pyrannc.get_rank() == 0:

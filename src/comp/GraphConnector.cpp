@@ -357,7 +357,7 @@ namespace rannc {
             const std::unordered_map<std::string, IValueMap>& inputs, int split_index, bool grad_mode) {
 
         if (param_storage_->zeroEnabled(id)) {
-            param_storage_->bcastParams(id);
+            param_storage_->bcastParamsZero(id, false);
         }
 
         const auto event_key = getFuncKey("forward", id, split_index, grad_mode);

@@ -126,6 +126,10 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if "gather_inputs" in kwargs:
         gather_inputs = module_args["gather_inputs"] = kwargs["gather_inputs"]
 
+    enable_zero = False
+    if "enable_zero" in kwargs:
+        enable_zero = module_args["enable_zero"] = kwargs["enable_zero"]
+
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=use_amp, **module_args)
 
     compare_params(model, rmodel, use_amp, rtol, atol)
@@ -164,6 +168,8 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
             if gather_inputs or pyrannc.get_rank() == 0:
+                if enable_zero:
+                    rmodel._sync_orig_params(sync_grad=True)
                 compare_grads(model, rmodel, use_amp, rtol, atol)
 
             opt.step()
@@ -172,6 +178,8 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             r_opt.zero_grad()
 
         if gather_inputs or pyrannc.get_rank() == 0:
+            if enable_zero:
+                rmodel._sync_orig_params()
             compare_params(model, rmodel, use_amp, rtol, atol)
 
     if gather_inputs or pyrannc.get_rank() == 0:

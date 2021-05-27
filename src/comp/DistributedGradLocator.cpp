@@ -13,14 +13,6 @@ namespace rannc {
         grad_buffers_[pid] = torch::zeros_like(param).cuda();
     }
 
-    at::Tensor DistributedGradLocator::getParamSegment(long pid, int index) {
-        return getSegment(pid, index, false);
-    }
-
-    at::Tensor DistributedGradLocator::getGradSegment(long pid, int index) {
-        return getSegment(pid, index, true);
-    }
-
     at::Tensor DistributedGradLocator::getSegment(long pid, int index, bool grad) {
         assert(contains(params_, pid));
 

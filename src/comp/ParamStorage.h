@@ -65,7 +65,7 @@ namespace rannc {
 
         void allReduceParamGrads(const std::string& graph_id);
         void clearParamGrads(const std::string& graph_id);
-        void bcastParams(const std::string& graph_id);
+        void bcastParamsZero(const std::string& graph_id, bool grad);
         void prepareBackward(const std::string& graph_id);
         void scaleGrads(const std::string& graph_id, bool amp_master_grads);
         void unscaleGrads(const std::string& graph_id, bool amp_master_grads);

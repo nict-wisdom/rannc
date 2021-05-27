@@ -558,7 +558,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             return
 
         if self.enable_zero:
-            self.sync_param_zero()
+            self.sync_param_zero(sync_grad)
 
         for name in sorted(self.name_to_param.keys()):
             if name_pattern is not None and name_pattern not in name:
