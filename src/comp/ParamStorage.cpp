@@ -655,10 +655,12 @@ namespace rannc {
                 if (!contains(ranks_, param_id)) {
                     continue;
                 }
-                at::Tensor &param_tensor = params_.at(param_id);
                 const auto &param_ranks = ranks_.at(param_id);
-                zero_grad_locators_[graph_id]->registerGrad(param_id, param_tensor, param_ranks);
-                logger->trace("Registered param for zero: pid={} ranks={}}", param_id, join_as_str(param_ranks));
+                if (contains(param_ranks, mpi::getRank())) {
+                    at::Tensor &param_tensor = params_.at(param_id);
+                    zero_grad_locators_[graph_id]->registerGrad(param_id, param_tensor, param_ranks);
+                    logger->trace("Registered param for zero: pid={} ranks={}", param_id, join_as_str(param_ranks));
+                }
             }
         } else if (consolidate_) {
             for (const auto &it: graph_grouped_params) {
