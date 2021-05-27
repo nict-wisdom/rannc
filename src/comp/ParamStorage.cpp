@@ -326,9 +326,6 @@ namespace rannc {
                             }
                         }
                         ar.reduce(tag, grads, out_bufs, roots);
-                        for (long pid: param_ids) {
-                            locator->unstashGrad(pid);
-                        }
                     } else {
                         grads.reserve(param_ids.size());
                         for (long pid: param_ids) {
@@ -427,11 +424,7 @@ namespace rannc {
     }
 
     void ParamStorage::prepareBackward(const std::string& graph_id) {
-        if (zeroEnabled(graph_id)) {
-            for (const auto& it: getParamIDs(graph_id, false)) {
-                zero_grad_locators_.at(graph_id)->stashGrad(it.second);
-            }
-        } else if (consolidate_) {
+        if (consolidate_) {
             consolidateGrads(graph_id);
         }
     }

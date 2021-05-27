@@ -13,18 +13,6 @@ namespace rannc {
         grad_buffers_[pid] = torch::zeros_like(param).cuda();
     }
 
-    void DistributedGradLocator::stashGrad(long pid) {
-        assert(contains(params_, pid));
-        assert(contains(grad_buffers_, pid));
-
-        auto &param = params_.at(pid);
-        if (param.grad().defined()) {
-            stashed_buffers_[pid] = param.grad();
-        }
-        grad_buffers_.at(pid).zero_();
-        getMutableGradRef(param) = grad_buffers_.at(pid);
-    }
-
     at::Tensor DistributedGradLocator::getParamSegment(long pid, int index) {
         return getSegment(pid, index, false);
     }
@@ -54,18 +42,5 @@ namespace rannc {
 
         assert(ten.numel() >= offset + src_size);
         return ten.flatten().slice(0, offset, offset+src_size);
-    }
-
-    void DistributedGradLocator::unstashGrad(long pid) {
-        assert(contains(params_, pid));
-
-        if (!contains(stashed_buffers_, pid)) {
-            return;
-        }
-
-        auto &param = params_.at(pid);
-        if (stashed_buffers_.at(pid).defined()) {
-            getMutableGradRef(param) += stashed_buffers_.at(pid);
-        }
     }
 }
