@@ -54,10 +54,7 @@ namespace rannc {
         at::Tensor getAmpMasterParamTensor(long param_id) const;
         bool hasAmpMasterParam(long param_id) const;
         bool distributed(long param_id) const;
-        int distParamOwner(long param_id) const;
         bool zeroEnabled(const std::string& graph_id) const;
-
-        const std::unordered_set<int>& getRanks(long param_id);
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);
@@ -77,9 +74,7 @@ namespace rannc {
         void clipGradNorm(const std::string& graph_id, double max_grad_norm, bool use_amp_master);
         double calcGradGlobalL2Norm(const std::string& graph_id, bool use_amp_master);
 
-        at::Tensor syncParam(long param_id);
         at::Tensor gatherParam(long param_id, int dest);
-        at::Tensor syncParamGrad(long param_id);
         at::Tensor gatherParamGrad(long param_id, int dest);
 
         IRType getParamType(long param_id);

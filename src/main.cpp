@@ -206,16 +206,10 @@ PYBIND11_MODULE(_pyrannc, m) {
             .def("undeploy", [](RaNNCModule& self) {
                 self.destroy();
             })
-            .def("sync_param", [](RaNNCModule& self, long param_id, bool sync_all_ranks) {
-                if (sync_all_ranks) {
-                    return self.syncParam(param_id);
-                }
+            .def("sync_param", [](RaNNCModule& self, long param_id) {
                 return self.gatherParam(param_id, 0);
             })
-            .def("sync_param_grad", [](RaNNCModule& self, long param_id, bool sync_all_ranks) {
-                if (sync_all_ranks) {
-                    return self.syncParamGrad(param_id);
-                }
+            .def("sync_param_grad", [](RaNNCModule& self, long param_id) {
                 return self.gatherParamGrad(param_id, 0);
             })
             .def("load_deployment", [](RaNNCModule& self, const std::string& file) {

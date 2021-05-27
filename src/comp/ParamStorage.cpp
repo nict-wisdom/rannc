@@ -720,16 +720,8 @@ namespace rannc {
         throw std::invalid_argument(ss.str());
     }
 
-    at::Tensor ParamStorage::syncParam(long param_id) {
-        return doSyncParam(param_id, false);
-    }
-
     at::Tensor ParamStorage::gatherParam(long param_id, int dest) {
         return doGatherParam(param_id, dest, false);
-    }
-
-    at::Tensor ParamStorage::syncParamGrad(long param_id) {
-        return doSyncParam(param_id, true);
     }
 
     at::Tensor ParamStorage::gatherParamGrad(long param_id, int dest) {
@@ -869,10 +861,6 @@ namespace rannc {
         grouped_params_.clear();
         tag_rank_set_.clear();
         use_amp_master_params_.clear();
-    }
-
-    const std::unordered_set<int>& ParamStorage::getRanks(long param_id) {
-        return ranks_[param_id];
     }
 
     void ParamStorage::doReleaseParam(long param_id) {

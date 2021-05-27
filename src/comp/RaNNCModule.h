@@ -47,9 +47,7 @@ namespace rannc {
         void clipGrad(float max_grad_norm);
         double calcGradL2Norm();
 
-        at::Tensor syncParam(long pid);
         at::Tensor gatherParam(long param_id, int dest);
-        at::Tensor syncParamGrad(long pid);
         at::Tensor gatherParamGrad(long param_id, int dest);
 
         void saveDeployment(const std::string& deployment_file);

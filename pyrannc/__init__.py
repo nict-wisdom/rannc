@@ -453,11 +453,10 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             self._setup_amp_params()
         return super().calc_grad_norm()
 
-    def state_dict(self, *args, sync_all_ranks=True, no_hook=False, sync_grad=False, **kwargs):
+    def state_dict(self, *args, no_hook=False, sync_grad=False, **kwargs):
         r"""
         Returns ``state_dict`` of the model.
 
-        :param sync_all_ranks: If ``True``, RaNNC synchronizes model parameters on all ranks. If ``False``, parameters on rank 0 are synchronized.
         :param no_hook: If ``True``, hooks on ``state_dict`` of the original models are ignored.
         :param sync_grad: Set ``True`` to synchronize gradients.
 
@@ -466,7 +465,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         """
         if not self.ready:
             return self.model.state_dict(*args, **kwargs)
-        self._sync_orig_params(sync_all_ranks, sync_grad)
+        self._sync_orig_params(sync_grad)
 
         # amp O2 hook converts params to fp32
         # This may cause oom
@@ -528,19 +527,18 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         else:
             logger.warning("save_deployment works only on rank 0")
 
-    def undeploy(self, sync=False, sync_all_ranks=False):
+    def undeploy(self, sync=False):
         r"""
         Undeploys a model distributed on GPUs. This frees GPU memory used for the model.
 
         :param sync: Set ``True`` if you need to synchronize model parameters before undeploying the model.
-        :param sync_all_ranks: If ``True``, RaNNC synchronizes model parameters on all ranks. If ``False``, parameters on rank 0 are synchronized.
 
         .. note::
             This method must be called from all ranks.
         """
         if self.ready:
             if sync:
-                self._sync_orig_params(sync_all_ranks)
+                self._sync_orig_params()
             super().undeploy()
 
     def __del__(self):
@@ -555,7 +553,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             return wrapper_func
         return model_attr
 
-    def _sync_orig_params(self, sync_all_ranks=True, sync_grad=False, name_pattern=None):
+    def _sync_orig_params(self, sync_grad=False, name_pattern=None):
         if not self.ready:
             return
 
@@ -565,15 +563,15 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
             pid = self.name_to_pid[name]
             param = self.name_to_param[name]
-            synced_param_cpu = self.sync_param(pid, sync_all_ranks)
+            synced_param_cpu = self.sync_param(pid)
             if synced_param_cpu is not None:
-                if sync_all_ranks or _pyrannc.get_rank() == 0:
+                if _pyrannc.get_rank() == 0:
                     with torch.no_grad():
                         param.copy_(synced_param_cpu)
             if sync_grad:
-                synced_param_grad_cpu = self.sync_param_grad(pid, sync_all_ranks)
+                synced_param_grad_cpu = self.sync_param_grad(pid)
                 if synced_param_grad_cpu is not None:
-                    if sync_all_ranks or _pyrannc.get_rank() == 0:
+                    if _pyrannc.get_rank() == 0:
                         with torch.no_grad():
                             if param.grad is not None and synced_param_grad_cpu is not None:
                                 param.grad.copy_(synced_param_grad_cpu)
