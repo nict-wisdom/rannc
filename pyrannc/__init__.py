@@ -383,7 +383,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             self.model.train(mode)
             if self.ready:
                 logger.warning("Grad mode was changed to {}. The computation graph will be reconstructed.".format(mode))
-                self.undeploy(True, True)
+                self.undeploy(True)
                 self.ready = False
 
     def eval(self):
@@ -556,6 +556,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     def _sync_orig_params(self, sync_grad=False, name_pattern=None):
         if not self.ready:
             return
+
+        if self.enable_zero:
+            self.sync_param_zero()
 
         for name in sorted(self.name_to_param.keys()):
             if name_pattern is not None and name_pattern not in name:

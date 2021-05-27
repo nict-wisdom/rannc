@@ -212,6 +212,9 @@ PYBIND11_MODULE(_pyrannc, m) {
             .def("sync_param_grad", [](RaNNCModule& self, long param_id) {
                 return self.gatherParamGrad(param_id, 0);
             })
+            .def("sync_param_zero", [](RaNNCModule& self) {
+                return self.syncParamZero();
+            })
             .def("load_deployment", [](RaNNCModule& self, const std::string& file) {
                 self.setLoadDeployment(true);
                 self.setDeploymentFile(file);

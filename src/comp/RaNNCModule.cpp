@@ -520,6 +520,10 @@ namespace rannc {
         return param_storage_->gatherParamGrad(param_id, dest);
     }
 
+    void RaNNCModule::syncParamZero() {
+        param_storage_->bcastParams(id_);
+    }
+
     void RaNNCModule::destroy() {
         if (driver_) {
             driver_->undeployGraph(id_);

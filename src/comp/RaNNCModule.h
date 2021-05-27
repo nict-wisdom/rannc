@@ -49,6 +49,7 @@ namespace rannc {
 
         at::Tensor gatherParam(long param_id, int dest);
         at::Tensor gatherParamGrad(long param_id, int dest);
+        void syncParamZero();
 
         void saveDeployment(const std::string& deployment_file);
 
