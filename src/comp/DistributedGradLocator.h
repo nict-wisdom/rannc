@@ -14,11 +14,14 @@ namespace rannc {
     public:
         void registerGrad(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
         at::Tensor getSegment(long pid, int index, bool grad);
+        at::Tensor getLocalParamSegment(long pid);
+        void setGradToLocalParamSegment(long pid);
 
     private:
+        void checkIndices(long pid, int index);
+
         std::unordered_map<long, at::Tensor> params_;
-        std::unordered_map<long, at::Tensor> grad_buffers_;
-        std::unordered_map<long, at::Tensor> stashed_buffers_;
+        std::unordered_map<long, at::Tensor> local_param_segments_;
     };
 }
 

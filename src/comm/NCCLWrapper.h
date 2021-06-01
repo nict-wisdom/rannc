@@ -47,7 +47,7 @@ namespace rannc {
 
         void allreduce(int tag, const std::vector<at::Tensor> &tensors);
         void allreduceMin(int tag, const std::vector<at::Tensor> &tensors);
-        void reduce(int tag, const std::vector<at::Tensor> &tensors, const std::vector<at::Tensor>& out_bufs, const std::vector<int>& roots);
+        void reduce(int tag, const std::vector<at::Tensor> &tensors, const std::vector<int>& roots);
         void redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
                     int64_t batch_size, const IRType& global_type, int split_index);
         void bcast(int tag, const std::vector<at::Tensor>& tensors, const std::vector<int>& roots);

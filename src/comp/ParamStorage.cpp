@@ -214,13 +214,13 @@ namespace rannc {
         assert(removed == 1);
     }
 
-    const std::unordered_map<std::string, long> ParamStorage::getParamIDs(const std::string& graph_id, bool buffer) {
-        if (!buffer) {
-            return graph_params_[graph_id];
+    std::unordered_map<std::string, long> ParamStorage::getParamIDs(const std::string& graph_id, bool include_buffer) const {
+        if (include_buffer) {
+            return graph_params_.at(graph_id);
         }
 
         std::unordered_map<std::string, long> only_params;
-        for (const auto& it: graph_params_[graph_id]) {
+        for (const auto& it: graph_params_.at(graph_id)) {
             if (!contains(buffer_ids_, it.second)) {
                 only_params[it.first] = it.second;
             }
@@ -228,14 +228,14 @@ namespace rannc {
         return only_params;
     }
 
-    long ParamStorage::getParamID(const std::string& graph_id, const std::string& name) {
+    long ParamStorage::getParamID(const std::string& graph_id, const std::string& name) const {
         assert(contains(graph_params_, graph_id));
         const auto& params = graph_params_.at(graph_id);
         assert(contains(params, name));
         return params.at(name);
     }
 
-    at::Tensor ParamStorage::getParamTensor(const std::string& graph_id, const std::string& name) {
+    at::Tensor ParamStorage::getParamTensor(const std::string& graph_id, const std::string& name) const {
         return getParamTensor(getParamID(graph_id, name));
     }
 
@@ -316,16 +316,15 @@ namespace rannc {
                         auto locator = zero_grad_locators_.at(graph_id);
                         std::vector<int> roots;
                         roots.reserve(param_ids.size());
-                        std::vector<at::Tensor> out_bufs;
                         for (long pid: param_ids) {
                             for (int i=0; i<locator->getSegmentNum(pid); i++) {
                                 const auto segment = locator->getSegment(pid, i, true);
                                 grads.push_back(segment);
-                                out_bufs.push_back(segment);
-                                roots.push_back(locator->getOwner(pid, i));
+                                roots.push_back(i);
                             }
+                            locator->setGradToLocalParamSegment(pid);
                         }
-                        ar.reduce(tag, grads, out_bufs, roots);
+                        ar.reduce(tag, grads, roots);
                     } else {
                         grads.reserve(param_ids.size());
                         for (long pid: param_ids) {
@@ -358,7 +357,10 @@ namespace rannc {
             }
         } else {
             for (const auto& it: getParamIDs(graph_id, false)) {
-                getParamTensor(it.second).zero_();
+                auto grad = getParamTensor(it.second).grad();
+                if (grad.defined()) {
+                    grad.zero_();
+                }
             }
         }
     }
@@ -387,7 +389,7 @@ namespace rannc {
                     for (int i = 0; i < locator->getSegmentNum(pid); i++) {
                         const auto segment = locator->getSegment(pid, i, grad);
                         params.push_back(segment);
-                        roots.push_back(locator->getOwner(pid, i));
+                        roots.push_back(i);
                     }
                 }
                 ar.bcast(tag, params, roots);
@@ -433,6 +435,22 @@ namespace rannc {
         return contains(zero_grad_locators_, graph_id);
     }
 
+    at::Tensor ParamStorage::getLocalParamSegment(long param_id) const {
+        for (const auto& it: zero_grad_locators_) {
+            for (const auto& param_it: getParamIDs(it.first, false)) {
+                if (param_it.second == param_id) {
+                    const auto &locator = it.second;
+                    assert(contains(ranks_, param_id));
+                    return locator->getLocalParamSegment(param_id);
+                }
+            }
+        }
+
+        std::stringstream ss;
+        ss << "Param is not registered for zero: " << param_id;
+        throw std::invalid_argument(ss.str());
+    }
+
     void ParamStorage::consolidateGrads(const std::string& graph_id) {
         if (!contains(grad_cons_, graph_id)) {
             return;
@@ -453,7 +471,7 @@ namespace rannc {
         double global_norm = calcGradGlobalL2Norm(graph_id, use_amp_master) + 1e-6;
         if (global_norm > max_grad_norm) {
             double scale =  max_grad_norm / global_norm;
-            for (const auto &it: getParamIDs(graph_id)) {
+            for (const auto &it: getParamIDs(graph_id, false)) {
                 long pid = it.second;
                 at::Tensor param;
                 if (use_amp_master && contains(amp_master_params_, pid)) {
@@ -472,7 +490,7 @@ namespace rannc {
     double ParamStorage::calcGradGlobalL2Norm(const std::string& graph_id, bool use_amp_master) {
 
         std::unordered_map<long, float> norms;
-        for (const auto& it: getParamIDs(graph_id)) {
+        for (const auto& it: getParamIDs(graph_id, false)) {
             long pid = it.second;
             at::Tensor ten;
             if (use_amp_master && contains(amp_master_params_, pid)) {
@@ -497,7 +515,7 @@ namespace rannc {
             }
         }
 
-        std::unordered_map<std::string, long> params_on_rank = getParamIDs(graph_id);
+        std::unordered_map<std::string, long> params_on_rank = getParamIDs(graph_id, false);
         std::unordered_map<std::string, long> all_param_ids;
         all_param_ids.reserve(params_on_rank.size());
         for (const auto& it: params_on_rank) {
@@ -539,7 +557,7 @@ namespace rannc {
         }
 
         std::unordered_map<long, std::string> id_to_name;
-        for (const auto& it: getParamIDs(graph_id)) {
+        for (const auto& it: getParamIDs(graph_id, false)) {
             id_to_name[it.second] = it.first;
         }
 
@@ -610,7 +628,7 @@ namespace rannc {
                 zpl.remove(param_id);
                 dist_ids_.erase(param_id);
             } else {
-                syncParam(param_id, param_ranks);
+                syncParamOnInit(param_id, param_ranks);
             }
 
             if (mpi::getRank() == 0 && sync_on_init_) {
@@ -676,7 +694,7 @@ namespace rannc {
         logger->trace("ParamStorage::deployGraph deployed all params. graph_id={}", decomp.id);
     }
 
-    void ParamStorage::syncParam(long param_id, const std::unordered_set<int>& ranks) {
+    void ParamStorage::syncParamOnInit(long param_id, const std::unordered_set<int>& ranks) {
         at::Tensor &param_tensor = params_.at(param_id);
 
         assert(param_tensor.is_contiguous());
@@ -845,6 +863,7 @@ namespace rannc {
         grad_cons_.erase(graph_id);
         grouped_params_.erase(graph_id);
         unused_params_.erase(graph_id);
+        zero_grad_locators_.erase(graph_id);
     }
 
     void ParamStorage::clear() {

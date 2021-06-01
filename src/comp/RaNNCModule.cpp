@@ -524,6 +524,10 @@ namespace rannc {
         param_storage_->bcastParamsZero(id_, grad);
     }
 
+    at::Tensor RaNNCModule::getLocalParamSegment(long param_id) {
+        return param_storage_->getLocalParamSegment(param_id);
+    }
+
     void RaNNCModule::destroy() {
         if (driver_) {
             driver_->undeployGraph(id_);

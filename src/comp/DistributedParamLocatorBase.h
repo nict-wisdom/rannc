@@ -17,6 +17,7 @@ namespace rannc {
         void remove(long pid);
         size_t getSegmentNum(long pid);
         size_t getOwner(long pid, int index);
+        std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
 
     protected:
         NCCLWrapper& nccl_;
@@ -28,6 +29,7 @@ namespace rannc {
         std::unordered_map<long, IRType> ir_types_;
         std::unordered_map<long, int64_t> segment_sizes_;
         std::unordered_map<long, std::unordered_set<int>> ranks_;
+        std::unordered_map<long, int> my_indices_;
 
         DistributedParamLocatorBase() : nccl_(NCCLWrapper::get()) {};
         ~DistributedParamLocatorBase() = default;

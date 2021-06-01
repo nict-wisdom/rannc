@@ -47,18 +47,18 @@ namespace rannc {
 
         void registerParam(long param_id, const at::Tensor& param_tensor, bool buffer, bool distributed);
         void unregisterParam(long param_id);
-        const std::unordered_map<std::string, long> getParamIDs(const std::string& graph_id, bool buffer=false);
-        long getParamID(const std::string& graph_id, const std::string& name);
-        at::Tensor getParamTensor(const std::string& graph_id, const std::string& name);
+        std::unordered_map<std::string, long> getParamIDs(const std::string& graph_id, bool include_buffer) const;
+        long getParamID(const std::string& graph_id, const std::string& name) const;
+        at::Tensor getParamTensor(const std::string& graph_id, const std::string& name) const;
         at::Tensor getParamTensor(long param_id) const;
         at::Tensor getAmpMasterParamTensor(long param_id) const;
         bool hasAmpMasterParam(long param_id) const;
         bool distributed(long param_id) const;
         bool zeroEnabled(const std::string& graph_id) const;
+        at::Tensor getLocalParamSegment(long param_id) const;
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);
-        void syncParam(long param_id, const std::unordered_set<int>& ranks);
 
         long globalToLocal(long global_param_id);
         long localToGlobal(long local_param_id);
@@ -107,6 +107,7 @@ namespace rannc {
         static void syncOnInit(bool initValue);
 
     protected:
+        void syncParamOnInit(long param_id, const std::unordered_set<int>& ranks);
         virtual void doReleaseParam(long param_id);
         void doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads);
         at::Tensor doSyncParam(long param_id, bool grad);

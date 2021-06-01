@@ -311,6 +311,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
                     for p in param_group['params']:
                         if id(p) in self.used_param_ids:
+                            if self.enable_zero:
+                                p = self.get_local_param_segment(id(p))
+
                             params.append(p)
                             order_local_to_global[local_order] = global_order
                             used_param_global_order.append(global_order)
@@ -323,6 +326,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 self.optimizer.param_groups = new_param_groups
                 self.optimizer.order_local_to_global = order_local_to_global
 
+                # replace state_dict and load_state_dict
                 old_state_dict = self.optimizer.state_dict
 
                 def new_state_dict(opt, from_global=False, **kwargs):
@@ -345,6 +349,13 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                         old_load_state_dict(state_dict, **kwargs)
 
                 self.optimizer.load_state_dict = types.MethodType(new_load_state_dict, self.optimizer)
+
+                # replace zero_grad
+                if self.enable_zero:
+                    def new_zero_grad(opt, **kwargs):
+                        self.zero_grad(**kwargs)
+
+                    self.optimizer.zero_grad = types.MethodType(new_zero_grad, self.optimizer)
 
             self.ready = True
             self.dummy_input = args
@@ -506,12 +517,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         r"""
         Sets zeros to  gradients of model parameters.
         """
-        if self.optimizer:
-            self.optimizer.zero_grad()
-        elif self.model:
-            self.model.zero_grad()
-        else:
-            super().zero_grad()
+        super().zero_grad()
 
     def save_deployment(self, file):
         r"""

@@ -23,9 +23,6 @@ namespace rannc {
         segment_sizes_[pid] = segment_size;
         ranks_[pid] = ranks;
 
-        spdlog::info("doRegister pid={} param={} segment_size={} ranks={} offset={}, src_size={}",
-                     pid, toString(toIRType(param)), segment_size, join_as_str(ranks), join_as_str(offsets_[pid]), join_as_str(src_sizes_[pid]));
-
         TagMap& tag_map = TagMap::get();
         int tag = tag_map.getRankSetTag(ranks);
         SComm& scomm = SComm::get();
@@ -37,6 +34,7 @@ namespace rannc {
         global_id_to_local_[global_id] = pid;
 
         ir_types_[pid] = toIRType(param);
+        my_indices_[pid] = getLocalRank(ranks, mpi::getRank());
 
         MPI_Barrier(communicator);
     }
@@ -46,11 +44,23 @@ namespace rannc {
         ir_types_.erase(pid);
         segment_sizes_.erase(pid);
         ir_types_.erase(pid);
+        my_indices_.erase(pid);
     }
 
     size_t DistributedParamLocatorBase::getSegmentNum(long pid) {
         assert(contains(ranks_, pid));
         return ranks_.at(pid).size();
+    }
+
+    std::pair<int64_t, int64_t> DistributedParamLocatorBase::getSegmentRange(long pid, int index) {
+        assert(contains(offsets_, pid));
+        assert(contains(src_sizes_, pid));
+        assert(offsets_.at(pid).size() > index);
+        assert(src_sizes_.at(pid).size() > index);
+
+        int64_t offset = offsets_.at(pid).at(index);
+        int64_t src_size = src_sizes_.at(pid).at(index);
+        return std::pair<int64_t, int64_t>(offset, offset + src_size);
     }
 
     size_t DistributedParamLocatorBase::getOwner(long pid, int index) {

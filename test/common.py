@@ -16,6 +16,9 @@ seed = 0
 RELATIVE_TOLERANCE = 1e-2
 ABSOLUTE_TOLERANCE = 1e-4
 
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+
 
 def get_dataset_default(dataset_size, input_dim, output_dim):
     ds_x = torch.randn((dataset_size,) + input_dim)

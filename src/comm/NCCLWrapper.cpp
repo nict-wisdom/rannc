@@ -245,20 +245,14 @@ namespace rannc {
         doAllreduce(tag, tensors, ncclMin);
     }
 
-    void NCCLWrapper::reduce(int tag, const std::vector<at::Tensor> &tensors,
-                             const std::vector<at::Tensor>& out_bufs, const std::vector<int>& roots) {
+    void NCCLWrapper::reduce(int tag, const std::vector<at::Tensor> &tensors, const std::vector<int>& roots) {
 
         assert(tensors.size() == roots.size());
         runCollectiveComm(comm_map_, tag, tensors, "reduce",
-                          [&out_bufs, &roots](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
+                          [&roots](void* ptr, size_t count, ncclDataType_t datatype, ncclComm_t* ncomm, size_t index) {
                               assert(index < roots.size());
-                              assert(index < out_bufs.size());
                               int root = roots.at(index);
-                              void* recv_buf = nullptr;
-                              if (mpi::getRank() == root) {
-                                  recv_buf = out_bufs.at(index).data_ptr();
-                              }
-                              ncclReduce(ptr, recv_buf, count, datatype, ncclSum, root, *ncomm, (cudaStream_t) nullptr);
+                              ncclReduce(ptr, ptr, count, datatype, ncclSum, root, *ncomm, (cudaStream_t) nullptr);
                           });
     }
 
