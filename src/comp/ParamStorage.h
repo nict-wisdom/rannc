@@ -74,8 +74,8 @@ namespace rannc {
         void clipGradNorm(const std::string& graph_id, double max_grad_norm, bool use_amp_master);
         double calcGradGlobalL2Norm(const std::string& graph_id, bool use_amp_master);
 
-        at::Tensor gatherParam(long param_id, int dest);
-        at::Tensor gatherParamGrad(long param_id, int dest);
+        at::Tensor syncParam(long param_id);
+        at::Tensor syncParamGrad(long param_id);
 
         IRType getParamType(long param_id);
         IRType getParamType(const std::string& graph_id, const std::string& name);
@@ -111,7 +111,7 @@ namespace rannc {
         virtual void doReleaseParam(long param_id);
         void doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads);
         at::Tensor doSyncParam(long param_id, bool grad);
-        at::Tensor doGatherParam(long param_id, int dest, bool grad);
+//        at::Tensor doGatherParam(long param_id, int dest, bool grad);
         void consolidateGrads(const std::string& graph_id);
         std::vector<int> sortCommTags(const std::string& graph_id);
 

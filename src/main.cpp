@@ -207,10 +207,10 @@ PYBIND11_MODULE(_pyrannc, m) {
                 self.destroy();
             })
             .def("sync_param", [](RaNNCModule& self, long param_id) {
-                return self.gatherParam(param_id, 0);
+                return self.syncParam(param_id);
             })
             .def("sync_param_grad", [](RaNNCModule& self, long param_id) {
-                return self.gatherParamGrad(param_id, 0);
+                return self.syncParamGrad(param_id);
             })
             .def("sync_param_zero", [](RaNNCModule& self, bool grad) {
                 return self.syncParamZero(grad);

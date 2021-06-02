@@ -47,8 +47,8 @@ namespace rannc {
         void clipGrad(float max_grad_norm);
         double calcGradL2Norm();
 
-        at::Tensor gatherParam(long param_id, int dest);
-        at::Tensor gatherParamGrad(long param_id, int dest);
+        at::Tensor syncParam(long param_id);
+        at::Tensor syncParamGrad(long param_id);
         void syncParamZero(bool grad);
         at::Tensor getLocalParamSegment(long param_id);
 

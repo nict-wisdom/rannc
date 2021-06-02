@@ -616,30 +616,11 @@ namespace rannc {
             }
             const auto &param_ranks = ranks_.at(param_id);
 
-            if (distributed(param_id)) {
-                DistributedParamLocator& zpl = DistributedParamLocator::get();
-                at::Tensor &param_tensor = params_.at(param_id);
-                if (contains(param_ranks, mpi::getRank())) {
-                    at::Tensor zero_param_tensor = zpl.load(param_id);
-                    param_tensor.set_data(zero_param_tensor);
-                } else {
-                    param_tensor.set_data(torch::zeros({1}));
-                }
-                zpl.remove(param_id);
-                dist_ids_.erase(param_id);
-            } else {
-                syncParamOnInit(param_id, param_ranks);
-            }
-
             if (mpi::getRank() == 0 && sync_on_init_) {
-                logger->debug("Synchronized param {}/{}", i, sorted_param_ids.size());
+                assert(contains(id_to_name, param_id));
+                const auto &param_name = id_to_name.at(param_id);
+                logger->debug("Synchronized {} {}/{}", param_name, i, sorted_param_ids.size());
             }
-
-            assert(contains(id_to_name, param_id));
-            const auto &param_name = id_to_name.at(param_id);
-            logger->trace("ParamStorage::deployGraph deployed param: name={} param_id={} ranks={} ({}/{})",
-                          param_name, param_id, join_as_str(param_ranks),
-                          i, sorted_param_ids.size());
 
             NCCLWrapper& ar = NCCLWrapper::get();
             int comm_tag = tag_map.getRankSetTag(param_ranks);
@@ -661,6 +642,22 @@ namespace rannc {
                                   join_as_str(param_ranks));
                 }
             }
+
+            if (distributed(param_id)) {
+                DistributedParamLocator& zpl = DistributedParamLocator::get();
+                at::Tensor &param_tensor = params_.at(param_id);
+                if (contains(param_ranks, mpi::getRank())) {
+                    at::Tensor zero_param_tensor = zpl.load(param_id);
+                    param_tensor.set_data(zero_param_tensor);
+                } else {
+                    param_tensor.set_data(torch::zeros({1}));
+                }
+                zpl.remove(param_id);
+                dist_ids_.erase(param_id);
+            } else {
+                syncParamOnInit(param_id, param_ranks);
+            }
+
             graph_grouped_params[comm_tag].push_back(param_id);
             tag_rank_set_[comm_tag] = param_ranks;
             i++;
@@ -740,12 +737,12 @@ namespace rannc {
         throw std::invalid_argument(ss.str());
     }
 
-    at::Tensor ParamStorage::gatherParam(long param_id, int dest) {
-        return doGatherParam(param_id, dest, false);
+    at::Tensor ParamStorage::syncParam(long param_id) {
+        return doSyncParam(param_id, false);
     }
 
-    at::Tensor ParamStorage::gatherParamGrad(long param_id, int dest) {
-        return doGatherParam(param_id, dest, true);
+    at::Tensor ParamStorage::syncParamGrad(long param_id) {
+        return doSyncParam(param_id, true);
     }
 
     at::Tensor ParamStorage::doSyncParam(long param_id, bool grad) {
@@ -758,82 +755,42 @@ namespace rannc {
         assert(contains(ranks_, param_id));
         auto param_ranks = setToVector(ranks_.at(param_id));
         std::sort(param_ranks.begin(), param_ranks.end());
-
-        // bcast type
         int root = param_ranks.front();
-        SComm& scomm = SComm::get();
 
-        auto& tag_map = TagMap::get();
-        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
-        int src_tag = tag_map.getRankSetTag({root});
-        RouteDP route(IValueLocation("PARAM_SYNC"), {root}, setToVector(mpi::getAllRanks()),
-                      tag, src_tag, RouteTypeDP::BROADCAST);
-        torch::jit::IValue buf;
+        IRType ir_type;
+        if (mpi::getRank() == root) {
+            assert(contains(params_, param_id));
+            ir_type = toIRType(params_.at(param_id));
+        }
+        ObjectComm& ocomm = ObjectComm::get();
+        ir_type = ocomm.bcast(ir_type, root);
+
+        at::Tensor buf;
         if (mpi::getRank() == root) {
             if (grad) {
                 const auto& param = params_.at(param_id);
                 if (param.grad().defined()) {
                     buf = param.grad();
                 } else {
-                    buf = at::Tensor();
+                    buf = torch::zeros_like(param).cuda();
                 }
             } else {
-                buf = params_.at(param_id);
+                buf = params_.at(param_id).cuda();
             }
+        } else {
+            at::TensorOptions options;
+            options = options.dtype(fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType()))
+                    .device(c10::Device(c10::DeviceType::CUDA));
+            buf = torch::zeros(ir_type.getTensorDim(), options);
         }
 
-        const auto result = scomm.bcastIValue(buf, route);
-        const auto result_cpu = toCPU(result, true);
+        NCCLWrapper& ar = NCCLWrapper::get();
+        auto& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+        ar.bcast(tag, {buf}, {root});
+        const auto result_cpu = toCPU(buf, true);
         assert(result_cpu.isTensor());
         return result_cpu.toTensor();
-    }
-
-    at::Tensor ParamStorage::doGatherParam(long param_id, int dest, bool grad) {
-        // check if param exists
-        if (!contains(ranks_, param_id)) {
-            logger->debug("Ranks of param {} is not set.", param_id);
-            return at::Tensor();
-        }
-
-        assert(contains(ranks_, param_id));
-        auto param_ranks = setToVector(ranks_.at(param_id));
-        std::sort(param_ranks.begin(), param_ranks.end());
-        int src = param_ranks.front();
-
-        SComm& scomm = SComm::get();
-
-        std::unordered_set<int> route_ranks = {src, dest};
-        auto& tag_map = TagMap::get();
-        int tag = tag_map.getRankSetTag(route_ranks);
-        int src_tag = tag_map.getRankSetTag({src});
-        RouteDP route(IValueLocation("PARAM_GATHER"), {src}, {dest},
-                      tag, src_tag, RouteTypeDP::BROADCAST);
-
-        at::Tensor ret;
-        if (mpi::getRank() == src) {
-            if (grad) {
-                const auto& param = params_.at(param_id);
-                if (param.grad().defined()) {
-                    ret = param.grad();
-                } else {
-                    ret = at::Tensor();
-                }
-            } else {
-                ret = params_.at(param_id);
-            }
-            if (mpi::getRank() != dest) {
-                scomm.bcastIValue(ret, route);
-            }
-        } else if (mpi::getRank() == dest) {
-            torch::jit::IValue buf;
-            const auto result = scomm.bcastIValue(buf, route);
-            assert(result.isTensor());
-            ret = result.toTensor();
-            ret = ret.cpu().detach();
-        }
-
-        MPI_Barrier(MPI_COMM_WORLD);
-        return ret;
     }
 
     void ParamStorage::useAmpMasterParams(const std::string& graph_id, bool use_amp_master_params){

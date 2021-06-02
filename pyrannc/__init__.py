@@ -559,7 +559,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             return wrapper_func
         return model_attr
 
-    def _sync_orig_params(self, sync_grad=False, name_pattern=None):
+    def _sync_orig_params(self, sync_all_ranks=False, sync_grad=False, name_pattern=None):
         if not self.ready:
             return
 
@@ -574,12 +574,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             param = self.name_to_param[name]
             synced_param_cpu = self.sync_param(pid)
             if synced_param_cpu is not None:
-                if _pyrannc.get_rank() == 0:
+                if _pyrannc.get_rank() == 0 or sync_all_ranks:
                     with torch.no_grad():
                         param.copy_(synced_param_cpu)
             if sync_grad:
                 synced_param_grad_cpu = self.sync_param_grad(pid)
-                if synced_param_grad_cpu is not None:
+                if synced_param_grad_cpu is not None or sync_all_ranks:
                     if _pyrannc.get_rank() == 0:
                         with torch.no_grad():
                             if param.grad is not None and synced_param_grad_cpu is not None:

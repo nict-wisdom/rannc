@@ -512,12 +512,12 @@ namespace rannc {
         }
     }
 
-    at::Tensor RaNNCModule::gatherParam(long param_id, int dest) {
-        return param_storage_->gatherParam(param_id, dest);
+    at::Tensor RaNNCModule::syncParam(long param_id) {
+        return param_storage_->syncParam(param_id);
     }
 
-    at::Tensor RaNNCModule::gatherParamGrad(long param_id, int dest) {
-        return param_storage_->gatherParamGrad(param_id, dest);
+    at::Tensor RaNNCModule::syncParamGrad(long param_id) {
+        return param_storage_->syncParamGrad(param_id);
     }
 
     void RaNNCModule::syncParamZero(bool grad) {
