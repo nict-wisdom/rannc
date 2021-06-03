@@ -263,6 +263,7 @@ namespace rannc {
             if (load_deployment_) {
                 logger->info("Loading deployment state from {}", deployment_file_);
                 deployment_ = load(deployment_file_, mpi::getSize(), dev_info.total_mem);
+                deployment_.id = id_;
 
                 ProfilerUtil prof_util(sg_prof);
                 logger->info("Estimated profiles of subgraphs: batch_size={} ranks={} pipeline_num={}",

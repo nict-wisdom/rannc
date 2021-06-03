@@ -549,7 +549,7 @@ namespace rannc {
 
     void ParamStorage::deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params,
                               bool enable_zero) {
-        logger->trace("ParamStorage::deployGraph starting: graph_id={}", decomp.id);
+        logger->trace("ParamStorage::deploy starting: graph_id={}", decomp.id);
 
         auto& graph_id = decomp.id;
         for (const auto& it: graph_params) {
@@ -688,7 +688,7 @@ namespace rannc {
             }
         }
 
-        logger->trace("ParamStorage::deployGraph deployed all params. graph_id={}", decomp.id);
+        logger->trace("ParamStorage::deploy deployed all params. graph_id={}", decomp.id);
     }
 
     void ParamStorage::syncParamOnInit(long param_id, const std::unordered_set<int>& ranks) {
