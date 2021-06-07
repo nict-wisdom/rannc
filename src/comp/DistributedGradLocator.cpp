@@ -15,7 +15,8 @@ namespace rannc {
     at::Tensor DistributedGradLocator::getLocalParamSegment(long pid) {
         if (!contains(local_param_segments_, pid)) {
             // Keep local segment to set grad to it.
-            local_param_segments_[pid] = getSegment(pid, my_indices_.at(pid), false).detach();
+            local_param_segments_[pid] = getSegment(pid, my_indices_.at(pid), false).detach()
+                    .set_requires_grad(true);
         }
         return local_param_segments_.at(pid);
     }

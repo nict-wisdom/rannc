@@ -70,6 +70,8 @@ namespace rannc {
         void scaleGrads(const std::string& graph_id, bool amp_master_grads);
         void unscaleGrads(const std::string& graph_id, bool amp_master_grads);
 
+        void setGradToLocalParamSegment(const std::string& graph_id);
+
         void registerAmpMasterParam(long model_param_id, long master_param_id, const at::Tensor& param_tensor);
         void clipGradNorm(const std::string& graph_id, double max_grad_norm, bool use_amp_master);
         double calcGradGlobalL2Norm(const std::string& graph_id, bool use_amp_master);

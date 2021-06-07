@@ -438,6 +438,10 @@ namespace rannc {
             outputs = scomm.bcastIValueMap(outputs, bcast_route_);
         }
 
+        if (param_storage_->zeroEnabled(id)) {
+            param_storage_->setGradToLocalParamSegment(id);
+        }
+
         time_counter_.stop("GraphLauncher::backward");
         logger->trace("GraphLauncher::backward finished");
 

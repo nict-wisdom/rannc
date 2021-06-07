@@ -347,6 +347,15 @@ namespace rannc {
         recordEnd(ss.str());
     }
 
+    void ParamStorage::setGradToLocalParamSegment(const std::string& graph_id) {
+        if (zeroEnabled(graph_id)) {
+            auto locator = zero_grad_locators_.at(graph_id);
+            for (const auto &it: getParamIDs(graph_id, false)) {
+                locator->setGradToLocalParamSegment(it.second);
+            }
+        }
+    }
+
     void ParamStorage::clearParamGrads(const std::string& graph_id) {
         if (consolidate_) {
             const auto& graph_grad_cons = grad_cons_[graph_id];
