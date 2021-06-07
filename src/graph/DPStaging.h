@@ -45,6 +45,7 @@ namespace rannc {
         size_t dev_mem_;
         GraphMergeCache graph_merge_cache_;
         bool use_amp_master_params_;
+        bool enable_zero_;
 
         const std::shared_ptr<spdlog::logger> logger = getLogger("DPStaging");
     };

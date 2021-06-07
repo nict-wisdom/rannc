@@ -315,6 +315,11 @@ namespace rannc {
 //                     toString(getRngState()));
 
         logger->trace("GraphLauncher::forward starting");
+
+        if (param_storage_->zeroEnabled(id)) {
+            param_storage_->bcastParamsZero(id, false);
+        }
+
         time_counter_.start("GraphLauncher::forward");
 
         int64_t input_batch_size = (int64_t) guessBatchSize(inputs);

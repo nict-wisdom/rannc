@@ -349,7 +349,7 @@ namespace rannc {
             long ar_time = calcAllReduceTime(g->getParamSizeInByte());
 
             int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_);
+            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
             size_t total = prof.max_allocated_mem + opt_mem;
 
             logger->info(
@@ -509,8 +509,8 @@ namespace rannc {
                                 step_prof = prof_util_.profile(step_graph, batch_size_,
                                                                (d - d_prev) * replica_num * pipeline_num,
                                                                checkpointing);
-                                step_mem = calcGraphMem(step_graph, step_prof, batch_size_, replica_num, pipeline_num,
-                                                        use_amp_master_params_);
+                                step_mem = calcGraphMem(step_graph, step_prof, batch_size_, (d - d_prev) * replica_num, pipeline_num,
+                                                        use_amp_master_params_, enable_zero_);
                                 step_val = ::rannc::estimateEval(step_prof,
                                                                  step_in_comm, step_out_comm,
                                                                  table[s - 1][b_prev][d_prev].max_fwd,
@@ -531,7 +531,7 @@ namespace rannc {
                                 long opt_mem = 0;
                                 for (size_t i = b_prev; i <= (b - 1); i++) {
                                     const auto &node = graph.nodes.at(i);
-                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_);
+                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev));
                                 }
                                 step_mem = step_prof.max_allocated_mem + opt_mem;
                             }

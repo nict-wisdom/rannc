@@ -49,23 +49,24 @@ namespace rannc {
         return size * 1e6 / (double) (10 * 1024L  * 1024L * 1024L);
     }
 
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, bool use_amp_master_params) {
+    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, bool use_amp_master_params,
+                        bool enable_zero, int zero_dist_num) {
         static int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-        size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params);
+        size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params, enable_zero, zero_dist_num);
 
         return prof.max_allocated_mem + opt_mem;
     }
 
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-                        size_t batch_size, int replica_num, int pipeline_num, bool use_amp_master_params) {
+    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, size_t batch_size, int replica_num,
+                        int pipeline_num, bool use_amp_master_params, bool enable_zero) {
         size_t bs = ceil(batch_size / (double) (replica_num*pipeline_num));
         auto scaled = std::make_shared<IRGraph>("scaled", *g);
         scaled->setBatchSize(bs);
-        return calcGraphMem(g, prof, use_amp_master_params) + calcCommBufSize(scaled, pipeline_num);
+        return calcGraphMem(g, prof, use_amp_master_params, enable_zero, replica_num) + calcCommBufSize(scaled, pipeline_num);
     }
 
     bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity, bool use_amp_master_params) {
-        return calcGraphMem(g, prof, use_amp_master_params) < (size_t) capacity;
+        return calcGraphMem(g, prof, use_amp_master_params, false, 1) < (size_t) capacity;
     }
 
     GraphProfile makeErrorProfile() {

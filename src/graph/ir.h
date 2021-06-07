@@ -602,7 +602,8 @@ namespace rannc {
 
     std::pair<std::shared_ptr<IRGraph>, std::unordered_map<std::string, std::vector<std::string>>> cloneSharedInputs(const std::shared_ptr<IRGraph> &ir_graph);
     int64_t guessGraphBatchSize(const std::shared_ptr<IRGraph>& ir_graph);
-    size_t getOptMemSize(const std::shared_ptr<IRGraph> &ir_graph, int opt_param_factor, bool use_amp_master_param);
+    size_t getOptMemSize(const std::shared_ptr<IRGraph> &ir_graph, int opt_param_factor, bool use_amp_master_param,
+                         bool enable_zero, int zero_dist_num);
     size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph);
     bool verifyNoDuplicatedOutputs(const std::shared_ptr<IRGraph>& g);
     bool verifyNodeInputs(const std::shared_ptr<IRGraph>& g, bool show_msg=false);

@@ -576,7 +576,13 @@ namespace rannc {
         return 0;
     }
 
-    size_t getOptMemSize(const std::shared_ptr<IRGraph> &ir_graph, int opt_param_factor, bool use_amp_master_param) {
+    size_t getOptMemSize(const std::shared_ptr<IRGraph> &ir_graph, int opt_param_factor, bool use_amp_master_param,
+                         bool enable_zero, int zero_dist_num) {
+
+        if (!zero_dist_num) {
+            zero_dist_num = 1;
+        }
+
         // This does not need to consider batch size
         size_t sum = 0;
         for (const auto& v: ir_graph->getValues()) {
@@ -587,18 +593,20 @@ namespace rannc {
                         sum += val.getSizeInByte()
                                * 2 // amp holds both param and grad
                                * 2; // FP32
-                        sum += val.getSizeInByte()
+                        sum += val.getSizeInByte() // optimizer state
                                * 2 // FP32
-                               * opt_param_factor;
+                               * opt_param_factor
+                               / zero_dist_num;
                     } else if (val.getType().getTensorElemType() == IRTensorElemType::FLOAT
                                 || val.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
                             // we have to keep memory for stashed gradients
-                        sum += val.getSizeInByte() * (opt_param_factor + 1);
+                        sum += val.getSizeInByte() * opt_param_factor / zero_dist_num // optimizer state
+                                + val.getSizeInByte(); // stashed gradients
                     } else {
                         throw std::runtime_error("Unexpected param type: " + toString(val.getType().getTensorElemType()));
                     }
                 } else {
-                    sum += val.getSizeInByte() * opt_param_factor;
+                    sum += val.getSizeInByte() * opt_param_factor / zero_dist_num;  // optimizer state
                 }
             }
         }

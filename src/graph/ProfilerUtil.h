@@ -17,9 +17,10 @@ namespace rannc {
     long calcOutputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
     long calcAllReduceTime(long cut_size);
 
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, bool use_amp_master_params);
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-                        size_t batch_size, int replica_num, int pipeline_num, bool use_amp_master_params);
+    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, bool use_amp_master_params,
+                        bool enable_zero, int zero_dist_num);
+    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, size_t batch_size, int replica_num,
+                        int pipeline_num, bool use_amp_master_params, bool enable_zero);
     bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity, bool use_amp_master_params);
 
     struct MLProfileKey {

@@ -276,7 +276,7 @@ namespace rannc {
                                                         deployment_.checkpointing);
 
                     int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-                    size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_);
+                    size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
 
                     size_t bs = ceil(batch_size / (double) (repl_num*deployment_.pipeline_num));
                     auto scaled = std::make_shared<IRGraph>("scaled", *g);
