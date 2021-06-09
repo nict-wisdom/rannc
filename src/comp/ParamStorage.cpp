@@ -460,6 +460,22 @@ namespace rannc {
         throw std::invalid_argument(ss.str());
     }
 
+    std::tuple<int64_t, int64_t> ParamStorage::getLocalParamRange(long param_id) {
+        for (const auto& it: zero_grad_locators_) {
+            for (const auto& param_it: getParamIDs(it.first, false)) {
+                if (param_it.second == param_id) {
+                    const auto &locator = it.second;
+                    assert(contains(ranks_, param_id));
+                    return locator->getSegmentRange(param_id);
+                }
+            }
+        }
+
+        std::stringstream ss;
+        ss << "Param is not registered for zero: " << param_id;
+        throw std::invalid_argument(ss.str());
+    }
+
     void ParamStorage::consolidateGrads(const std::string& graph_id) {
         if (!contains(grad_cons_, graph_id)) {
             return;
@@ -512,18 +528,7 @@ namespace rannc {
             }
         }
 
-        ObjectComm& ocomm = ObjectComm::get();
-        std::vector<std::unordered_map<long, float>> gathered_norms = ocomm.allgather(norms, MPI_COMM_WORLD);
-
-        for (const auto& gn: gathered_norms) {
-            for (const auto& it: gn) {
-                long global_pid = it.first;
-                if (!contains(norms, global_pid)) {
-                    norms[global_pid] = it.second;
-                }
-            }
-        }
-
+        // For stable results, we need to sort param ids
         std::unordered_map<std::string, long> params_on_rank = getParamIDs(graph_id, false);
         std::unordered_map<std::string, long> all_param_ids;
         all_param_ids.reserve(params_on_rank.size());
@@ -539,13 +544,27 @@ namespace rannc {
             }
         }
 
+        ObjectComm& ocomm = ObjectComm::get();
+        std::vector<std::unordered_map<long, float>> gathered_norms = ocomm.allgather(norms, MPI_COMM_WORLD);
+
+        std::unordered_map<int, std::unordered_map<long, float>> norms_buf;
+        int rank = 0;
+        for (const auto &gn: gathered_norms) {
+            for (const auto &it: gn) {
+                long global_pid = it.first;
+                int rank_idx = zeroEnabled(graph_id) ? rank : 0;
+                norms_buf[rank_idx][global_pid] = it.second;
+            }
+            rank++;
+        }
+
         double norm_sq_sum = 0;
-        for (const auto global_pid: getSortedParamIDs(all_param_ids)) {
-            if (contains(norms, global_pid)) {
-                // norms may not contain global_pid because it does not include an element if the param tensor does not have its gradient.
-                // this happens when the parameter is not used in the graph.
-                double norm = norms.at(global_pid);
-                norm_sq_sum += norm * norm;
+        for (const auto& it: norms_buf) {
+            for (const auto global_pid: getSortedParamIDs(all_param_ids)) {
+                if (contains(it.second, global_pid)) {
+                    double norm = it.second.at(global_pid);
+                    norm_sq_sum += norm * norm;
+                }
             }
         }
         return sqrt(norm_sq_sum);

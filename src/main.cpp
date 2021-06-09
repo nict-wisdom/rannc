@@ -215,6 +215,9 @@ PYBIND11_MODULE(_pyrannc, m) {
             .def("sync_param_zero", [](RaNNCModule& self, bool grad) {
                 return self.syncParamZero(grad);
             })
+            .def("get_local_param_range", [](RaNNCModule& self, long param_id) {
+                return self.getLocalParamRange(param_id);
+            })
             .def("get_local_param_segment", [](RaNNCModule& self, long param_id) {
                 return self.getLocalParamSegment(param_id);
             })

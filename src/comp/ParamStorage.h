@@ -56,6 +56,7 @@ namespace rannc {
         bool distributed(long param_id) const;
         bool zeroEnabled(const std::string& graph_id) const;
         at::Tensor getLocalParamSegment(long param_id) const;
+        std::tuple<int64_t, int64_t> getLocalParamRange(long param_id);
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);

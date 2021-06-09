@@ -18,6 +18,7 @@ namespace rannc {
         size_t getSegmentNum(long pid);
         size_t getOwner(long pid, int index);
         std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
+        std::pair<int64_t, int64_t> getSegmentRange(long pid);
 
     protected:
         NCCLWrapper& nccl_;

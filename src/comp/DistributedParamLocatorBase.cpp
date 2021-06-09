@@ -63,6 +63,11 @@ namespace rannc {
         return std::pair<int64_t, int64_t>(offset, offset + src_size);
     }
 
+    std::pair<int64_t, int64_t> DistributedParamLocatorBase::getSegmentRange(long pid) {
+        assert(contains(my_indices_, pid));
+        return getSegmentRange(pid, my_indices_.at(pid));
+    }
+
     size_t DistributedParamLocatorBase::getOwner(long pid, int index) {
         assert(contains(ranks_, pid));
 

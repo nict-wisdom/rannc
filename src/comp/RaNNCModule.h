@@ -51,6 +51,7 @@ namespace rannc {
         at::Tensor syncParamGrad(long param_id);
         void syncParamZero(bool grad);
         at::Tensor getLocalParamSegment(long param_id);
+        std::tuple<int64_t, int64_t> getLocalParamRange(long param_id);
 
         void saveDeployment(const std::string& deployment_file);
 

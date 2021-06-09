@@ -181,6 +181,26 @@ def _get_local_optimizer_state_dict(global_state_dict, pids):
     return local_state_dict
 
 
+def _slice_optimizer_state(local_state_dict, param_zero_range):
+    sliced_state_dict = {}
+    for k, v in local_state_dict.items():
+        if k == 'state':
+            for pid, param_state in v.items():
+                new_state_vals = {}
+                for state_k, state_v in param_state.items():
+                    if torch.is_tensor(state_v):
+                        # slice here
+                        slice = param_zero_range[pid]
+                        new_state_vals[state_k] = state_v.detach().clone()[slice[0], slice[1]]
+                    else:
+                        new_state_vals[state_k] = state_v
+                sliced_state_dict[k][pid] = new_state_vals
+        else:
+            sliced_state_dict[k] = v
+
+    return sliced_state_dict
+
+
 def _optimizer_state_to_cuda(optimizer, device):
     for state in optimizer.state.values():
         for k, v in state.items():
@@ -306,13 +326,18 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 used_param_global_order = []
                 local_order = 0
                 global_order = 0
+                param_zero_range = {}
+                param_zero_segment_to_id = {}
                 for param_group in self.optimizer.param_groups:
                     params = []
 
                     for p in param_group['params']:
                         if id(p) in self.used_param_ids:
                             if self.enable_zero:
-                                p = self.get_local_param_segment(id(p))
+                                pid = id(p)
+                                p = self.get_local_param_segment(pid)
+                                param_zero_range[global_order] = self.get_local_param_range(pid)
+                                param_zero_segment_to_id[p] = pid
 
                             params.append(p)
                             order_local_to_global[local_order] = global_order
@@ -325,6 +350,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                     new_param_groups.append(param_group)
                 self.optimizer.param_groups = new_param_groups
                 self.optimizer.order_local_to_global = order_local_to_global
+                self.optimizer.param_zero_segment_to_id = param_zero_segment_to_id
 
                 # replace state_dict and load_state_dict
                 old_state_dict = self.optimizer.state_dict
@@ -343,6 +369,10 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 def new_load_state_dict(opt, state_dict, from_global=False, **kwargs):
                     if from_global:
                         local_state_dict = _get_local_optimizer_state_dict(state_dict, used_param_global_order)
+
+                        if self.enable_zero:
+                            local_state_dict = _slice_optimizer_state(local_state_dict, param_zero_range)
+
                         old_load_state_dict(local_state_dict)
                         _optimizer_state_to_cuda(opt, device)
                     else:
@@ -440,7 +470,11 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             from .amp import zip_params, patch_amp_scaler
             master_params, model_params = zip_params(self.optimizer)
             for master_p, model_p in zip(master_params, model_params):
-                _pyrannc.register_amp_master_param(id(model_p), master_p)
+                if model_p in self.optimizer.param_zero_segment_to_id:
+                    _pyrannc.register_amp_master_param(self.optimizer.param_zero_segment_to_id[model_p], master_p)
+                else:
+                    _pyrannc.register_amp_master_param(id(model_p), master_p)
+
             patch_amp_scaler()
             self.amp_master_param_registered = True
 

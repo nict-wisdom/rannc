@@ -152,6 +152,9 @@ namespace rannc {
                                         const py::function& var_lookup_fn, const py::args& args,
                                         bool gather_inputs) {
 
+        EventRecorder& ev = EventRecorder::get();
+        ev.enable(false);
+
         doRegisterParams(py_params, false);
         doRegisterParams(py_buffers, true);
 
@@ -431,6 +434,7 @@ namespace rannc {
         }
 
         logger->info("RaNNCModule is ready. (rank{})", mpi::getRank());
+        ev.enable(true);
 
         return param_ids_on_rank_;
     }
@@ -527,6 +531,10 @@ namespace rannc {
 
     at::Tensor RaNNCModule::getLocalParamSegment(long param_id) {
         return param_storage_->getLocalParamSegment(param_id);
+    }
+
+    std::tuple<int64_t, int64_t> RaNNCModule::getLocalParamRange(long param_id) {
+        return param_storage_->getLocalParamRange(param_id);
     }
 
     void RaNNCModule::destroy() {

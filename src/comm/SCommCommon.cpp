@@ -430,7 +430,13 @@ namespace rannc {
 
     IRType reduceTypes(IRType type, MPI_Comm comm) {
         ObjectComm& ocomm = ObjectComm::get();
+        std::stringstream ss;
+        ss << "SComm::reduceTypes_allgather_" << toString(type);
+        const auto key = ss.str();
+        recordStart(key);
         const std::vector<IRType> all_types = ocomm.allgather(type, comm);
+        recordEnd(key);
+
         return doReduceTypes(all_types);
     }
 

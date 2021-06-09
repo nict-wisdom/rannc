@@ -40,6 +40,10 @@ namespace rannc {
             return enabled_;
         }
 
+        void enable(bool enabled) {
+            enabled_ = enabled;
+        }
+
     private:
         EventRecorder();
 

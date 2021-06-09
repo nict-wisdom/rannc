@@ -550,7 +550,13 @@ namespace rannc {
     }
 
     IRType SComm::reduceRouteTypes(const IRType& type, const RouteDP& route) {
-        return reduceTypes(type, getRouteCommunicator(route));
+        std::stringstream ss;
+        ss << "SComm::reduceRouteTypes_" << toString(type) << "_" << toString(route);
+        const auto key = ss.str();
+        recordStart(key);
+        auto ret = reduceTypes(type, getRouteCommunicator(route));
+        recordEnd(key);
+        return ret;
     }
 
     torch::jit::IValue SComm::distribute(const torch::jit::IValue& val, const RouteDP& route, bool is_bwd, int split_delay) {

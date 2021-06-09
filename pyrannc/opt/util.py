@@ -99,7 +99,10 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=Tr
         from ..amp import zip_params
         master_params, model_params = zip_params(optimizer)
         for master_p, model_p in zip(master_params, model_params):
-            _pyrannc.register_amp_master_param(id(model_p), master_p)
+            if model_p in optimizer.param_zero_segment_to_id:
+                _pyrannc.register_amp_master_param(optimizer.param_zero_segment_to_id[model_p], master_p)
+            else:
+                _pyrannc.register_amp_master_param(id(model_p), master_p)
 
     state_dict = optimizer.state_dict(from_global=False)
     # replace local ids with global ones
