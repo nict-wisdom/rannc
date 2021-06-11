@@ -65,7 +65,7 @@ namespace rannc {
                 obj["ph"] = evt.phase;
                 obj["pid"] = evt.rank;
                 obj["tid"] = 0;
-                obj["ts"] = evt.time;
+                obj["ts"] = evt.time * 1000;
 
                 js_events.push_back(obj);
             }

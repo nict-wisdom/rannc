@@ -329,7 +329,7 @@ namespace rannc {
             graph_clone_params.clear();
         }
 
-        for (const auto& p: getParamInputTensors(id, split_idx <= last_split_idx_)) {
+        for (const auto &p: getParamInputTensors(id, split_idx <= last_split_idx_)) {
             stack.emplace_back(p);
         }
 

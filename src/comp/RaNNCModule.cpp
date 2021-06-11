@@ -153,6 +153,7 @@ namespace rannc {
                                         bool gather_inputs) {
 
         EventRecorder& ev = EventRecorder::get();
+        bool ev_trace = ev.isEnabled();
         ev.enable(false);
 
         doRegisterParams(py_params, false);
@@ -434,7 +435,7 @@ namespace rannc {
         }
 
         logger->info("RaNNCModule is ready. (rank{})", mpi::getRank());
-        ev.enable(true);
+        ev.enable(ev_trace);
 
         return param_ids_on_rank_;
     }

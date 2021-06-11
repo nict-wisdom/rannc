@@ -183,8 +183,6 @@ namespace rannc {
         // NCCL's limitation
         assert(send_tensors.size() <= NCCL_MAX_COLL_OP_NUM);
 
-        syncStream();
-
         std::stringstream ss;
         size_t elem_sum = 0;
         for (const auto& grad: send_tensors) {
@@ -216,7 +214,6 @@ namespace rannc {
             f(sendptr, recvptr, getTensorElemCount(send_ten), root, datatype, ncomm);
         }
         ncclGroupEnd();
-        syncStream();
 
         recordEnd(ss.str());
     }
@@ -234,6 +231,10 @@ namespace rannc {
         std::vector<at::Tensor> send_tensors_buf;
         std::vector<at::Tensor> recv_tensors_buf;
         std::vector<int> roots_buf;
+
+        send_tensors_buf.reserve(NCCL_MAX_COLL_OP_NUM);
+        recv_tensors_buf.reserve(NCCL_MAX_COLL_OP_NUM);
+        roots_buf.reserve(NCCL_MAX_COLL_OP_NUM);
 
         for (size_t i=0; i<send_tensors.size(); i++) {
 

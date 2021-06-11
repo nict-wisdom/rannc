@@ -315,7 +315,8 @@ namespace rannc {
                     if (zeroEnabled(graph_id)) {
                         auto locator = zero_grad_locators_.at(graph_id);
                         std::vector<int> roots;
-                        roots.reserve(param_ids.size());
+                        grads.reserve(param_ids.size()*ranks.size());
+                        roots.reserve(param_ids.size()*ranks.size());
                         for (long pid: param_ids) {
                             for (int i=0; i<locator->getSegmentNum(pid); i++) {
                                 const auto segment = locator->getSegment(pid, i, true);
@@ -344,6 +345,7 @@ namespace rannc {
             }
         }
 
+        syncStream();
         recordEnd(ss.str());
     }
 
@@ -381,7 +383,8 @@ namespace rannc {
 
         std::stringstream ss;
         ss << "ParamStorage::bcastParams_graph_" << graph_id;
-        recordStart(ss.str());
+        const auto key = ss.str();
+        recordStart(key);
 
         NCCLWrapper &ar = NCCLWrapper::get();
         std::vector<int> sorted_tags = sortCommTags(graph_id);
@@ -389,11 +392,19 @@ namespace rannc {
             assert(contains(tag_rank_set_, tag));
             const auto &ranks = tag_rank_set_.at(tag);
             if (contains(ranks, mpi::getRank())) {
+
+                std::stringstream ss_seg;
+                ss_seg << key << "_setup_tag_" << tag;
+                const auto seg_key = ss_seg.str();
+                recordStart(seg_key);
+
                 const auto &param_ids = graph_grouped_params.at(tag);
                 std::vector<at::Tensor> params;
-
                 std::vector<int> roots;
-                roots.reserve(param_ids.size());
+
+                params.reserve(param_ids.size()*ranks.size());
+                roots.reserve(param_ids.size()*ranks.size());
+
                 for (long pid: param_ids) {
                     for (int i = 0; i < locator->getSegmentNum(pid); i++) {
                         const auto segment = locator->getSegment(pid, i, grad);
@@ -401,10 +412,12 @@ namespace rannc {
                         roots.push_back(i);
                     }
                 }
+                recordEnd(seg_key);
                 ar.bcast(tag, params, roots);
             }
-            recordEnd(ss.str());
         }
+        syncStream();
+        recordEnd(key);
     }
 
     void ParamStorage::doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads) {
@@ -785,40 +798,44 @@ namespace rannc {
         std::sort(param_ranks.begin(), param_ranks.end());
         int root = param_ranks.front();
 
+        at::Tensor param;
         IRType ir_type;
-        if (mpi::getRank() == root) {
+        if (contains(param_ranks, mpi::getRank())) {
             assert(contains(params_, param_id));
-            ir_type = toIRType(params_.at(param_id));
+            if (hasAmpMasterParam(param_id)) {
+                param = getAmpMasterParamTensor(param_id);
+            } else {
+                param = params_.at(param_id);
+            }
+            ir_type = toIRType(param);
         }
         ObjectComm& ocomm = ObjectComm::get();
-        ir_type = ocomm.bcast(ir_type, root);
+        const auto sync_ir_type = ocomm.bcast(ir_type, root);
 
         at::Tensor buf;
-        if (mpi::getRank() == root) {
+        if (contains(param_ranks, mpi::getRank())) {
             if (grad) {
-                const auto& param = params_.at(param_id);
                 if (param.grad().defined()) {
-                    buf = param.grad();
+                    buf = param.grad().detach().clone();
                 } else {
                     buf = torch::zeros_like(param).cuda();
                 }
             } else {
-                buf = params_.at(param_id).cuda();
+                buf = param.detach().clone();
             }
         } else {
             at::TensorOptions options;
-            options = options.dtype(fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType()))
+            options = options.dtype(fromIRTensorElemTypeToScalarType(sync_ir_type.getTensorElemType()))
                     .device(c10::Device(c10::DeviceType::CUDA));
-            buf = torch::zeros(ir_type.getTensorDim(), options);
+            buf = torch::zeros(sync_ir_type.getTensorDim(), options);
         }
 
         NCCLWrapper& ar = NCCLWrapper::get();
         auto& tag_map = TagMap::get();
         int tag = tag_map.getRankSetTag(mpi::getAllRanks());
         ar.bcast(tag, {buf}, {root});
-        const auto result_cpu = toCPU(buf, true);
-        assert(result_cpu.isTensor());
-        return result_cpu.toTensor();
+        syncStream();
+        return buf;
     }
 
     void ParamStorage::useAmpMasterParams(const std::string& graph_id, bool use_amp_master_params){
