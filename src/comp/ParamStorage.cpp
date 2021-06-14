@@ -736,8 +736,6 @@ namespace rannc {
         at::Tensor &param_tensor = params_.at(param_id);
 
         assert(param_tensor.is_contiguous());
-        syncStream();
-
         static bool msg_shown = false;
 
         if (sync_on_init_) {
@@ -747,9 +745,12 @@ namespace rannc {
                     logger->info("Synchronizing parameters ...");
                 }
             }
-            mpi::checkMPIResult(MPI_Bcast(param_tensor.data_ptr(), param_tensor.numel(),
-                                          scalarTypeToMPIDatatype(param_tensor.type().scalarType()), 0,
-                                          MPI_COMM_WORLD));
+            NCCLWrapper& nccl = NCCLWrapper::get();
+            auto& tag_map = TagMap::get();
+            int tag = tag_map.getRankSetTag(ranks);
+            syncStream();
+            nccl.bcast(tag, {param_tensor}, {0});
+            syncStream();
         } else {
             if (!msg_shown && mpi::getRank() == 0) {
                 logger->info("Skipped parameter synchronization");
