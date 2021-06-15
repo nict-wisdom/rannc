@@ -43,7 +43,7 @@ def allreduce_grads(optimizer, prescale=1.0):
 
 def zip_params(optimizer):
     stash = optimizer._amp_stash
-    return stash.all_fp32_from_fp16_params, stash.all_fp16_params
+    return zip(stash.all_fp32_from_fp16_params, stash.all_fp16_params)
 
 
 def zip_grads(optimizer):

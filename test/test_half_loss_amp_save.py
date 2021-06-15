@@ -58,12 +58,12 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     torch.cuda.manual_seed(seed)
 
     data_loader = common.get_loader(
-        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset)
+        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, True)
 
     lr = 0.01
 
     model_base = model_base.to(device)
-    rmodel_base =copy.deepcopy(model_base)
+    rmodel_base = copy.deepcopy(model_base)
 
     opt_base = optim.Adam(model_base.parameters(), lr=lr)
     model, opt = amp.initialize(model_base, opt_base, opt_level="O2",
@@ -104,20 +104,12 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         allreduce_grads_rannc(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
-        expected_master_params = {n: p for n, p in zip([n for n, p in model.module.named_parameters()], amp.master_params(opt))}
-        actual_master_params = {n: p for n, p in zip([n for n, p in rmodel.named_parameters()], amp.master_params(ropt))}
-        for n, rp in actual_master_params.items():
-            p = expected_master_params[n]
-            np.testing.assert_equal(rp.grad.size(), p.grad.size())
-            np.testing.assert_allclose(rp.grad.tolist(), p.grad.tolist(), rtol=rtol, atol=atol)
+        common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=False, opt_exp=opt, opt_act=ropt)
 
         opt.step()
         ropt.step()
 
-        for n, rp in actual_master_params.items():
-            p = expected_master_params[n]
-            np.testing.assert_equal(rp.size(), p.size())
-            np.testing.assert_allclose(rp.tolist(), p.tolist(), rtol=rtol, atol=atol)
+        common.compare_params(model, rmodel, rtol, atol, fp16=True, zero=False, opt_exp=opt, opt_act=ropt)
 
         opt.zero_grad()
         ropt.zero_grad()

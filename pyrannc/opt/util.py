@@ -97,8 +97,7 @@ def merge_param_groups(target_groups, sub_groups):
 def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=True, root=0):
     if use_amp_master_param:
         from ..amp import zip_params
-        master_params, model_params = zip_params(optimizer)
-        for master_p, model_p in zip(master_params, model_params):
+        for master_p, model_p in zip_params(optimizer):
             if model_p in optimizer.param_zero_segment_to_id:
                 _pyrannc.register_amp_master_param(optimizer.param_zero_segment_to_id[model_p], master_p)
             else:

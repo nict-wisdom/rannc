@@ -10,6 +10,8 @@ try:
 except ImportError:
     print("Failed to import apex. Tests with FP16 will fail.")
 import pyrannc
+import pyrannc.amp
+
 
 ASSERT_DECIMAL = 3
 seed = 0
@@ -42,7 +44,10 @@ def compare_tensors(v1, v2, rtol, atol):
     np.testing.assert_allclose(v1.tolist(), v2.tolist(), rtol=rtol, atol=atol)
 
 
-def do_compare_params(model_exp, model_act, f, fp16, rtol, atol):
+def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, opt_exp, opt_act):
+    if hasattr(model_exp, "module"): # ddp model
+        model_exp = model_exp.module
+
     expected_params = {n: p for n, p in model_exp.named_parameters()}
     actual_params = {n: p for n, p in model_act.named_parameters()}
 
@@ -50,13 +55,24 @@ def do_compare_params(model_exp, model_act, f, fp16, rtol, atol):
         p = expected_params[n]
         compare_tensors(f(rp), f(p), rtol, atol)
 
+    if fp16:
+        expected_amp_param_map = {model_p: master_p for master_p, model_p in pyrannc.amp.zip_params(opt_exp)}
+        expected_master_params = {n: expected_amp_param_map[p] for n, p in expected_params.items()}
 
-def compare_params(model_exp, model_act, fp16, rtol, atol):
-    do_compare_params(model_exp, model_act, lambda p: p, fp16, rtol, atol)
+        actual_amp_param_map = {model_p: master_p for master_p, model_p in pyrannc.amp.zip_params(opt_act)}
+        actual_master_params = {n: actual_amp_param_map[p] for n, p in actual_params.items()}
+
+        for n, rp in actual_master_params.items():
+            p = expected_master_params[n]
+            compare_tensors(f(rp), f(p), rtol, atol)
 
 
-def compare_grads(model_exp, model_act, fp16, rtol, atol):
-    do_compare_params(model_exp, model_act, lambda p: p.grad, fp16, rtol, atol)
+def compare_params(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
+    do_compare_params(model_exp, model_act, lambda p: p, rtol, atol, fp16, opt_exp, opt_act)
+
+
+def compare_grads(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
+    do_compare_params(model_exp, model_act, lambda p: p.grad, rtol, atol, fp16, opt_exp, opt_act)
 
 
 def reset_running_stats(model):
@@ -135,7 +151,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=use_amp, **module_args)
 
-    compare_params(model, rmodel, use_amp, rtol, atol)
+    compare_params(model, rmodel, rtol, atol, use_amp)
 
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for x, tgt in data_loader:
@@ -173,7 +189,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             if gather_inputs or pyrannc.get_rank() == 0:
                 if enable_zero:
                     rmodel._sync_orig_params(sync_grad=True)
-                compare_grads(model, rmodel, use_amp, rtol, atol)
+                compare_grads(model, rmodel, rtol, atol, use_amp)
 
             opt.step()
             r_opt.step()
@@ -183,10 +199,10 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         if gather_inputs or pyrannc.get_rank() == 0:
             if enable_zero:
                 rmodel._sync_orig_params()
-            compare_params(model, rmodel, use_amp, rtol, atol)
+            compare_params(model, rmodel, rtol, atol, use_amp)
 
     if gather_inputs or pyrannc.get_rank() == 0:
-        compare_params(model, rmodel, use_amp, rtol, atol)
+        compare_params(model, rmodel, rtol, atol, use_amp)
 
     ddp_model = None
     model.eval()

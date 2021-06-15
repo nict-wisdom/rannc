@@ -468,8 +468,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     def _setup_amp_params(self):
         if not self.amp_master_param_registered:
             from .amp import zip_params, patch_amp_scaler
-            master_params, model_params = zip_params(self.optimizer)
-            for master_p, model_p in zip(master_params, model_params):
+            for master_p, model_p in zip_params(self.optimizer):
                 if model_p in self.optimizer.param_zero_segment_to_id:
                     _pyrannc.register_amp_master_param(self.optimizer.param_zero_segment_to_id[model_p], master_p)
                 else:
@@ -610,14 +609,14 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if synced_param_cpu is not None:
                 if _pyrannc.get_rank() == 0 or sync_all_ranks:
                     with torch.no_grad():
-                        param.copy_(synced_param_cpu)
+                        param.copy_(synced_param_cpu.view(param.size()))
             if sync_grad:
                 synced_param_grad_cpu = self.sync_param_grad(pid)
                 if synced_param_grad_cpu is not None or sync_all_ranks:
                     if _pyrannc.get_rank() == 0:
                         with torch.no_grad():
                             if param.grad is not None and synced_param_grad_cpu is not None:
-                                param.grad.copy_(synced_param_grad_cpu)
+                                param.grad.copy_(synced_param_grad_cpu.view(param.size()))
                             if param.grad is None:
                                 param.grad = synced_param_grad_cpu
 
