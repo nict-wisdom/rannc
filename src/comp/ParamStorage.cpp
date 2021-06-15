@@ -593,6 +593,7 @@ namespace rannc {
         logger->trace("ParamStorage::deploy starting: graph_id={}", decomp.id);
 
         auto& graph_id = decomp.id;
+        graph_params_[graph_id] = std::unordered_map<std::string, long>();
         for (const auto& it: graph_params) {
             useParam(graph_id,  it.first, it.second);
         }
