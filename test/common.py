@@ -56,11 +56,8 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, opt_exp, opt_ac
         compare_tensors(f(rp), f(p), rtol, atol)
 
     if fp16:
-        expected_amp_param_map = {model_p: master_p for master_p, model_p in pyrannc.amp.zip_params(opt_exp)}
-        expected_master_params = {n: expected_amp_param_map[p] for n, p in expected_params.items()}
-
-        actual_amp_param_map = {model_p: master_p for master_p, model_p in pyrannc.amp.zip_params(opt_act)}
-        actual_master_params = {n: actual_amp_param_map[p] for n, p in actual_params.items()}
+        expected_master_params = pyrannc.amp.named_master_params(model_exp, opt_exp)
+        actual_master_params = pyrannc.amp.named_master_params(model_act, opt_act)
 
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]

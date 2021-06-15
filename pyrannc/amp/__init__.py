@@ -80,6 +80,11 @@ def model_grads_to_master_grads(optimizer, scale):
     return convert_and_scale_params(model_grads, master_grads, scale)
 
 
+def named_master_params(model, optimizer):
+    amp_param_map = {model_p: master_p for master_p, model_p in zip_params(optimizer)}
+    return {n: amp_param_map[p] for n, p in model.named_parameters()}
+
+
 def allreduce_grads_rannc(rmodel, optimizer, prescale=1.0, use_amp_master_param=True):
 
     if use_amp_master_param:
@@ -112,6 +117,7 @@ def allreduce_grads_rannc(rmodel, optimizer, prescale=1.0, use_amp_master_param=
         return had_overflow
 
     return False
+
 
 def patch_amp_scaler():
     scaler = _amp_state.loss_scalers[0]
