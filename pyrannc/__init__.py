@@ -577,7 +577,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         """
         if self.ready:
             if sync:
-                self._sync_orig_params()
+                self._sync_orig_params(sync_all_ranks=sync)
             super().undeploy()
 
     def __del__(self):
