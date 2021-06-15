@@ -657,12 +657,6 @@ namespace rannc {
             }
             const auto &param_ranks = ranks_.at(param_id);
 
-            if (mpi::getRank() == 0 && sync_on_init_) {
-                assert(contains(id_to_name, param_id));
-                const auto &param_name = id_to_name.at(param_id);
-                logger->debug("Synchronized {} {}/{}", param_name, i, sorted_param_ids.size());
-            }
-
             NCCLWrapper& ar = NCCLWrapper::get();
             int comm_tag = tag_map.getRankSetTag(param_ranks);
 
@@ -696,7 +690,15 @@ namespace rannc {
                 zpl.remove(param_id);
                 dist_ids_.erase(param_id);
             } else {
-                syncParamOnInit(param_id, param_ranks);
+                if (contains(param_ranks, mpi::getRank())) {
+                    syncParamOnInit(param_id, param_ranks);
+                }
+
+                if (mpi::getRank() == 0 && sync_on_init_) {
+                    assert(contains(id_to_name, param_id));
+                    const auto &param_name = id_to_name.at(param_id);
+                    logger->debug("Synchronized {} {}/{}", param_name, i, sorted_param_ids.size());
+                }
             }
 
             graph_grouped_params[comm_tag].push_back(param_id);
@@ -745,12 +747,19 @@ namespace rannc {
                     logger->info("Synchronizing parameters ...");
                 }
             }
+
+            const auto buf = param_tensor.cuda().detach().clone();
+
             NCCLWrapper& nccl = NCCLWrapper::get();
             auto& tag_map = TagMap::get();
             int tag = tag_map.getRankSetTag(ranks);
+
             syncStream();
-            nccl.bcast(tag, {param_tensor}, {0});
-            syncStream();
+            nccl.bcast(tag, {buf}, {0});
+            {
+                torch::NoGradGuard no_grad;
+                param_tensor.copy_(buf);
+            }
         } else {
             if (!msg_shown && mpi::getRank() == 0) {
                 logger->info("Skipped parameter synchronization");
