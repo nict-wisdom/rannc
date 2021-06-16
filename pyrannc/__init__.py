@@ -11,7 +11,7 @@ import torch.random
 
 from . import _pyrannc
 
-from .opt import gather_optimizer_state_dict
+from .opt import patch_optimizer
 from .zero_param import store_dist_param, load_dist_param, DistributeModelParams
 
 # Run backward to set python engine as the default engine
@@ -157,49 +157,6 @@ def _check_input_tensors(args):
             raise ValueError("All inputs to RaNNCModule must be on a CUDA device.")
 
 
-def _get_local_optimizer_state_dict(global_state_dict, pids):
-    local_state_dict = {}
-    for k, v in global_state_dict.items():
-        if k == 'state':
-            local_state_dict['state'] = {pid: sv for pid, sv in v.items() if pid in pids}
-        elif k == 'param_groups':
-            local_state_dict['param_groups'] = []
-            for grp in v:
-                new_grp = grp.copy()
-                new_grp['params'] = [pid for pid in grp['params'] if pid in pids]
-                local_state_dict['param_groups'].append(new_grp)
-        else:
-            local_state_dict[k] = v
-    return local_state_dict
-
-
-def _slice_optimizer_state(local_state_dict, param_zero_range):
-    sliced_state_dict = {}
-    for k, v in local_state_dict.items():
-        if k == 'state':
-            for pid, param_state in v.items():
-                new_state_vals = {}
-                for state_k, state_v in param_state.items():
-                    if torch.is_tensor(state_v):
-                        # slice here
-                        slice = param_zero_range[pid]
-                        new_state_vals[state_k] = state_v.detach().clone()[slice]
-                    else:
-                        new_state_vals[state_k] = state_v
-                sliced_state_dict[k][pid] = new_state_vals
-        else:
-            sliced_state_dict[k] = v
-
-    return sliced_state_dict
-
-
-def _optimizer_state_to_cuda(optimizer, device):
-    for state in optimizer.state.values():
-        for k, v in state.items():
-            if isinstance(v, torch.Tensor):
-                state[k] = v.to(device)
-
-
 def _set_hooks_for_tracing(model, device):
     cpu_params = {}
 
@@ -287,7 +244,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if self.load_deployment:
                 super().load_deployment(self.load_deployment)
 
-            device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+            self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
             # Stash buffer values
             with torch.no_grad():
@@ -295,7 +252,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
             # Restore rng state
             with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
-                hook_handles = _set_hooks_for_tracing(self.model, device)
+                hook_handles = _set_hooks_for_tracing(self.model, self.device)
                 self.used_param_ids = super().init(self.model.forward, parameters, buffers, self.var_lookup_fn,
                                                    self.gather_inputs, *args)
                 _unset_hooks_for_tracing(hook_handles)
@@ -305,81 +262,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 for b, b_clone in zip(self.model.buffers(), buffers_clone):
                     b.copy_(b_clone)
 
-            _to_in_place([p for p in self.model.parameters() if id(p) in self.used_param_ids], device)
-            _to_in_place([b for b in self.model.buffers() if id(b) in self.used_param_ids], device)
+            _to_in_place([p for p in self.model.parameters() if id(p) in self.used_param_ids], self.device)
+            _to_in_place([b for b in self.model.buffers() if id(b) in self.used_param_ids], self.device)
 
             # Remove parameters from optimizer
             if self.optimizer and self.model.training:
-                # preserve param groups and order
-                self.optimizer.original_param_groups = self.optimizer.state_dict()['param_groups']
-                new_param_groups = []
-
-                order_local_to_global = {}
-                used_param_global_order = []
-                local_order = 0
-                global_order = 0
-                param_zero_range = {}
-                param_zero_segment_to_id = {}
-                for param_group in self.optimizer.param_groups:
-                    params = []
-
-                    for p in param_group['params']:
-                        if id(p) in self.used_param_ids:
-                            if self.enable_zero:
-                                pid = id(p)
-                                p = self.get_local_param_segment(pid)
-                                range = self.get_local_param_range(pid)
-                                param_zero_range[pid] = slice(range[0], range[1])
-                                param_zero_segment_to_id[p] = pid
-
-                            params.append(p)
-                            order_local_to_global[local_order] = global_order
-                            used_param_global_order.append(global_order)
-                            local_order += 1
-                        global_order += 1
-                    # Need to add a param group even when this rank has no param.
-                    # Otherwise load_state_dict() of the optimizer will fail because the numbers of param groups do not match.
-                    param_group['params'] = params
-                    new_param_groups.append(param_group)
-                self.optimizer.param_groups = new_param_groups
-                self.optimizer.order_local_to_global = order_local_to_global
-                self.optimizer.param_zero_segment_to_id = param_zero_segment_to_id
-                self.optimizer.param_zero_range = param_zero_range
-
-                # replace state_dict and load_state_dict
-                old_state_dict = self.optimizer.state_dict
-
-                def new_state_dict(opt, from_global=False, **kwargs):
-                    if from_global:
-                        global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=self.use_amp_master_params, **kwargs)
-                        return global_opt_state_dict
-                    else:
-                        return old_state_dict(**kwargs)
-
-                self.optimizer.state_dict = types.MethodType(new_state_dict, self.optimizer)
-
-                old_load_state_dict = self.optimizer.load_state_dict
-
-                def new_load_state_dict(opt, state_dict, from_global=False, **kwargs):
-                    if from_global:
-                        local_state_dict = _get_local_optimizer_state_dict(state_dict, used_param_global_order)
-
-                        if self.enable_zero:
-                            local_state_dict = _slice_optimizer_state(local_state_dict, param_zero_range)
-
-                        old_load_state_dict(local_state_dict)
-                        _optimizer_state_to_cuda(opt, device)
-                    else:
-                        old_load_state_dict(state_dict, **kwargs)
-
-                self.optimizer.load_state_dict = types.MethodType(new_load_state_dict, self.optimizer)
-
-                # replace zero_grad
-                if self.enable_zero:
-                    def new_zero_grad(opt, **kwargs):
-                        self.zero_grad(**kwargs)
-
-                    self.optimizer.zero_grad = types.MethodType(new_zero_grad, self.optimizer)
+                patch_optimizer(self, self.optimizer)
 
             self.ready = True
             self.dummy_input = args

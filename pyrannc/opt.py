@@ -1,4 +1,5 @@
 import pickle
+import types
 
 import torch
 
@@ -139,4 +140,121 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=Tr
 
     return None, None
 
+
+def _get_local_optimizer_state_dict(global_state_dict, pids):
+    local_state_dict = {}
+    for k, v in global_state_dict.items():
+        if k == 'state':
+            local_state_dict['state'] = {pid: sv for pid, sv in v.items() if pid in pids}
+        elif k == 'param_groups':
+            local_state_dict['param_groups'] = []
+            for grp in v:
+                new_grp = grp.copy()
+                new_grp['params'] = [pid for pid in grp['params'] if pid in pids]
+                local_state_dict['param_groups'].append(new_grp)
+        else:
+            local_state_dict[k] = v
+    return local_state_dict
+
+
+def _optimizer_state_to_cuda(optimizer, device):
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+
+
+def _slice_optimizer_state(local_state_dict, param_zero_range):
+    sliced_state_dict = {}
+    for k, v in local_state_dict.items():
+        if k == 'state':
+            for pid, param_state in v.items():
+                new_state_vals = {}
+                for state_k, state_v in param_state.items():
+                    if torch.is_tensor(state_v):
+                        # slice here
+                        slice = param_zero_range[pid]
+                        new_state_vals[state_k] = state_v.detach().clone()[slice]
+                    else:
+                        new_state_vals[state_k] = state_v
+                sliced_state_dict[k][pid] = new_state_vals
+        else:
+            sliced_state_dict[k] = v
+
+    return sliced_state_dict
+
+
+def patch_optimizer(model, optimizer):
+    # preserve param groups and order
+    optimizer.original_param_groups = optimizer.state_dict()['param_groups']
+    print(" self.optimizer.original_param_groups={}".format(optimizer.original_param_groups))
+    print(" self.optimizer.param_groups={}".format(optimizer.param_groups))
+    new_param_groups = []
+
+    order_local_to_global = {}
+    used_param_global_order = []
+    local_order = 0
+    global_order = 0
+    param_zero_range = {}
+    param_zero_segment_to_id = {}
+    for param_group in optimizer.param_groups:
+        params = []
+
+        for p in param_group['params']:
+            if id(p) in model.used_param_ids:
+                if model.enable_zero:
+                    pid = id(p)
+                    p = model.get_local_param_segment(pid)
+                    range = model.get_local_param_range(pid)
+                    param_zero_range[pid] = slice(range[0], range[1])
+                    param_zero_segment_to_id[p] = pid
+
+                params.append(p)
+                order_local_to_global[local_order] = global_order
+                used_param_global_order.append(global_order)
+                local_order += 1
+            global_order += 1
+        # Need to add a param group even when this rank has no param.
+        # Otherwise load_state_dict() of the optimizer will fail because the numbers of param groups do not match.
+        param_group['params'] = params
+        new_param_groups.append(param_group)
+    optimizer.param_groups = new_param_groups
+    optimizer.order_local_to_global = order_local_to_global
+    optimizer.param_zero_segment_to_id = param_zero_segment_to_id
+    optimizer.param_zero_range = param_zero_range
+
+    # replace state_dict and load_state_dict
+    old_state_dict = optimizer.state_dict
+
+    def new_state_dict(opt, from_global=False, **kwargs):
+        if from_global:
+            global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=model.use_amp_master_params, **kwargs)
+            return global_opt_state_dict
+        else:
+            return old_state_dict(**kwargs)
+
+    optimizer.state_dict = types.MethodType(new_state_dict, optimizer)
+
+    old_load_state_dict = optimizer.load_state_dict
+
+    def new_load_state_dict(opt, state_dict, from_global=False, **kwargs):
+        if from_global:
+            local_state_dict = _get_local_optimizer_state_dict(state_dict, used_param_global_order)
+
+            if model.enable_zero:
+                local_state_dict = _slice_optimizer_state(local_state_dict, param_zero_range)
+
+            old_load_state_dict(local_state_dict)
+            _optimizer_state_to_cuda(opt, model.device)
+        else:
+            old_load_state_dict(state_dict, **kwargs)
+
+    optimizer.load_state_dict = types.MethodType(new_load_state_dict, optimizer)
+
+    # replace zero_grad
+    if model.enable_zero:
+        def new_zero_grad(opt, **kwargs):
+            model.zero_grad(**kwargs)
+
+        optimizer.zero_grad = types.MethodType(new_zero_grad, optimizer)
 
