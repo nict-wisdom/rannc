@@ -812,12 +812,7 @@ namespace rannc {
         at::Tensor param;
         IRType ir_type;
         if (contains(param_ranks, mpi::getRank())) {
-            assert(contains(params_, param_id));
-            if (hasAmpMasterParam(param_id)) {
-                param = getAmpMasterParamTensor(param_id);
-            } else {
-                param = params_.at(param_id);
-            }
+            param = params_.at(param_id);
             ir_type = toIRType(param);
         }
         ObjectComm& ocomm = ObjectComm::get();

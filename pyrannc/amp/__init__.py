@@ -80,8 +80,13 @@ def model_grads_to_master_grads(optimizer, scale):
     return convert_and_scale_params(model_grads, master_grads, scale)
 
 
-def named_master_params(model, optimizer):
+def named_master_params(model, optimizer, zero=False):
     amp_param_map = {model_p: master_p for master_p, model_p in zip_params(optimizer)}
+
+    if zero:
+        pid_to_name = {pid: n for n, pid in model.name_to_pid.items()}
+        return {pid_to_name[optimizer.param_zero_segment_to_id[model_p]]: master_p for model_p, master_p in amp_param_map.items()}
+
     return {n: amp_param_map[p] for n, p in model.named_parameters()}
 
 

@@ -44,32 +44,39 @@ def compare_tensors(v1, v2, rtol, atol):
     np.testing.assert_allclose(v1.tolist(), v2.tolist(), rtol=rtol, atol=atol)
 
 
-def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, opt_exp, opt_act):
+def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, opt_act):
     if hasattr(model_exp, "module"): # ddp model
         model_exp = model_exp.module
 
     expected_params = {n: p for n, p in model_exp.named_parameters()}
     actual_params = {n: p for n, p in model_act.named_parameters()}
 
+    if zero:
+        zero_ranges = {n: opt_act.param_zero_range[id(p)] for n, p in model_act.named_parameters()}
+
     for n, rp in actual_params.items():
         p = expected_params[n]
-        compare_tensors(f(rp), f(p), rtol, atol)
+        v_a = f(rp).flatten()[zero_ranges[n]] if zero else f(rp)
+        v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
+        compare_tensors(v_a, v_e, rtol, atol)
 
     if fp16:
         expected_master_params = pyrannc.amp.named_master_params(model_exp, opt_exp)
-        actual_master_params = pyrannc.amp.named_master_params(model_act, opt_act)
+        actual_master_params = pyrannc.amp.named_master_params(model_act, opt_act, zero)
 
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
-            compare_tensors(f(rp), f(p), rtol, atol)
+            v_a = f(rp).flatten() if zero else f(rp)
+            v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
+            compare_tensors(v_a, v_e, rtol, atol)
 
 
 def compare_params(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
-    do_compare_params(model_exp, model_act, lambda p: p, rtol, atol, fp16, opt_exp, opt_act)
+    do_compare_params(model_exp, model_act, lambda p: p, rtol, atol, fp16, zero, opt_exp, opt_act)
 
 
 def compare_grads(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
-    do_compare_params(model_exp, model_act, lambda p: p.grad, rtol, atol, fp16, opt_exp, opt_act)
+    do_compare_params(model_exp, model_act, lambda p: p.grad, rtol, atol, fp16, zero, opt_exp, opt_act)
 
 
 def reset_running_stats(model):

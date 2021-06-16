@@ -191,7 +191,7 @@ def _slice_optimizer_state(local_state_dict, param_zero_range):
                     if torch.is_tensor(state_v):
                         # slice here
                         slice = param_zero_range[pid]
-                        new_state_vals[state_k] = state_v.detach().clone()[slice[0], slice[1]]
+                        new_state_vals[state_k] = state_v.detach().clone()[slice]
                     else:
                         new_state_vals[state_k] = state_v
                 sliced_state_dict[k][pid] = new_state_vals
@@ -336,7 +336,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                             if self.enable_zero:
                                 pid = id(p)
                                 p = self.get_local_param_segment(pid)
-                                param_zero_range[global_order] = self.get_local_param_range(pid)
+                                range = self.get_local_param_range(pid)
+                                param_zero_range[pid] = slice(range[0], range[1])
                                 param_zero_segment_to_id[p] = pid
 
                             params.append(p)
@@ -351,6 +352,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 self.optimizer.param_groups = new_param_groups
                 self.optimizer.order_local_to_global = order_local_to_global
                 self.optimizer.param_zero_segment_to_id = param_zero_segment_to_id
+                self.optimizer.param_zero_range = param_zero_range
 
                 # replace state_dict and load_state_dict
                 old_state_dict = self.optimizer.state_dict
