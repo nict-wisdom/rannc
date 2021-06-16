@@ -3,6 +3,7 @@ import pickle
 import torch
 
 from .. import _pyrannc
+from ..amp import register_amp_params
 
 
 def replace_ids_in_param_group(param_group, order_local_to_global):
@@ -96,12 +97,7 @@ def merge_param_groups(target_groups, sub_groups):
 
 def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=True, root=0):
     if use_amp_master_param:
-        from ..amp import zip_params
-        for master_p, model_p in zip_params(optimizer):
-            if model_p in optimizer.param_zero_segment_to_id:
-                _pyrannc.register_amp_master_param(optimizer.param_zero_segment_to_id[model_p], master_p)
-            else:
-                _pyrannc.register_amp_master_param(id(model_p), master_p)
+        register_amp_params(optimizer)
 
     state_dict = optimizer.state_dict(from_global=False)
     # replace local ids with global ones

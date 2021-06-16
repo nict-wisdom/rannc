@@ -5,7 +5,8 @@ import torch.distributed as dist
 from apex import amp
 from apex.amp import _amp_state
 
-from .. import _allreduce_sum, _allreduce_min
+from .. import _pyrannc
+from ..tensor_coll import _allreduce_sum, _allreduce_min
 
 
 def allreduce_grads(optimizer, prescale=1.0):
@@ -47,14 +48,15 @@ def zip_params(optimizer):
 
 
 def zip_grads(optimizer):
-    stash = optimizer._amp_stash
-    master_grads = []
-    model_grads = []
-    for model_param, master_param in zip(stash.all_fp16_params, stash.all_fp32_from_fp16_params):
-        master_grads.append(master_param.grad)
-        model_grads.append(model_param.grad)
+    return [(master_param.grad, model_param.grad) for master_param, model_param in zip_params(optimizer)]
 
-    return master_grads, model_grads
+
+def register_amp_params(optimizer):
+    for master_p, model_p in zip_params(optimizer):
+        if model_p in optimizer.param_zero_segment_to_id:
+            _pyrannc.register_amp_master_param(optimizer.param_zero_segment_to_id[model_p], master_p)
+        else:
+            _pyrannc.register_amp_master_param(id(model_p), master_p)
 
 
 def convert_and_scale_params(source_grads, dest_grads, scale):
@@ -71,13 +73,13 @@ def convert_and_scale_params(source_grads, dest_grads, scale):
 
 
 def master_grads_to_model_grads(optimizer, scale):
-    master_grads, model_grads = zip_grads(optimizer)
-    return convert_and_scale_params(master_grads, model_grads, scale)
+    zipped_grads = zip_grads(optimizer)
+    return convert_and_scale_params(list(map(lambda t: t[0], zipped_grads)), list(map(lambda t: t[1], zipped_grads)), scale)
 
 
 def model_grads_to_master_grads(optimizer, scale):
-    master_grads, model_grads = zip_grads(optimizer)
-    return convert_and_scale_params(model_grads, master_grads, scale)
+    zipped_grads = zip_grads(optimizer)
+    return convert_and_scale_params(list(map(lambda t: t[1], zipped_grads)), list(map(lambda t: t[0], zipped_grads)), scale)
 
 
 def named_master_params(model, optimizer, zero=False):

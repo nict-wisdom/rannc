@@ -67,14 +67,6 @@ def clear():
     _pyrannc.clear()
 
 
-def _allreduce_sum(t):
-    return _pyrannc.allreduce_tensor(t, True)
-
-
-def _allreduce_min(t):
-    return _pyrannc.allreduce_tensor(t, False)
-
-
 def delay_grad_allreduce(delay):
     r"""
     As default, RaNNC performs *allreduce* of gradients soon after ``backward``.
@@ -469,13 +461,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
     def _setup_amp_params(self):
         if not self.amp_master_param_registered:
-            from .amp import zip_params, patch_amp_scaler
-            for master_p, model_p in zip_params(self.optimizer):
-                if model_p in self.optimizer.param_zero_segment_to_id:
-                    _pyrannc.register_amp_master_param(self.optimizer.param_zero_segment_to_id[model_p], master_p)
-                else:
-                    _pyrannc.register_amp_master_param(id(model_p), master_p)
-
+            from .amp import patch_amp_scaler, register_amp_params
+            register_amp_params(self.optimizer)
             patch_amp_scaler()
             self.amp_master_param_registered = True
 
