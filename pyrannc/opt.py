@@ -2,8 +2,8 @@ import pickle
 
 import torch
 
-from .. import _pyrannc
-from ..amp import register_amp_params
+from . import _pyrannc
+from .amp import register_amp_params
 
 
 def replace_ids_in_param_group(param_group, order_local_to_global):
