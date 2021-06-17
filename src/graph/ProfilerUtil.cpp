@@ -65,8 +65,10 @@ namespace rannc {
         return calcGraphMem(g, prof, use_amp_master_params, enable_zero, replica_num) + calcCommBufSize(scaled, pipeline_num);
     }
 
-    bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity, bool use_amp_master_params) {
-        return calcGraphMem(g, prof, use_amp_master_params, false, 1) < (size_t) capacity;
+    bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
+                  bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
+        return calcGraphMem(g, prof, use_amp_master_params, enable_zero, zero_dist_num)
+                    < (size_t) capacity;
     }
 
     GraphProfile makeErrorProfile() {

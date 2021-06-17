@@ -118,7 +118,7 @@ namespace rannc {
                                 || (eval_adj > eval_ave + eval_sigma*2);
                 } else {
                     const auto& prof_merged = profile(merged.graph);
-                    if (!fitToMem(merged.graph, prof_merged, dev_mem_, use_amp_master_params_)) {
+                    if (!fitToMem(merged.graph, prof_merged, dev_mem_, use_amp_master_params_, enable_zero_, max_repl_num_)) {
 //                    spdlog::info("v={} adj={}: merged graph does not fit to mem. mem={}", v.id, adj.id, prof_merged.max_allocated_mem);
                         continue;
                     }
@@ -594,13 +594,13 @@ namespace rannc {
 
                 const auto prof_moved_src = profile(moved_result.src_node.graph);
                 long eval_moved_src = eval(prof_moved_src);
-                if (!fitToMem(moved_result.src_node.graph, prof_moved_src, dev_mem_, use_amp_master_params_)) {
+                if (!fitToMem(moved_result.src_node.graph, prof_moved_src, dev_mem_, use_amp_master_params_, enable_zero_, max_repl_num_)) {
                     continue;
                 }
 
                 const auto prof_moved_tgt = profile(moved_result.tgt_node.graph);
                 long eval_moved_tgt = eval(prof_moved_tgt);
-                if (!fitToMem(moved_result.tgt_node.graph, prof_moved_tgt, dev_mem_, use_amp_master_params_)) {
+                if (!fitToMem(moved_result.tgt_node.graph, prof_moved_tgt, dev_mem_, use_amp_master_params_, enable_zero_, max_repl_num_)) {
                     continue;
                 }
                 long eval_moved_comm = calcCommTime(calcEdgeSize(moved_result.edge) / (dev_num_*max_pipeline_num_));
@@ -692,7 +692,7 @@ namespace rannc {
 
                 merged = merge(preceding, min_node, merged_graph.nodes, merged_graph.edges);
                 const auto prof = profile(merged.graph);
-                if (!fitToMem(merged.graph, prof, dev_mem_, use_amp_master_params_)) {
+                if (!fitToMem(merged.graph, prof, dev_mem_, use_amp_master_params_, enable_zero_, max_repl_num_)) {
                     break;
                 }
                 min_adj_eval = eval(prof);
@@ -705,7 +705,7 @@ namespace rannc {
 
                 const auto merged_fol = merge(min_node, following, merged_graph.nodes, merged_graph.edges);
                 const auto prof = profile(merged_fol.graph);
-                if (!fitToMem(merged_fol.graph, prof, dev_mem_, use_amp_master_params_)) {
+                if (!fitToMem(merged_fol.graph, prof, dev_mem_, use_amp_master_params_, enable_zero_, max_repl_num_)) {
                     break;
                 }
                 long val_following = eval(prof);

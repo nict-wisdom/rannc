@@ -32,12 +32,13 @@ namespace rannc {
     public:
         MLPartitioner(std::shared_ptr<GraphProfiler> profiler, size_t dev_num, size_t dev_mem,
                       size_t max_pipeline_num, size_t min_pipeline_bs,
-                      bool use_amp_master_params, bool coarsen_by_time):
+                      bool use_amp_master_params, bool coarsen_by_time, bool enable_zero, int max_repl_num):
                 prof_util_(std::move(profiler)), dev_num_(dev_num), dev_mem_(dev_mem),
                 max_pipeline_num_(max_pipeline_num),
                 min_pipeline_bs_(min_pipeline_bs),
                 use_amp_master_params_(use_amp_master_params),
-                coarsen_by_time_(coarsen_by_time) {}
+                coarsen_by_time_(coarsen_by_time),
+                enable_zero_(enable_zero), max_repl_num_(max_repl_num) {}
 
         MLGraph partition(const std::shared_ptr<IRGraph>& ir_graph);
 
@@ -71,6 +72,8 @@ namespace rannc {
         size_t min_pipeline_bs_;
         bool use_amp_master_params_;
         bool coarsen_by_time_;
+        bool enable_zero_;
+        int max_repl_num_;
 
         const std::shared_ptr<spdlog::logger> logger = getLogger("MLPartitioner");
     };

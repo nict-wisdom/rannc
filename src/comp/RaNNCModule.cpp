@@ -270,8 +270,8 @@ namespace rannc {
                 deployment_.id = id_;
 
                 ProfilerUtil prof_util(sg_prof);
-                logger->info("Estimated profiles of subgraphs: batch_size={} ranks={} pipeline_num={}",
-                        batch_size, mpi::getSize(), deployment_.pipeline_num);
+                logger->info("Estimated profiles of subgraphs: batch_size={} ranks={} pipeline_num={} zero={}",
+                        batch_size, mpi::getSize(), deployment_.pipeline_num, enable_zero_);
                 for (const auto& it: deployment_.subgraphs) {
                     assert(contains(deployment_.allocation, it.first));
                     int repl_num = deployment_.allocation.at(it.first).size();
@@ -325,7 +325,7 @@ namespace rannc {
                 }
             } else {
                 MetaDecomposer decomposer(sg_prof, mpi::getSize(), batch_size, prof_results.node_profiles,
-                                          dev_info.total_mem, use_amp_master_params_);
+                                          dev_info.total_mem, use_amp_master_params_, enable_zero_);
                 const auto decomp_name = config::Config::get().getVal<std::string>(config::DECOMPOSER);
                 deployment_ = decomposer.decompose(decomp_name, ir_graph_);
 

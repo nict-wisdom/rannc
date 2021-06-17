@@ -24,8 +24,10 @@ namespace rannc {
 
     class DPStaging {
     public:
-        DPStaging(std::shared_ptr<GraphProfiler> profiler, size_t batch_size, size_t dev_mem, bool use_amp_master_params)
-            :prof_util_(std::move(profiler)), batch_size_(batch_size), dev_mem_(dev_mem), use_amp_master_params_(use_amp_master_params) {}
+        DPStaging(std::shared_ptr<GraphProfiler> profiler, size_t batch_size, size_t dev_mem,
+                  bool use_amp_master_params, bool enable_zero)
+            :prof_util_(std::move(profiler)), batch_size_(batch_size), dev_mem_(dev_mem),
+            use_amp_master_params_(use_amp_master_params), enable_zero_(enable_zero) {}
         AllocSolution runDpComm(const MLGraph& graph, size_t dev_num);
 
     private:

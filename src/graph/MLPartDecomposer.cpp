@@ -108,13 +108,13 @@ namespace rannc {
         const int min_pipeline_bs = config::Config::get().getVal<int>(config::MIN_PIPELINE_BS);
         const bool coarsen_by_time = config::Config::get().getVal<bool>(config::COARSEN_BY_TIME);
         MLPartitioner partitioner(sg_prof_, mpi::getSize(), dev_mem_, max_pipeline, min_pipeline_bs,
-                                  use_amp_master_params_, coarsen_by_time);
+                                  use_amp_master_params_, coarsen_by_time, enable_zero_, mpi::getSize());
         MLGraph part_graph = partitioner.partition(ir_graph);
 
         ///////////
         logger->trace("Starting DP: id={} #nodes={}", ir_graph->getName(),
                       part_graph.nodes.size());
-        DPStaging dp(sg_prof_, batch_size_, dev_mem_, use_amp_master_params_);
+        DPStaging dp(sg_prof_, batch_size_, dev_mem_, use_amp_master_params_, enable_zero_);
         AllocSolution sol = dp.runDpComm(part_graph, mpi::getSize());
         logger->trace("Finished DP: id={}", ir_graph->getName());
 

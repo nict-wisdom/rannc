@@ -579,7 +579,7 @@ namespace rannc {
     size_t getOptMemSize(const std::shared_ptr<IRGraph> &ir_graph, int opt_param_factor, bool use_amp_master_param,
                          bool enable_zero, int zero_dist_num) {
 
-        if (!zero_dist_num) {
+        if (!enable_zero) {
             zero_dist_num = 1;
         }
 

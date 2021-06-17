@@ -58,7 +58,8 @@ namespace rannc {
                 break;
             }
             case DecomposerType::ML_PART: {
-                MLPartDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, node_profiles_, dev_mem_, use_amp_master_params_);
+                MLPartDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, node_profiles_, dev_mem_,
+                                            use_amp_master_params_, enable_zero_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
             }
