@@ -2,7 +2,6 @@
 
 #include <pybind11/pybind11.h>
 #include <mpi.h>
-#include <torch/csrc/jit/passes/onnx.h>
 
 #include <comm/NCCLWrapper.h>
 #include <comp/Backward.h>
