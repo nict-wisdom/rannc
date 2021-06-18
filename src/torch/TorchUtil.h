@@ -179,7 +179,7 @@ namespace rannc {
     at::Tensor boolToInt(const at::Tensor& ten);
 
     bool inPlaceOpName(const std::string& name);
-
+    at::Tensor createTensorFromIRType(const IRType& ir_type, const c10::Device& device);
 
     template<typename T>
     bool almostEqualTensorsWithTolerance(const at::Tensor& t1, const at::Tensor& t2, T tolerance, T tolerance_ratio) {

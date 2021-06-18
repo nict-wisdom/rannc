@@ -3,7 +3,7 @@ import types
 
 import torch
 
-from . import _pyrannc
+from . import _pyrannc, comm_utils, tensor_coll
 from .amp import register_amp_params
 
 
@@ -105,38 +105,40 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=Tr
     state_dict = replace_param_ids(state_dict, optimizer.order_local_to_global)
     state_dict = to_cpu_tensor(state_dict) if to_cpu else state_dict
 
+    param_num = sum([len(pg["params"]) for pg in optimizer.original_param_groups])
+    new_state = {}
+    for global_order in range(0, param_num):
+        pid = optimizer.global_order_to_id[global_order]
+        ranks = sorted(list(_pyrannc.get_param_ranks(pid)))
+        assert(len(ranks) > 0)
+        param_root = ranks[0]
+
+        tensor_item_names = []
+        non_tensor_item_names = []
+        if _pyrannc.get_rank() == param_root:
+            param_state = state_dict["state"][global_order]
+            tensor_item_names = [k for k, v in param_state.items() if torch.is_tensor(v)]
+            non_tensor_item_names = [k for k, v in param_state.items() if not torch.is_tensor(v)]
+        tensor_item_names = comm_utils.bcast_obj(tensor_item_names, param_root)
+        non_tensor_item_names = comm_utils.bcast_obj(non_tensor_item_names, param_root)
+
+        new_param_state = {}
+        all_item_names = tensor_item_names + non_tensor_item_names
+        for k in sorted(all_item_names):
+            v = state_dict["state"][global_order][k] if _pyrannc.get_rank() == param_root else None
+            if k in tensor_item_names:
+                v = tensor_coll.bcast(v, param_root).cpu()
+            else:
+                v = comm_utils.bcast_obj(v, param_root)
+            if _pyrannc.get_rank() == root:
+                new_param_state[k] = v
+        new_state[global_order] = new_param_state
+
     if _pyrannc.get_rank() == root:
-        param_ranks = {}
-        append_param_ranks(param_ranks, state_dict, root)
-
-        state_dict['param_groups'] = merge_param_groups(optimizer.original_param_groups, state_dict['param_groups'])
-
-        for r in range(0, _pyrannc.get_world_size()):
-            if r == root:
-                continue
-
-            # Send pids that are already available on root rank
-            current_pids = list(state_dict['state'].keys())
-            pck_current_pids = pickle.dumps(current_pids)
-            _pyrannc.send_bytes(pck_current_pids, r)
-
-            data = _pyrannc.recv_bytes(r)
-            rank_state = pickle.loads(data)
-            append_param_ranks(param_ranks, rank_state, r)
-            state_dict = merge_state_dict(state_dict, rank_state)
-
-        _pyrannc.barrier()
-
-        return state_dict, param_ranks
-
-    else:
-        pck_current_root_pids = _pyrannc.recv_bytes(root)
-        current_root_pids = pickle.loads(pck_current_root_pids)
-        state_dict = remove_params_from_state(state_dict, current_root_pids)
-        pickled_state = pickle.dumps(state_dict)
-        _pyrannc.send_bytes(pickled_state, root)
-
-        _pyrannc.barrier()
+        new_state_dict = {}
+        new_state_dict['param_groups'] = optimizer.original_param_groups
+        new_state_dict['state'] = new_state
+        return new_state_dict, None
 
     return None, None
 
@@ -187,11 +189,10 @@ def _slice_optimizer_state(local_state_dict, param_zero_range):
 def patch_optimizer(model, optimizer):
     # preserve param groups and order
     optimizer.original_param_groups = optimizer.state_dict()['param_groups']
-    print(" self.optimizer.original_param_groups={}".format(optimizer.original_param_groups))
-    print(" self.optimizer.param_groups={}".format(optimizer.param_groups))
     new_param_groups = []
 
     order_local_to_global = {}
+    global_order_to_id = {}
     used_param_global_order = []
     local_order = 0
     global_order = 0
@@ -201,9 +202,9 @@ def patch_optimizer(model, optimizer):
         params = []
 
         for p in param_group['params']:
-            if id(p) in model.used_param_ids:
+            pid = id(p)
+            if pid in model.used_param_ids:
                 if model.enable_zero:
-                    pid = id(p)
                     p = model.get_local_param_segment(pid)
                     range = model.get_local_param_range(pid)
                     param_zero_range[pid] = slice(range[0], range[1])
@@ -213,6 +214,8 @@ def patch_optimizer(model, optimizer):
                 order_local_to_global[local_order] = global_order
                 used_param_global_order.append(global_order)
                 local_order += 1
+
+            global_order_to_id[global_order] = pid
             global_order += 1
         # Need to add a param group even when this rank has no param.
         # Otherwise load_state_dict() of the optimizer will fail because the numbers of param groups do not match.
@@ -220,6 +223,7 @@ def patch_optimizer(model, optimizer):
         new_param_groups.append(param_group)
     optimizer.param_groups = new_param_groups
     optimizer.order_local_to_global = order_local_to_global
+    optimizer.global_order_to_id = global_order_to_id
     optimizer.param_zero_segment_to_id = param_zero_segment_to_id
     optimizer.param_zero_range = param_zero_range
 

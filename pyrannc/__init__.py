@@ -374,7 +374,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             self._setup_amp_params()
         return super().calc_grad_norm()
 
-    def state_dict(self, *args, no_hook=False, sync_grad=False, **kwargs):
+    def state_dict(self, *args, no_hook=False, sync_all_ranks=False, sync_grad=False, **kwargs):
         r"""
         Returns ``state_dict`` of the model.
 
@@ -386,7 +386,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         """
         if not self.ready:
             return self.model.state_dict(*args, **kwargs)
-        self._sync_orig_params(sync_grad)
+        self._sync_orig_params(sync_all_ranks=sync_all_ranks, sync_grad=sync_grad)
 
         # amp O2 hook converts params to fp32
         # This may cause oom

@@ -1384,4 +1384,11 @@ namespace rannc {
 
         return false;
     }
+
+    at::Tensor createTensorFromIRType(const IRType& ir_type, const c10::Device& device) {
+        at::TensorOptions options;
+        options = options.dtype(fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType()))
+                .device(c10::Device(c10::DeviceType::CUDA));
+        return torch::zeros(ir_type.getTensorDim(), options);
+    }
 }

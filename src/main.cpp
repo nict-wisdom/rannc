@@ -6,6 +6,7 @@
 #include <comm/NCCLWrapper.h>
 #include <comp/Backward.h>
 #include <comm/SComm.h>
+#include <comm/ObjectComm.h>
 #include <bind/PybindUtil.h>
 #include <comp/EventRecorder.h>
 
@@ -82,6 +83,31 @@ PYBIND11_MODULE(_pyrannc, m) {
         }
     });
 
+    m.def("bcast_tensor", [](py::handle py_tensor, int root) {
+        IRType ir_type;
+        at::Tensor ten;
+        if (mpi::getRank() == root) {
+            auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
+            assert(iv.isTensor());
+            ten = iv.toTensor().cuda();
+            ir_type = toIRType(ten);
+        }
+        ObjectComm& ocomm = ObjectComm::get();
+        ir_type = ocomm.bcast(ir_type, root);
+
+        if (mpi::getRank() != root) {
+            ten = createTensorFromIRType(ir_type, c10::Device(c10::DeviceType::CUDA));
+        }
+
+        NCCLWrapper& ar = NCCLWrapper::get();
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+
+        ar.createCommunicator(tag, mpi::getAllRanks());
+        ar.bcast(tag, {ten}, {root});
+        return ten;
+    });
+
     m.def("keep_graph", [](bool keep) {
         return TorchDriver::setKeepGraph(keep);
     });
@@ -138,6 +164,12 @@ PYBIND11_MODULE(_pyrannc, m) {
     m.def("load_dist_param", [](long pid) {
         DistributedParamLocator& zpl = DistributedParamLocator::get();
         return zpl.load(pid);
+    });
+
+    m.def("get_param_ranks", [](long pid) {
+        auto r = RaNNCFactory::get();
+        auto param_storage = r->getParamStorage();
+        return param_storage->getRanks(pid);
     });
 
     py::class_<RaNNCModule, std::shared_ptr<RaNNCModule>>(m, "RaNNCModule")
@@ -265,6 +297,13 @@ PYBIND11_MODULE(_pyrannc, m) {
         return py::bytes(buf);
     });
 
+    m.def("bcast_bytes", [](const py::bytes& data, int root) {
+        std::string str_data = static_cast<std::string>(data);
+
+        ObjectComm& ocomm = ObjectComm::get();
+        const std::string recv_data = ocomm.bcast(str_data, root, MPI_COMM_WORLD);
+        return py::bytes(recv_data);
+    });
 
 #ifdef VERSION_INFO
     m.attr("__version__") = VERSION_INFO;

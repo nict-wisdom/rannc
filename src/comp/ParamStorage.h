@@ -56,7 +56,8 @@ namespace rannc {
         bool distributed(long param_id) const;
         bool zeroEnabled(const std::string& graph_id) const;
         at::Tensor getLocalParamSegment(long param_id) const;
-        std::tuple<int64_t, int64_t> getLocalParamRange(long param_id);
+        std::tuple<int64_t, int64_t> getLocalParamRange(long param_id) const;
+        std::unordered_set<int> getRanks(long param_id) const;
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);
         void useParam(const std::string& graph_id, const std::string& name, long param_id);
@@ -114,7 +115,6 @@ namespace rannc {
         virtual void doReleaseParam(long param_id);
         void doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads);
         at::Tensor doSyncParam(long param_id, bool grad);
-//        at::Tensor doGatherParam(long param_id, int dest, bool grad);
         void consolidateGrads(const std::string& graph_id);
         std::vector<int> sortCommTags(const std::string& graph_id);
 

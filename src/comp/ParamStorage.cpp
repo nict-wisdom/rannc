@@ -473,7 +473,7 @@ namespace rannc {
         throw std::invalid_argument(ss.str());
     }
 
-    std::tuple<int64_t, int64_t> ParamStorage::getLocalParamRange(long param_id) {
+    std::tuple<int64_t, int64_t> ParamStorage::getLocalParamRange(long param_id) const {
         for (const auto& it: zero_grad_locators_) {
             for (const auto& param_it: getParamIDs(it.first, false)) {
                 if (param_it.second == param_id) {
@@ -487,6 +487,11 @@ namespace rannc {
         std::stringstream ss;
         ss << "Param is not registered for zero: " << param_id;
         throw std::invalid_argument(ss.str());
+    }
+
+    std::unordered_set<int> ParamStorage::getRanks(long param_id) const {
+        assert(contains(ranks_, param_id));
+        return ranks_.at(param_id);
     }
 
     void ParamStorage::consolidateGrads(const std::string& graph_id) {
@@ -830,10 +835,7 @@ namespace rannc {
                 buf = param.detach().clone();
             }
         } else {
-            at::TensorOptions options;
-            options = options.dtype(fromIRTensorElemTypeToScalarType(sync_ir_type.getTensorElemType()))
-                    .device(c10::Device(c10::DeviceType::CUDA));
-            buf = torch::zeros(sync_ir_type.getTensorDim(), options);
+            buf = createTensorFromIRType(sync_ir_type, c10::Device(c10::DeviceType::CUDA));
         }
 
         NCCLWrapper& ar = NCCLWrapper::get();
