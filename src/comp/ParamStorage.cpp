@@ -489,6 +489,22 @@ namespace rannc {
         throw std::invalid_argument(ss.str());
     }
 
+    at::Tensor ParamStorage::gatherTensorZero(const at::Tensor& ten, long param_id) {
+        for (const auto& it: zero_grad_locators_) {
+            for (const auto& param_it: getParamIDs(it.first, false)) {
+                if (param_it.second == param_id) {
+                    const auto &locator = it.second;
+                    assert(contains(ranks_, param_id));
+                    return locator->gather(ten, param_id);
+                }
+            }
+        }
+
+        std::stringstream ss;
+        ss << "Param is not registered for zero: " << param_id;
+        throw std::invalid_argument(ss.str());
+    }
+
     std::unordered_set<int> ParamStorage::getRanks(long param_id) const {
         assert(contains(ranks_, param_id));
         return ranks_.at(param_id);

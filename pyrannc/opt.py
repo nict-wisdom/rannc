@@ -3,6 +3,7 @@ import types
 
 import torch
 
+import pyrannc
 from . import _pyrannc, comm_utils, tensor_coll
 from .amp import register_amp_params
 
@@ -96,7 +97,7 @@ def merge_param_groups(target_groups, sub_groups):
     return [merge_param_group(pg_all.copy(), pg_sub) for pg_all, pg_sub in zip(target_groups, sub_groups)]
 
 
-def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=True, root=0):
+def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_zero=False, to_cpu=True, root=0):
     if use_amp_master_param:
         register_amp_params(optimizer)
 
@@ -125,8 +126,11 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, to_cpu=Tr
         new_param_state = {}
         all_item_names = tensor_item_names + non_tensor_item_names
         for k in sorted(all_item_names):
-            v = state_dict["state"][global_order][k] if _pyrannc.get_rank() == param_root else None
+            v = state_dict["state"][global_order][k] if _pyrannc.get_rank() in ranks else None
             if k in tensor_item_names:
+                if enable_zero:
+                    if pyrannc.get_rank() in ranks:
+                        v = _pyrannc.gather_tensor_zero(v, pid).cpu()
                 v = tensor_coll.bcast(v, param_root).cpu()
             else:
                 v = comm_utils.bcast_obj(v, param_root)
@@ -232,7 +236,8 @@ def patch_optimizer(model, optimizer):
 
     def new_state_dict(opt, from_global=False, **kwargs):
         if from_global:
-            global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=model.use_amp_master_params, **kwargs)
+            global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=model.use_amp_master_params,
+                                                                   enable_zero=model.enable_zero, **kwargs)
             return global_opt_state_dict
         else:
             return old_state_dict(**kwargs)

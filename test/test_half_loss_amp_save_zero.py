@@ -117,7 +117,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     # state_dict should run on all ranks
     model_state_dict = rmodel.state_dict()
     global_opt_state_dict = ropt.state_dict(from_global=True)
-    print("global_opt_state_dict={}".format(global_opt_state_dict))
 
     if pyrannc.get_rank() == 0:
         torch.save(model_state_dict, 'model.pt')
@@ -162,7 +161,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
                 ldv = ld_param_state[k]
                 pv = pt_param_state[k]
                 if isinstance(ldv, torch.Tensor):
-                    print("ldv={} ptv={}".format(ldv.size(), pv.size()))
                     np.testing.assert_equal(ldv.numel(), pv.numel())
                     np.testing.assert_almost_equal(ldv.flatten().tolist(), pv.flatten().tolist(), decimal=ASSERT_DECIMAL)
                 else:

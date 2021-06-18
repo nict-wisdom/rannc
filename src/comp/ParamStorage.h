@@ -57,6 +57,7 @@ namespace rannc {
         bool zeroEnabled(const std::string& graph_id) const;
         at::Tensor getLocalParamSegment(long param_id) const;
         std::tuple<int64_t, int64_t> getLocalParamRange(long param_id) const;
+        at::Tensor gatherTensorZero(const at::Tensor& ten, long param_id);
         std::unordered_set<int> getRanks(long param_id) const;
 
         void deploy(const Deployment &decomp, const std::unordered_map<std::string, long>& graph_params, bool enable_zero);

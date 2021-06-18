@@ -108,6 +108,15 @@ PYBIND11_MODULE(_pyrannc, m) {
         return ten;
     });
 
+    m.def("gather_tensor_zero", [](py::handle py_tensor, long param_id) {
+        auto r = RaNNCFactory::get();
+        auto param_storage = r->getParamStorage();
+        auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
+        assert(iv.isTensor());
+        const auto ten = iv.toTensor().cuda();
+        return param_storage->gatherTensorZero(ten, param_id);
+    });
+
     m.def("keep_graph", [](bool keep) {
         return TorchDriver::setKeepGraph(keep);
     });

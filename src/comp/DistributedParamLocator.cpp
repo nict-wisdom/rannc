@@ -38,35 +38,9 @@ namespace rannc {
     }
 
     at::Tensor DistributedParamLocator::load(long pid) {
-        assert(contains(segment_sizes_, pid));
-        assert(contains(ranks_, pid));
-        assert(contains(ir_types_, pid));
-
         assert(contains(param_parts_, pid));
         auto param_part = param_parts_.at(pid);
-
-        const IRType& ir_type = ir_types_.at(pid);
-        at::TensorOptions options;
-        options = options.dtype(fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType()))
-                .requires_grad(param_part.requires_grad())
-                .device(c10::Device(c10::DeviceType::CUDA));
-        at::Tensor buf = torch::zeros({(int64_t)(segment_sizes_.at(pid)*ranks_.at(pid).size())}, options);
-
-        TagMap& tag_map = TagMap::get();
-        int tag = tag_map.getRankSetTag(mpi::getAllRanks());
-        nccl_.createCommunicator(tag, mpi::getAllRanks());
-
-        at::NoGradGuard no_grad;
-
-        param_part.set_requires_grad(false);
-        const auto sendbuf = param_part.cuda();
-
-        nccl_.allgather(tag, {sendbuf}, {buf});
-        param_part.set_requires_grad(true);
-
-        return buf.slice(0, 0, productDim(ir_type.getTensorDim()))
-                .view(ir_type.getTensorDim())
-                .cpu().detach();
+        return gather(param_part, pid);
     }
 
     void DistributedParamLocator::fetchStart() {

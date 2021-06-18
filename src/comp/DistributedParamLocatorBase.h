@@ -14,11 +14,12 @@ namespace rannc {
 
     class DistributedParamLocatorBase {
     public:
-        void remove(long pid);
+        virtual void remove(long pid);
         size_t getSegmentNum(long pid);
         size_t getOwner(long pid, int index);
         std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
         std::pair<int64_t, int64_t> getSegmentRange(long pid);
+        at::Tensor gather(const at::Tensor& tensor_part, long pid);
 
     protected:
         NCCLWrapper& nccl_;

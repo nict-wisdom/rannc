@@ -77,4 +77,32 @@ namespace rannc {
 
         return ranks_buf.at(index);
     }
+
+    at::Tensor DistributedParamLocatorBase::gather(const at::Tensor& tensor_part, long pid) {
+        assert(contains(segment_sizes_, pid));
+        assert(contains(ranks_, pid));
+        assert(contains(ir_types_, pid));
+
+        const IRType& ir_type = ir_types_.at(pid);
+        const auto& ranks = ranks_.at(pid);
+
+        at::TensorOptions options;
+        options = options.dtype(tensor_part.dtype())
+                .requires_grad(tensor_part.requires_grad())
+                .device(c10::Device(c10::DeviceType::CUDA));
+        at::Tensor buf = torch::zeros({(int64_t)(segment_sizes_.at(pid)*ranks.size())}, options);
+
+        TagMap& tag_map = TagMap::get();
+        int tag = tag_map.getRankSetTag(ranks);
+        nccl_.createCommunicator(tag, ranks);
+
+        at::NoGradGuard no_grad;
+
+        const auto sendbuf = tensor_part.set_requires_grad(false).cuda();
+        nccl_.allgather(tag, {sendbuf}, {buf});
+
+        return buf.slice(0, 0, productDim(ir_type.getTensorDim()))
+                .view(ir_type.getTensorDim())
+                .cpu().detach();
+    }
 }
