@@ -22,7 +22,7 @@ RUN mkdir -p $DOCKER_BUILD_DIR
 # Boost
 RUN cd ${DOCKER_BUILD_DIR} \
     && export BOOST_VERSION_FILE=${BOOST_VERSION//./_} \
-    && wget --quiet https://dl.bintray.com/boostorg/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_FILE}.tar.gz \
+    && wget --quiet https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_FILE}.tar.gz \
     && tar -xzf boost_${BOOST_VERSION_FILE}.tar.gz \
     && cd boost_${BOOST_VERSION_FILE} \
     && /bin/bash ./bootstrap.sh \
