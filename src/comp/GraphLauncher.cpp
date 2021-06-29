@@ -423,6 +423,8 @@ namespace rannc {
             }
         }
 
+        param_storage_->prepareBackward(id);
+
         SComm& scomm = SComm::get();
         std::function<void(int64_t)> set_bs = [&scomm](size_t batch_size) {
             return scomm.startBwd(batch_size);

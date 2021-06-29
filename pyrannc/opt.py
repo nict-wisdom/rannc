@@ -147,18 +147,21 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_ze
     return None, None
 
 
-def _get_local_optimizer_state_dict(global_state_dict, pids):
-    local_state_dict = {}
+def _get_local_optimizer_state_dict(global_state_dict, used_param_global_order):
+
+    local_state_dict = {'state': {}, 'param_groups': []}
+
+    for global_order, sv in global_state_dict['state'].items():
+        if global_order in used_param_global_order:
+            local_state_dict['state'][global_order] = sv
+
+    for grp in global_state_dict['param_groups']:
+        new_grp = grp.copy()
+        new_grp['params'] = [global_order for global_order in grp['params'] if global_order in used_param_global_order]
+        local_state_dict['param_groups'].append(new_grp)
+
     for k, v in global_state_dict.items():
-        if k == 'state':
-            local_state_dict['state'] = {pid: sv for pid, sv in v.items() if pid in pids}
-        elif k == 'param_groups':
-            local_state_dict['param_groups'] = []
-            for grp in v:
-                new_grp = grp.copy()
-                new_grp['params'] = [pid for pid in grp['params'] if pid in pids]
-                local_state_dict['param_groups'].append(new_grp)
-        else:
+        if k not in local_state_dict.keys():
             local_state_dict[k] = v
     return local_state_dict
 
@@ -170,20 +173,19 @@ def _optimizer_state_to_cuda(optimizer, device):
                 state[k] = v.to(device)
 
 
-def _slice_optimizer_state(local_state_dict, param_zero_range):
-    sliced_state_dict = {}
+def _slice_optimizer_state(local_state_dict, param_zero_range, global_order_to_id):
+    sliced_state_dict = {'state': {}}
     for k, v in local_state_dict.items():
         if k == 'state':
-            for pid, param_state in v.items():
+            for global_order, param_state in v.items():
                 new_state_vals = {}
                 for state_k, state_v in param_state.items():
                     if torch.is_tensor(state_v):
-                        # slice here
-                        slice = param_zero_range[pid]
-                        new_state_vals[state_k] = state_v.detach().clone()[slice]
+                        param_slice = param_zero_range[global_order_to_id[global_order]]
+                        new_state_vals[state_k] = state_v.flatten().detach().clone()[param_slice]
                     else:
                         new_state_vals[state_k] = state_v
-                sliced_state_dict[k][pid] = new_state_vals
+                sliced_state_dict[k][global_order] = new_state_vals
         else:
             sliced_state_dict[k] = v
 
@@ -248,11 +250,14 @@ def patch_optimizer(model, optimizer):
 
     def new_load_state_dict(opt, state_dict, from_global=False, **kwargs):
         if from_global:
+            # `local_state_dict' uses global order
             local_state_dict = _get_local_optimizer_state_dict(state_dict, used_param_global_order)
 
             if model.enable_zero:
-                local_state_dict = _slice_optimizer_state(local_state_dict, param_zero_range)
+                local_state_dict = _slice_optimizer_state(local_state_dict, param_zero_range, opt.global_order_to_id)
 
+            global_to_local = {global_order: local_order for local_order, global_order in optimizer.order_local_to_global.items()}
+            local_state_dict = replace_param_ids(local_state_dict, global_to_local)
             old_load_state_dict(local_state_dict)
             _optimizer_state_to_cuda(opt, model.device)
         else:

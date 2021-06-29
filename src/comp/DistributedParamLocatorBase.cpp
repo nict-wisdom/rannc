@@ -7,7 +7,6 @@
 #include "DistributedParamLocatorBase.h"
 
 namespace rannc {
-    const int DistributedParamLocatorBase::FETCH_TAG = 10;
 
     void DistributedParamLocatorBase::doRegister(long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
 

@@ -37,7 +37,7 @@ namespace rannc {
         if (grad) {
             assert(param.grad().defined());
         }
-        return ten.flatten().slice(0, offset, offset+src_size);
+        return ten.view(-1).narrow(0, offset, src_size);
     }
 
     void DistributedGradLocator::checkIndices(long pid, int index) {

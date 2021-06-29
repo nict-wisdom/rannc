@@ -166,6 +166,9 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
                 else:
                     np.testing.assert_(ldv == pv)
 
+
+    ropt.load_state_dict(global_opt_state_dict, from_global=True)
+
     print("Done")
 
 
