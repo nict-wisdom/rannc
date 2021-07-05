@@ -54,12 +54,6 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, 
     if zero:
         zero_ranges = {n: opt_act.param_zero_range[id(p)] for n, p in model_act.named_parameters()}
 
-    for n, rp in actual_params.items():
-        p = expected_params[n]
-        v_a = f(rp).flatten()[zero_ranges[n]] if zero else f(rp)
-        v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
-        compare_tensors(v_a, v_e, rtol, atol)
-
     if fp16:
         expected_master_params = pyrannc.amp.named_master_params(model_exp, opt_exp)
         actual_master_params = pyrannc.amp.named_master_params(model_act, opt_act, zero)
@@ -67,6 +61,12 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, 
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]
             v_a = f(rp).flatten() if zero else f(rp)
+            v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
+            compare_tensors(v_a, v_e, rtol, atol)
+    else:
+        for n, rp in actual_params.items():
+            p = expected_params[n]
+            v_a = f(rp).flatten()[zero_ranges[n]] if zero else f(rp)
             v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
             compare_tensors(v_a, v_e, rtol, atol)
 
@@ -153,7 +153,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if "enable_zero" in kwargs:
         enable_zero = module_args["enable_zero"] = kwargs["enable_zero"]
 
-    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, use_amp_master_params=use_amp, **module_args)
+    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, **module_args)
 
     compare_params(model, rmodel, rtol, atol, use_amp)
 

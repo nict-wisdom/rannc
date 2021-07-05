@@ -12,7 +12,6 @@ from . import common
 from apex import amp
 
 import pyrannc
-from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
@@ -68,41 +67,54 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     opt_base = optim.Adam(model_base.parameters(), lr=lr)
     model, opt = amp.initialize(model_base, opt_base, opt_level="O2",
                                 loss_scale=LOSS_SCALE, master_weights=True)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[pyrannc.get_rank()],
-                                                      output_device=pyrannc.get_rank())
+    # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[pyrannc.get_rank()],
+    #                                                   output_device=pyrannc.get_rank())
 
     ropt_base = optim.Adam(rmodel_base.parameters(), lr=lr)
     rmodel_base, ropt = amp.initialize(rmodel_base, ropt_base, opt_level="O2",
                                        loss_scale=LOSS_SCALE, master_weights=True)
-    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, use_amp_master_params=True, enable_zero=True)
+    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, enable_apex_amp=True, enable_zero=True, allreduce_amp_master_param=True)
 
     # we manually run allreduce
     pyrannc.delay_grad_allreduce(True)
 
+    i = 0
+    lr = 0.01
+    ddp_model = None
     for x, tgt in data_loader:
+        print("iter={} x={}".format(i, x))
+        i += 1
+
         # Create test input
         x = x.to(device)
         tgt = tgt.to(device)
 
-        p_loss = model(x, tgt)
+        if not ddp_model:
+            jit_model = torch.jit.trace(model, (x, tgt))
+            ddp_model = torch.nn.parallel.DistributedDataParallel(jit_model, device_ids=[device], output_device=device)
+
+        p_loss = ddp_model(x, tgt)
         tmp_loss = p_loss.clone()
         torch.distributed.all_reduce(tmp_loss)
         tmp_loss /= pyrannc.get_world_size()
 
+        with amp.scale_loss(p_loss, opt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
+            scaled_loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(amp.master_params(opt), 1.0)
         r_loss = rmodel(x, tgt)
 
         # Verify the equality of outputs
         common.compare_tensors(r_loss, tmp_loss, rtol, atol)
 
-        with amp.scale_loss(p_loss, opt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
-            scaled_loss.backward()
-        torch.nn.utils.clip_grad_norm_(amp.master_params(opt), 1.0)
 
         with amp.scale_loss(r_loss, ropt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
             scaled_loss.backward()
-        allreduce_grads_rannc(rmodel, ropt)
+
+        pyrannc.allreduce_grads(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
+        # rmodel._sync_orig_params(sync_all_ranks=True, sync_grad=True)
         common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=True, opt_exp=opt, opt_act=ropt)
 
         opt.step()
@@ -132,7 +144,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
     ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
                                       loss_scale="dynamic", master_weights=True)
-    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, use_amp_master_params=True, enable_zero=True)
+    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True, enable_zero=True)
 
     # Verify parameters
     r_params = {n: p for n, p in rmodel.named_parameters()}

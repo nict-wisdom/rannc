@@ -12,7 +12,6 @@ from . import common
 from apex import amp
 
 import pyrannc
-from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
@@ -74,7 +73,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     ropt_base = optim.Adam(rmodel_base.parameters(), lr=lr)
     rmodel_base, ropt = amp.initialize(rmodel_base, ropt_base, opt_level="O2",
                                        loss_scale=LOSS_SCALE, master_weights=True)
-    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, use_amp_master_params=True)
+    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, enable_apex_amp=True, allreduce_amp_master_param=True)
 
     # we manually run allreduce
     pyrannc.delay_grad_allreduce(True)
@@ -101,7 +100,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         with amp.scale_loss(r_loss, ropt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
             scaled_loss.backward()
-        allreduce_grads_rannc(rmodel, ropt)
+        pyrannc.allreduce_grads(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
         common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=False, opt_exp=opt, opt_act=ropt)
@@ -133,7 +132,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
     ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
                                       loss_scale="dynamic", master_weights=True)
-    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, use_amp_master_params=True)
+    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True)
 
     # Verify parameters
     r_params = {n: p for n, p in rmodel.named_parameters()}

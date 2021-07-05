@@ -25,7 +25,8 @@ struct RaNNCTensorBackward : public torch::autograd::TraceableFunction {
                             std::string graph_id, std::string name,
                             torch::jit::IValue output, PathInIValue path,
                             std::vector<IValueLocation> ordered_inputs,
-                            std::vector<long> param_ids_on_rank);
+                            std::vector<long> param_ids_on_rank,
+                            bool enable_zero);
 
         variable_list apply(variable_list &&grads) override;
 
@@ -49,6 +50,7 @@ struct RaNNCTensorBackward : public torch::autograd::TraceableFunction {
         PathInIValue path_;
         std::vector<long> param_ids_on_rank_;
         bool skip_grad_scaling_;
+        bool enable_zero_;
 
         static bool delay_grad_allreduce_;
     };

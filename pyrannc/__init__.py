@@ -195,13 +195,13 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     Computes a PyTorch model on multiple GPUs with a hybrid parallelism.
     """
 
-    def __init__(self, model, optimizer=None, gather_inputs=True, load_deployment=None, use_amp_master_params=False,
+    def __init__(self, model, optimizer=None, gather_inputs=True, load_deployment=None, enable_apex_amp=False,
                  allreduce_amp_master_param=False, enable_zero=False, check_unused_values=True):
         r"""
         :param model: Model to distribute.
         :param optimizer: Optimizer that should work with RaNNC.
         :param gather_inputs: Set ``False`` if model uses inputs given on rank 0.
-        :param use_amp_master_params: Set ``True`` if ``model`` is processed by `Apex AMP <https://nvidia.github.io/apex/amp.html>`_.
+        :param enable_apex_amp: Set ``True`` if ``model`` is processed by `Apex AMP <https://nvidia.github.io/apex/amp.html>`_.
         :param allreduce_amp_master_param: Set ``True`` to allreduce gradients of master parameters of Apex AMP.
         :param check_unused_values: If ``True``, RaNNC throws an exception when it finds unused values in a computation graph.
         """
@@ -223,10 +223,10 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         self.amp_master_param_registered = False
         self.load_deployment = load_deployment
         self.allreduce_amp_master_param = allreduce_amp_master_param
-        self.use_amp_master_params = use_amp_master_params
+        self.enable_apex_amp = enable_apex_amp
         self.enable_zero = enable_zero
 
-        super(RaNNCModule, self).__init__(use_amp_master_params, allreduce_amp_master_param, enable_zero, check_unused_values)
+        super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_param, enable_zero, check_unused_values)
 
     def __call__(self, *args, **kwargs):
         if len(kwargs) > 0:
@@ -274,7 +274,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
         out = super().__call__(*args)
 
-        if self.use_amp_master_params:
+        if self.enable_apex_amp:
             def out_hook(grad):
                 self._setup_amp_params()
                 return grad
@@ -365,12 +365,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         .. note::
             This method must be called from all ranks.
         """
-        if self.use_amp_master_params:
+        if self.enable_apex_amp:
             self._setup_amp_params()
         super().clip_grad_norm(max_grad_norm)
 
     def _calc_grad_norm(self):
-        if self.use_amp_master_params:
+        if self.enable_apex_amp:
             self._setup_amp_params()
         return super().calc_grad_norm()
 
@@ -419,7 +419,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         .. note::
             This method must be called from all ranks.
         """
-        if self.use_amp_master_params:
+        if self.enable_apex_amp:
             self._setup_amp_params()
         super().allreduce_grads()
 
@@ -509,3 +509,19 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if id(p) in self.used_param_ids:
                 yield n, p
 
+
+def allreduce_grads(rmodel, optimizer, prescale=1.0):
+    if rmodel.enable_apex_amp:
+        rmodel._setup_amp_params()
+        from .amp import allreduce_grads_amp
+        return allreduce_grads_amp(rmodel, optimizer, prescale)
+
+    if rmodel.enable_zero:
+        rmodel.allreduce_grads_zero(prescale)
+    else:
+        with torch.no_grad():
+            for p in rmodel.parameters():
+                p.grad.mul_(prescale)
+        rmodel.allreduce_grads()
+
+    return False

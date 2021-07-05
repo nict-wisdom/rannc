@@ -43,6 +43,7 @@ namespace rannc {
         bool isCheckpointingEnabled() const;
 
         void allReduceParamGrads();
+        void allReduceParamGradsZero(double loss_scale);
         void clearParamGrads();
         void clipGrad(float max_grad_norm);
         double calcGradL2Norm();

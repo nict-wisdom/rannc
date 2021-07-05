@@ -312,36 +312,83 @@ namespace rannc {
                     const auto &param_ids = graph_grouped_params.at(tag);
                     std::vector<at::Tensor> grads;
 
-                    if (zeroEnabled(graph_id)) {
-                        auto locator = zero_grad_locators_.at(graph_id);
-                        std::vector<int> roots;
-                        grads.reserve(param_ids.size()*ranks.size());
-                        roots.reserve(param_ids.size()*ranks.size());
-                        for (long pid: param_ids) {
-                            for (int i=0; i<locator->getSegmentNum(pid); i++) {
-                                const auto segment = locator->getSegment(pid, i, true);
-                                grads.push_back(segment);
-                                roots.push_back(i);
-                            }
-                            locator->setGradToLocalParamSegment(pid);
+                    grads.reserve(param_ids.size());
+                    for (long pid: param_ids) {
+                        auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
+                                     ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
+                        auto& grad = param.grad();
+                        if (grad.defined()) {
+                            grads.push_back(grad);
                         }
-                        ar.reduce(tag, grads, roots);
-                    } else {
-                        grads.reserve(param_ids.size());
-                        for (long pid: param_ids) {
-                            auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
-                                         ? getAmpMasterParamTensor(pid) : getParamTensor(pid);
-                            auto& grad = param.grad();
-                            if (grad.defined()) {
-                                grads.push_back(grad);
-                            }
-                        }
-                        ar.allreduce(tag, grads);
                     }
+                    ar.allreduce(tag, grads);
                 }
             }
             if (sync_allreduce) {
                 MPI_Barrier(MPI_COMM_WORLD);
+            }
+        }
+
+        syncStream();
+        recordEnd(ss.str());
+    }
+
+    void ParamStorage::allReduceParamGradsZero(const std::string& graph_id, double loss_scale) {
+        const auto& graph_grouped_params = grouped_params_[graph_id];
+
+        assert(zeroEnabled(graph_id));
+
+        assert(contains(use_amp_master_params_, graph_id));
+        bool use_amp_master_params = use_amp_master_params_.at(graph_id);
+        assert(!use_amp_master_params || allreduce_amp_master_params_);
+
+        torch::NoGradGuard no_grad;
+
+        std::stringstream ss;
+        ss << "ParamStorage::allReduceParamGradsZero_graph_" << graph_id;
+        recordStart(ss.str());
+
+        NCCLWrapper& ar = NCCLWrapper::get();
+
+        std::vector<int> sorted_tags = sortCommTags(graph_id);
+        for (int tag: sorted_tags) {
+            assert(contains(tag_rank_set_, tag));
+            const auto& ranks = tag_rank_set_.at(tag);
+            if (contains(ranks, mpi::getRank())) {
+                const auto &param_ids = graph_grouped_params.at(tag);
+                std::vector<at::Tensor> grads;
+
+                auto locator = zero_grad_locators_.at(graph_id);
+                std::vector<int> roots;
+                grads.reserve(param_ids.size()*ranks.size());
+                roots.reserve(param_ids.size()*ranks.size());
+                for (long pid: param_ids) {
+                    for (int i=0; i<locator->getSegmentNum(pid); i++) {
+                        if (use_amp_master_params_.at(graph_id)) {
+                            // Assuming that allreduce_amp_master_params_ == true
+                            at::Tensor segment_fp32;
+                            if (mpi::getRank() == i) {
+                                // In this case, I am the owner and have the master param (grad)
+                                // the size must match the segment
+                                assert(hasAmpMasterParam(pid));
+                                const auto master_param = getAmpMasterParamTensor(pid);
+                                assert(master_param.grad().defined());
+                                segment_fp32 = master_param.grad();
+                            } else {
+                                const at::Tensor segment = locator->getSegment(pid, i, true);
+                                segment_fp32 = segment.to(at::ScalarType::Float, true);
+                                segment_fp32.mul_(1 / loss_scale);
+                            }
+                            grads.push_back(segment_fp32);
+                        } else {
+                            const auto segment = locator->getSegment(pid, i, true);
+                            grads.push_back(segment);
+                        }
+                        roots.push_back(i);
+                    }
+                    locator->setGradToLocalParamSegment(pid);
+                }
+                ar.reduce(tag, grads, roots);
             }
         }
 

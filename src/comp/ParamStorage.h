@@ -67,6 +67,7 @@ namespace rannc {
         long localToGlobal(long local_param_id);
 
         void allReduceParamGrads(const std::string& graph_id);
+        void allReduceParamGradsZero(const std::string& graph_id, double loss_scale);
         void clearParamGrads(const std::string& graph_id);
         void bcastParamsZero(const std::string& graph_id, bool grad);
         void prepareBackward(const std::string& graph_id);

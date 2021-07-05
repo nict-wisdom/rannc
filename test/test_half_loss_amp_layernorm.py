@@ -12,7 +12,6 @@ from . import common
 from apex import amp
 
 import pyrannc
-from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
@@ -76,7 +75,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     torch.cuda.manual_seed(seed)
 
     data_loader = common.get_loader(
-        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset)
+        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs=True)
 
     lr = 0.01
 
@@ -101,7 +100,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
                                        loss_scale=LOSS_SCALE, master_weights=True)
     norm_to_float(rmodel_base)
     rmodel = pyrannc.RaNNCModule(rmodel_base, ropt,
-                                 use_amp_master_params=True,
+                                 enable_apex_amp=True,
                                  allreduce_amp_master_param=True)
 
     # we manually run allreduce
@@ -139,7 +138,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
                 scaled_loss.backward()
 
         if delay_allreduce:
-            allreduce_grads_rannc(rmodel, ropt)
+            pyrannc.allreduce_grads(rmodel, ropt)
 
         torch.nn.utils.clip_grad_norm_(amp.master_params(opt), 1.0)
         rmodel.clip_grad_norm(1.0)

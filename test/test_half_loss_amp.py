@@ -12,7 +12,6 @@ from . import common
 from apex import amp
 
 import pyrannc
-from pyrannc.amp import allreduce_grads, allreduce_grads_rannc
 
 ASSERT_DECIMAL = 3
 seed = 0
@@ -58,7 +57,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     torch.cuda.manual_seed(seed)
 
     data_loader = common.get_loader(
-        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset)
+        batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, True)
 
     lr = 0.01
 
@@ -75,7 +74,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     rmodel_base, ropt = amp.initialize(rmodel_base, ropt_base, opt_level="O2",
                                        loss_scale=LOSS_SCALE, master_weights=True)
     rmodel = pyrannc.RaNNCModule(rmodel_base, ropt,
-                                 use_amp_master_params=True,
+                                 enable_apex_amp=True,
                                  allreduce_amp_master_param=True)
 
     # we manually run allreduce
@@ -103,7 +102,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
         with amp.scale_loss(r_loss, ropt, delay_overflow_check=False, delay_unscale=False) as scaled_loss:
             scaled_loss.backward()
-        allreduce_grads_rannc(rmodel, ropt)
+        pyrannc.allreduce_grads(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
         expected_master_params = {n: p for n, p in zip([n for n, p in model.module.named_parameters()], amp.master_params(opt))}

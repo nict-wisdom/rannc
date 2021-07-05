@@ -468,6 +468,13 @@ namespace rannc {
         param_storage_->allReduceParamGrads(id_);
     }
 
+    void RaNNCModule::allReduceParamGradsZero(double loss_scale) {
+        if (!skip_grad_scaling_) {
+            param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
+        }
+        param_storage_->allReduceParamGradsZero(id_, loss_scale);
+    }
+
     void RaNNCModule::clearParamGrads() {
         param_storage_->clearParamGrads(id_);
     }
@@ -508,9 +515,8 @@ namespace rannc {
             assert(elem.isTensor());
             auto var = elem.toTensor();
 
-            auto func = std::shared_ptr<RaNNCTensorBackward>(
-                    new RaNNCTensorBackward(driver_, param_storage_, graph_id, name, clone_out,
-                            path, ordered_inputs, param_ids_on_rank_));
+            auto func = std::make_shared<RaNNCTensorBackward>(driver_, param_storage_, graph_id, name, clone_out,
+                            path, ordered_inputs, param_ids_on_rank_, enable_zero_);
             func->add_input_metadata(var);
 
             torch::autograd::Edge e(func, 0);

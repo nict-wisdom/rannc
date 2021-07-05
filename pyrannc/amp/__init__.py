@@ -92,38 +92,44 @@ def named_master_params(model, optimizer, zero=False):
     return {n: amp_param_map[p] for n, p in model.named_parameters()}
 
 
-def allreduce_grads_rannc(rmodel, optimizer, prescale=1.0, use_amp_master_param=True):
+def scale_master_grads(optimizer, scale):
+    overflow_buf = torch.cuda.IntTensor([0])
+    master_grads = [param.grad for param in amp.master_params(optimizer) if param.grad is not None]
+    if len(master_grads) > 0:
+        amp_C.multi_tensor_scale(65536,
+                                 overflow_buf,
+                                 [master_grads, master_grads],
+                                 scale)
 
-    if use_amp_master_param:
-        scaler = _amp_state.loss_scalers[0]
-        if rmodel.allreduce_amp_master_param:
-            overflow_buf = torch.cuda.IntTensor([0])
-            master_grads = [param.grad for param in amp.master_params(optimizer) if param.grad is not None]
-            if len(master_grads) > 0:
-                amp_C.multi_tensor_scale(65536,
-                                         overflow_buf,
-                                         [master_grads, master_grads],
-                                         prescale)
-            torch.cuda.synchronize()
-        else:
-            master_grads_to_model_grads(optimizer, scaler.loss_scale()*prescale)
+def allreduce_grads_amp(rmodel, optimizer, prescale=1.0):
+
+    scaler = _amp_state.loss_scalers[0]
+    if rmodel.enable_zero:
+        assert(rmodel.allreduce_amp_master_param)
+        scale_master_grads(optimizer, prescale)
+
+        rmodel.allreduce_grads_zero(scaler.loss_scale())
+        had_overflow = scaler.update_scale()
+        return had_overflow
+
+    if rmodel.allreduce_amp_master_param:
+        scale_master_grads(optimizer, prescale)
+    else:
+        master_grads_to_model_grads(optimizer, scaler.loss_scale()*prescale)
 
     # rannc's allreduce
     rmodel.allreduce_grads()
 
-    if use_amp_master_param:
-        if rmodel.allreduce_amp_master_param:
-            had_overflow = scaler.update_scale()
-        else:
-            overflow_buf = model_grads_to_master_grads(optimizer, 1./scaler.loss_scale())
-            old_overflow_buf = scaler._overflow_buf
-            scaler._overflow_buf = overflow_buf
-            had_overflow = scaler.update_scale()
-            scaler._overflow_buf = old_overflow_buf
+    if rmodel.allreduce_amp_master_param:
+        had_overflow = scaler.update_scale()
+    else:
+        overflow_buf = model_grads_to_master_grads(optimizer, 1./scaler.loss_scale())
+        old_overflow_buf = scaler._overflow_buf
+        scaler._overflow_buf = overflow_buf
+        had_overflow = scaler.update_scale()
+        scaler._overflow_buf = old_overflow_buf
 
-        return had_overflow
-
-    return False
+    return had_overflow
 
 
 def patch_amp_scaler():

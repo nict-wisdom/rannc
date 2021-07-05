@@ -71,12 +71,14 @@ namespace rannc {
                                              std::string graph_id, std::string name,
                                              torch::jit::IValue output, PathInIValue path,
                                              std::vector<IValueLocation> ordered_inputs,
-                                             std::vector<long> param_ids_on_rank)
+                                             std::vector<long> param_ids_on_rank,
+                                             bool enable_zero)
             :output_(std::move(output)),
              ordered_inputs_(std::move(ordered_inputs)), driver_(std::move(driver)),
              param_storage_(std::move(param_storage)),
              graph_id_(std::move(graph_id)), value_name_(std::move(name)), path_(std::move(path)),
-             param_ids_on_rank_(std::move(param_ids_on_rank)) {
+             param_ids_on_rank_(std::move(param_ids_on_rank)),
+             enable_zero_(enable_zero) {
         skip_grad_scaling_ = config::Config::get().getVal<bool>(config::SKIP_GRAD_SCALING);
     }
 
@@ -109,7 +111,11 @@ namespace rannc {
                     param_storage_->unscaleGrads(graph_id_, false);
                 }
             } else {
-                param_storage_->allReduceParamGrads(graph_id_);
+                if (enable_zero_) {
+                    param_storage_->allReduceParamGradsZero(graph_id_, 1.0);
+                } else {
+                    param_storage_->allReduceParamGrads(graph_id_);
+                }
             }
 
             recordEnd(ss.str());
