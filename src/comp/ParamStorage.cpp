@@ -468,10 +468,8 @@ namespace rannc {
     }
 
     void ParamStorage::doScaleGrads(const std::string& graph_id, bool unscale, bool amp_master_grads) {
-        SComm& scomm = SComm::get();
-        int64_t batch_size = scomm.getBatchSize();
+        double ratio = 1 / (double) mpi::getSize();
         for (const auto& it: my_param_ranks_[graph_id]) {
-            double ratio = getDpRatio(batch_size, it.second, mpi::getRank());
             long pid = it.first;
             torch::NoGradGuard no_grad;
             auto p = amp_master_grads && hasAmpMasterParam(pid) ?

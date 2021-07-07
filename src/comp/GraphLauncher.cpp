@@ -397,22 +397,7 @@ namespace rannc {
             int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
             const auto pad_inputs = alignBatch(inputs, max_local_batch_size, deployment_.graph, true);
             global_batch_size = max_local_batch_size * mpi::getSize();
-
-            // Scale if a batch
-            // loss value is scaled by scommtensor
-            for (const auto& route: deployment_.bwd_in_routes) {
-                double scale = getDpRatio(global_batch_size, mpi::getAllRanks(), mpi::getRank());
-                scaled_inputs[route.location] = transformTensorsInIValue(
-                        pad_inputs.at(route.location),
-                        [scale](const at::Tensor& t){
-                            const auto& dim = getTensorDim(t);
-                            if (dim.empty()) {
-                                return t;
-                            }
-                            torch::NoGradGuard no_grad;
-                            return t.mul(scale).detach();
-                        });
-            }
+            scaled_inputs = pad_inputs;
         } else {
             global_batch_size = input_batch_size;
 

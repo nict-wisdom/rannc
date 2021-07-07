@@ -637,10 +637,12 @@ namespace rannc {
             src.zero_();
         } else if (val.isTensor()) {
             src = val.toTensor();
-            if (contains(route.sources, mpi::getRank())) {
-                src_ratio = getDpRatio(batch_size, route.sources, mpi::getRank(), split_index_);
+            if (!weight) {
+                if (contains(route.sources, mpi::getRank())) {
+                    src_ratio = getDpRatio(batch_size, route.sources, mpi::getRank(), split_index_);
+                }
+                src = src_ratio * src;
             }
-            src = src_ratio * src;
         } else {
             throw std::runtime_error("Unsupported tensor type for loss distribution: " + toString(toIRType(val)));
         }

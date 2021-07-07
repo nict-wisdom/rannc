@@ -462,17 +462,13 @@ namespace rannc {
     }
 
     void RaNNCModule::allReduceParamGrads() {
-        if (!skip_grad_scaling_) {
-            param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
-        }
         param_storage_->allReduceParamGrads(id_);
+        param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
     }
 
     void RaNNCModule::allReduceParamGradsZero(double loss_scale) {
-        if (!skip_grad_scaling_) {
-            param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
-        }
         param_storage_->allReduceParamGradsZero(id_, loss_scale);
+        param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
     }
 
     void RaNNCModule::clearParamGrads() {

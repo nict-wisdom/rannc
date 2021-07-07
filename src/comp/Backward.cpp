@@ -95,28 +95,20 @@ namespace rannc {
                 throw std::invalid_argument("The size of grads must be one.");
             }
 
-            if (!skip_grad_scaling_) {
-                std::stringstream ss_scale;
-                ss_scale << "RaNNCTensorBackward::apply_" << toString(value_name_) << "_scaleGrads";
-                recordStart(ss_scale.str());
-                param_storage_->scaleGrads(graph_id_, false);
-                recordEnd(ss_scale.str());
-            }
-
             inputs_[value_name_] = createZeroPad(output_, path_, grads.at(0));
             driver_->backward(graph_id_, inputs_);
 
-            if (delay_grad_allreduce_) {
-                if (!skip_grad_scaling_) {
-                    param_storage_->unscaleGrads(graph_id_, false);
-                }
+            if (enable_zero_) {
+                param_storage_->allReduceParamGradsZero(graph_id_, 1.0);
             } else {
-                if (enable_zero_) {
-                    param_storage_->allReduceParamGradsZero(graph_id_, 1.0);
-                } else {
-                    param_storage_->allReduceParamGrads(graph_id_);
-                }
+                param_storage_->allReduceParamGrads(graph_id_);
             }
+
+            std::stringstream ss_scale;
+            ss_scale << "RaNNCTensorBackward::apply_" << toString(value_name_) << "_scaleGrads";
+            recordStart(ss_scale.str());
+            param_storage_->scaleGrads(graph_id_, false);
+            recordEnd(ss_scale.str());
 
             recordEnd(ss.str());
 
