@@ -367,7 +367,7 @@ namespace rannc {
                         if (use_amp_master_params_.at(graph_id)) {
                             // Assuming that allreduce_amp_master_params_ == true
                             at::Tensor segment_fp32;
-                            if (mpi::getRank() == i) {
+                            if (getLocalRank(ranks, mpi::getRank()) == i) {
                                 // In this case, I am the owner and have the master param (grad)
                                 // the size must match the segment
                                 assert(hasAmpMasterParam(pid));
