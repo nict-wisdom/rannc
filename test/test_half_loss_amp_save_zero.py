@@ -82,7 +82,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     lr = 0.01
     ddp_model = None
     for x, tgt in data_loader:
-        print("iter={} x={}".format(i, x))
         i += 1
 
         # Create test input
@@ -114,7 +113,6 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         pyrannc.allreduce_grads(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
-        # rmodel._sync_orig_params(sync_all_ranks=True, sync_grad=True)
         common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=True, opt_exp=opt, opt_act=ropt)
 
         opt.step()

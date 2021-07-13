@@ -97,10 +97,11 @@ namespace rannc {
 
         at::NoGradGuard no_grad;
 
-        const auto sendbuf = tensor_part.set_requires_grad(false).cuda();
+        at::Tensor sendbuf = torch::zeros({(int64_t)(segment_sizes_.at(pid))}, options);
+        sendbuf.narrow(0, 0, tensor_part.numel()).copy_(tensor_part);
         nccl_.allgather(tag, {sendbuf}, {buf});
 
-        return buf.slice(0, 0, productDim(ir_type.getTensorDim()))
+        return buf.narrow(0, 0, productDim(ir_type.getTensorDim()))
                 .view(ir_type.getTensorDim())
                 .cpu().detach();
     }

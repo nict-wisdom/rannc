@@ -364,6 +364,11 @@ namespace rannc {
                 roots.reserve(param_ids.size()*ranks.size());
                 for (long pid: param_ids) {
                     for (int i=0; i<locator->getSegmentNum(pid); i++) {
+                        const auto range = locator->getSegmentRange(pid, i);
+                        if (range.first == range.second) {
+                            continue;
+                        }
+
                         if (use_amp_master_params_.at(graph_id)) {
                             // Assuming that allreduce_amp_master_params_ == true
                             at::Tensor segment_fp32;
@@ -454,6 +459,11 @@ namespace rannc {
 
                 for (long pid: param_ids) {
                     for (int i = 0; i < locator->getSegmentNum(pid); i++) {
+                        const auto range = locator->getSegmentRange(pid, i);
+                        if (range.first == range.second) {
+                            continue;
+                        }
+
                         const auto segment = locator->getSegment(pid, i, grad);
                         params.push_back(segment);
                         roots.push_back(i);

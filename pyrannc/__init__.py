@@ -492,10 +492,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 if synced_param_grad_cpu is not None or sync_all_ranks:
                     if _pyrannc.get_rank() == 0:
                         with torch.no_grad():
-                            if param.grad is not None and synced_param_grad_cpu is not None:
-                                param.grad.copy_(synced_param_grad_cpu.view(param.size()))
                             if param.grad is None:
-                                param.grad = synced_param_grad_cpu
+                                param.grad = torch.zeros_like(param)
+                            param.grad.copy_(synced_param_grad_cpu.view(param.size()))
 
         _pyrannc.barrier()
 
