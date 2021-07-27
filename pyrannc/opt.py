@@ -5,7 +5,7 @@ import torch
 
 import pyrannc
 from . import _pyrannc, comm_utils, tensor_coll
-from .amp import register_amp_params
+from .amp import register_amp_params, unset_master_grads
 
 
 def replace_ids_in_param_group(param_group, order_local_to_global):
@@ -268,6 +268,8 @@ def patch_optimizer(model, optimizer):
     # replace zero_grad
     if model.enable_zero:
         def new_zero_grad(opt, **kwargs):
+            if model.use_amp_master_params:
+                unset_master_grads(opt)
             model.zero_grad(**kwargs)
 
         optimizer.zero_grad = types.MethodType(new_zero_grad, optimizer)

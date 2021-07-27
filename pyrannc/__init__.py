@@ -275,10 +275,10 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         out = super().__call__(*args)
 
         if self.enable_apex_amp:
-            def out_hook(grad):
+            def setup_amp(grad):
                 self._setup_amp_params()
                 return grad
-            out.register_hook(out_hook)
+            out.register_hook(setup_amp)
 
         return out
 

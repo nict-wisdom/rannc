@@ -83,13 +83,26 @@ def model_grads_to_master_grads(optimizer, scale):
 
 
 def named_master_params(model, optimizer, zero=False):
-    amp_param_map = {model_p: master_p for master_p, model_p in zip_params(optimizer)}
+    if hasattr(optimizer._amp_stash, "all_fp32_from_fp16_params"):
+        amp_param_map = {model_p: master_p for master_p, model_p in zip_params(optimizer)}
 
-    if zero:
-        pid_to_name = {pid: n for n, pid in model.name_to_pid.items()}
-        return {pid_to_name[optimizer.param_zero_segment_to_id[model_p]]: master_p for model_p, master_p in amp_param_map.items()}
+        if zero:
+            pid_to_name = {pid: n for n, pid in model.name_to_pid.items()}
+            pid_to_segment = {pid: segment for segment, pid in optimizer.param_zero_segment_to_id.items()}
+            for pid, segment in pid_to_segment.items():
+                if segment.dtype == torch.float:
+                    amp_param_map[segment] = segment
 
-    return {n: amp_param_map[p] for n, p in model.named_parameters()}
+            for model_p, master_p in amp_param_map.items():
+                yield pid_to_name[optimizer.param_zero_segment_to_id[model_p]], master_p
+
+        else:
+            for p in model.parameters():
+                if p.dtype == torch.float:
+                    amp_param_map[p] = p
+
+            for n, p in model.named_parameters():
+                yield n, amp_param_map[p]
 
 
 def scale_master_grads(optimizer, scale):
@@ -154,3 +167,8 @@ def patch_amp_scaler():
         return wrapper
 
     scaler.update_scale = decorate(scaler.update_scale)
+
+
+def unset_master_grads(optimizer):
+    for p in amp.master_params(optimizer):
+        p.grad = None

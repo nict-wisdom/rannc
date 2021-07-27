@@ -371,20 +371,21 @@ namespace rannc {
 
                         if (use_amp_master_params_.at(graph_id)) {
                             // Assuming that allreduce_amp_master_params_ == true
-                            at::Tensor segment_fp32;
                             if (getLocalRank(ranks, mpi::getRank()) == i) {
-                                // In this case, I am the owner and have the master param (grad)
-                                // the size must match the segment
-                                assert(hasAmpMasterParam(pid));
-                                const auto master_param = getAmpMasterParamTensor(pid);
-                                assert(master_param.grad().defined());
-                                segment_fp32 = master_param.grad();
+                                // In this case, I am the owner.
+                                auto segment_fp32 = hasAmpMasterParam(pid) ?
+                                                        getAmpMasterParamTensor(pid).grad() // amp master grad (originally fp16)
+                                                        : locator->getSegment(pid, i, true); // fp32 param grad
+                                assert(segment_fp32.defined());
+                                assert(segment_fp32.scalar_type() == at::ScalarType::Float || segment_fp32.scalar_type() == at::ScalarType::Double);
+
+                                grads.push_back(segment_fp32);
                             } else {
                                 const at::Tensor segment = locator->getSegment(pid, i, true);
-                                segment_fp32 = segment.to(at::ScalarType::Float, true);
-                                segment_fp32.mul_(1 / loss_scale);
+                                auto segment_fp32 = segment.to(at::ScalarType::Float, true);
+                                segment_fp32 = segment_fp32.mul(1 / loss_scale).detach();
+                                grads.push_back(segment_fp32);
                             }
-                            grads.push_back(segment_fp32);
                         } else {
                             const auto segment = locator->getSegment(pid, i, true);
                             grads.push_back(segment);
@@ -424,6 +425,7 @@ namespace rannc {
                 if (grad.defined()) {
                     grad.zero_();
                 }
+                // amp modifies step() so that amp master grads are unset
             }
         }
     }
