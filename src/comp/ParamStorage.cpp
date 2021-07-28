@@ -592,6 +592,10 @@ namespace rannc {
                 at::Tensor param;
                 if (use_amp_master && contains(amp_master_params_, pid)) {
                     param = amp_master_params_.at(pid);
+                } else if (zeroEnabled(graph_id)) {
+                    assert(contains(zero_grad_locators_, graph_id));
+                    auto locator = zero_grad_locators_.at(graph_id);
+                    param = locator->getLocalParamSegment(pid); // fp32 param grad
                 } else {
                     param = getParamTensor(pid);
                 }
@@ -611,6 +615,10 @@ namespace rannc {
             at::Tensor ten;
             if (use_amp_master && contains(amp_master_params_, pid)) {
                 ten = amp_master_params_.at(pid);
+            } else if (zeroEnabled(graph_id)) {
+                assert(contains(zero_grad_locators_, graph_id));
+                auto locator = zero_grad_locators_.at(graph_id);
+                ten = locator->getLocalParamSegment(pid); // fp32 param grad
             } else {
                 ten = getParamTensor(pid);
             }
