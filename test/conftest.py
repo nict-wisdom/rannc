@@ -35,6 +35,9 @@ def init_dist(request):
         rank=rank,
         world_size=world_size)
 
+
+@pytest.fixture(scope="function")
+def init_seed(request):
     seed = int(request.config.getoption('--seed'))
     random.seed(seed)
     np.random.seed(seed)

@@ -108,11 +108,15 @@ def convert_dtype(t, dtype):
     return t
 
 
-def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
+def do_run(model_cls, batch_size_per_proc, num_iter,
            trace, fwd, aggregate, bwd, dtype, use_amp, allreduce_amp_master_params,
            enable_zero, rtol, atol, get_dataset,
            **kwargs):
-    print("Starting test using {}".format(model_base.__class__.__name__))
+    print("Starting test using {}".format(model_cls.__name__))
+
+    model_base = model_cls()
+    input_dim = model_base.INPUT_DIM
+    output_dim = model_base.OUTPUT_DIM
 
     device = torch.cuda.current_device()
 
@@ -282,6 +286,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     r_opt.load_state_dict(global_opt_state_dict, from_global=True)
 
     pyrannc.clear()
+    pyrannc.barrier()
     print("Done")
 
 
@@ -296,7 +301,7 @@ def run(model_base, batch_size_per_proc, num_iter,
             torch.distributed.all_reduce(tmp_loss)
             tmp_loss /= pyrannc.get_world_size()
             return tmp_loss
-        do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
+        do_run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: torch.jit.trace(model, (x, tgt)),
                lambda model, x, tgt: model(x, tgt),
                aggregate_out_loss,
@@ -304,7 +309,7 @@ def run(model_base, batch_size_per_proc, num_iter,
                dtype, use_amp, allreduce_amp_master_params, enable_zero, rtol, atol, get_dataset, **kwargs)
 
     else:
-        do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
+        do_run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: torch.jit.trace(model, (x,)),
                lambda model, x, tgt: model(x),
                lambda out: out,
