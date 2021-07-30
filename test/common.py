@@ -1,4 +1,5 @@
 import copy
+import inspect
 
 import numpy as np
 import torch
@@ -13,10 +14,8 @@ import pyrannc
 import pyrannc.amp
 
 
-ASSERT_DECIMAL = 3
-seed = 0
 RELATIVE_TOLERANCE = 1e-2
-ABSOLUTE_TOLERANCE = 1e-4
+ABSOLUTE_TOLERANCE = 0
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -112,6 +111,8 @@ def convert_dtype(t, dtype):
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
            trace, fwd, aggregate, bwd, dtype, use_amp, rtol, atol, get_dataset,
            **kwargs):
+    print("Starting test using {}".format(model_base.__class__.__name__))
+
     device = torch.cuda.current_device()
 
     model = copy.deepcopy(model_base)
@@ -236,29 +237,28 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        dtype=torch.float, use_amp=False,
+        dtype=torch.float, loss_out=False, use_amp=False,
         rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
-    do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           lambda model, x, tgt: torch.jit.trace(model, (x,)),
-           lambda model, x, tgt: model(x),
-           lambda out: out,
-           bwd_with_criterion,
-           dtype, use_amp, rtol, atol, get_dataset, **kwargs)
 
+    if loss_out:
+        def aggregate_out_loss(out):
+            tmp_loss = out.clone()
+            torch.distributed.all_reduce(tmp_loss)
+            tmp_loss /= pyrannc.get_world_size()
+            return tmp_loss
+        do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
+               lambda model, x, tgt: torch.jit.trace(model, (x, tgt)),
+               lambda model, x, tgt: model(x, tgt),
+               aggregate_out_loss,
+               bwd_loss_output,
+               dtype, use_amp, rtol, atol, get_dataset, **kwargs)
 
-def run_loss(model_base, batch_size_per_proc, num_iter,
-             dtype=torch.float, use_amp=False,
-             rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
-             get_dataset=None, **kwargs):
-    def aggregate_out_loss(out):
-        tmp_loss = out.clone()
-        torch.distributed.all_reduce(tmp_loss)
-        tmp_loss /= pyrannc.get_world_size()
-        return tmp_loss
-    do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
-           lambda model, x, tgt: torch.jit.trace(model, (x, tgt)),
-           lambda model, x, tgt: model(x, tgt),
-           aggregate_out_loss,
-           bwd_loss_output,
-           dtype, use_amp, rtol, atol, get_dataset, **kwargs)
+    else:
+        do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
+               lambda model, x, tgt: torch.jit.trace(model, (x,)),
+               lambda model, x, tgt: model(x),
+               lambda out: out,
+               bwd_with_criterion,
+               dtype, use_amp, rtol, atol, get_dataset, **kwargs)
+

@@ -1,52 +1,37 @@
+import pytest
+
 from . import common, models
 
+default_vals = {
+    "rtol": 1e-2,
+    "atol": 0,
+    "get_dataset": None,
+    "loss_out": False
+}
 
-def test_basic(init_dist, batch_size, iteration):
-    print("test_basic")
-    common.run(models.BasicModel(), batch_size, iteration)
+test_models = [
+    {"model": models.BasicModel(), "rtol": 5e-2},
+    {"model": models.SmallParamModel()},
+    {"model": models.ForkJoinModel()},
+    {"model": models.SharedParamModel()},
+    {"model": models.OneOpModel()},
+    {"model": models.TensorMulModel()},
+    {"model": models.EmbeddingModel(), "get_dataset": models.EmbeddingModel.get_dataset},
+    {"model": models.FunctionModel(), "get_dataset": models.FunctionModel.get_dataset},
+    {"model": models.LossOutModel(), "loss_out": True}
+]
 
+@pytest.mark.parametrize("test_model", test_models)
+def test_match(init_dist, batch_size, iteration, test_model):
 
-def test_small_param(init_dist, batch_size, iteration):
-    print("test_small_param")
-    common.run(models.SmallParamModel(), batch_size, iteration)
+    for k, v in default_vals.items():
+        if k not in test_model:
+            test_model[k] = v
 
-
-def test_fork_join(init_dist, batch_size, iteration):
-    print("test_fork_join")
-    common.run(models.ForkJoinModel(), batch_size, iteration)
-
-
-def test_shared_param(init_dist, batch_size, iteration):
-    print("test_shared_param")
-    common.run(models.SharedParamModel(), batch_size, iteration)
-
-
-def test_one_op(init_dist, batch_size, iteration):
-    print("test_one_op")
-    common.run(models.OneOpModel(), batch_size, iteration)
-
-
-def test_tensor_mul(init_dist, batch_size, iteration):
-    print("test_tensor_mul")
-    common.run(models.TensorMulModel(), batch_size, iteration)
-
-
-def test_emb(init_dist, batch_size, iteration):
-    print("test_emb")
-    common.run(models.EmbeddingModel(), batch_size, iteration, get_dataset=models.EmbeddingModel.get_dataset)
-
-
-def test_function(init_dist, batch_size, iteration):
-    print("test_function")
-    common.run(models.FunctionModel(), batch_size, iteration, get_dataset=models.FunctionModel.get_dataset)
-
-
-# def test_identity(init_dist, batch_size, iteration):
-#     print("test_identity")
-#     common.run(models.IdentityModel(), batch_size, iteration)
-
-
-def test_loss_out(init_dist, batch_size, iteration):
-    print("test_loss_out")
-    common.run_loss(models.LossOutModel(), batch_size, iteration)
+    common.run(test_model["model"], batch_size, iteration,
+               loss_out=test_model["loss_out"],
+               rtol=test_model["rtol"],
+               atol=test_model["atol"],
+               get_dataset=test_model["get_dataset"]
+               )
 

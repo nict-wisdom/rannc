@@ -15,11 +15,16 @@ def load_dist_param(pid):
 
 
 class DistributeModelParams(object):
-    def __init__(self):
-       print("DistributeModelParams init")
+
+    def __init__(self, enable=True):
+        print("DistributeModelParams init")
+        self.enable = enable
 
     def __enter__(self):
-        print("DistributeModelParams __enter__")
+        print("DistributeModelParams __enter__: enable={}".format(self.enable))
+
+        if not self.enable:
+            return
 
         def add_post_process(f):
             @functools.wraps(f)
