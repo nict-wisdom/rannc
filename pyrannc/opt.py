@@ -126,7 +126,13 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_ze
         new_param_state = {}
         all_item_names = tensor_item_names + non_tensor_item_names
         for k in sorted(all_item_names):
-            v = state_dict["state"][global_order][k] if _pyrannc.get_rank() in ranks else None
+            v = None
+            if _pyrannc.get_rank() in ranks:
+                if global_order in state_dict["state"]:
+                    v = state_dict["state"][global_order][k]
+                else:
+                    # The size of the segment is zero
+                    v = optimizer.param_zero_dummy[global_order]
             if k in tensor_item_names:
                 if enable_zero:
                     if pyrannc.get_rank() in ranks:
@@ -204,22 +210,34 @@ def patch_optimizer(model, optimizer):
     global_order = 0
     param_zero_range = {}
     param_zero_segment_to_id = {}
+    param_zero_dummy = {}
     for param_group in optimizer.param_groups:
         params = []
 
         for p in param_group['params']:
             pid = id(p)
             if pid in model.used_param_ids:
+                skip = False
                 if model.enable_zero:
                     p = model.get_local_param_segment(pid)
                     range = model.get_local_param_range(pid)
                     param_zero_range[pid] = slice(range[0], range[1])
                     param_zero_segment_to_id[p] = pid
 
-                params.append(p)
-                order_local_to_global[local_order] = global_order
-                used_param_global_order.append(global_order)
-                local_order += 1
+                    # We skip parameter segments whose size is zero.
+                    # PyTorch's optimizers can process params without an element, but
+                    # Apex Amp's unscaling using multi_tensor_apply produces incorrect results.
+                    if range[0] == range[1]:
+                        skip = True
+                        # Record tensor with no element. This is used when saving state_dict.
+                        # Keeping only dtype should work.
+                        param_zero_dummy[global_order] = torch.empty_like(p)
+
+                if not skip:
+                    params.append(p)
+                    order_local_to_global[local_order] = global_order
+                    used_param_global_order.append(global_order)
+                    local_order += 1
 
             global_order_to_id[global_order] = pid
             global_order += 1
@@ -232,6 +250,7 @@ def patch_optimizer(model, optimizer):
     optimizer.global_order_to_id = global_order_to_id
     optimizer.param_zero_segment_to_id = param_zero_segment_to_id
     optimizer.param_zero_range = param_zero_range
+    optimizer.param_zero_dummy = param_zero_dummy
 
     # replace state_dict and load_state_dict
     old_state_dict = optimizer.state_dict

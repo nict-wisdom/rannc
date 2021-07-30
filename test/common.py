@@ -55,8 +55,8 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, 
         zero_ranges = {n: opt_act.param_zero_range[id(p)] for n, p in model_act.named_parameters()}
 
     if fp16:
-        expected_master_params = pyrannc.amp.named_master_params(model_exp, opt_exp)
-        actual_master_params = pyrannc.amp.named_master_params(model_act, opt_act, zero)
+        expected_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)}
+        actual_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_act, opt_act, zero)}
 
         for n, rp in actual_master_params.items():
             p = expected_master_params[n]

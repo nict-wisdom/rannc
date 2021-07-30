@@ -25,6 +25,20 @@ if not torch.cuda.is_available():
     sys.exit(0)
 
 
+class BertLayerNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        super(BertLayerNorm, self).__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, x):
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
+        return self.weight * x + self.bias
+
+
 class Net(nn.Module):
 
     INPUT_DIM = (3,)
@@ -35,6 +49,7 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(3, 2, bias=False)
         w1 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], requires_grad=True)
         self.fc1.weight = torch.nn.Parameter(w1)
+        self.norm = BertLayerNorm(2)
         self.fc2 = nn.Linear(2, 3, bias=False)
         w2 = torch.tensor([[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]], requires_grad=True)
         self.fc2.weight = torch.nn.Parameter(w2)
@@ -42,6 +57,7 @@ class Net(nn.Module):
 
     def forward(self, x, tgt):
         x = self.fc1(x)
+        x = self.norm(x.float()).half()
         x = self.fc2(x)
         loss = self.criterion(x, tgt)
         return loss
@@ -62,28 +78,42 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     lr = 0.01
 
     model_base = model_base.to(device)
+
+    def norm_to_float(module):
+        for name, _module in module.named_modules():
+            if name.endswith('norm'.lower()):
+                print("changing to fp32={}".format(name))
+                _module.float()
+
     rmodel_base = copy.deepcopy(model_base)
 
     opt_base = optim.Adam(model_base.parameters(), lr=lr)
     model, opt = amp.initialize(model_base, opt_base, opt_level="O2",
                                 loss_scale=LOSS_SCALE, master_weights=True)
+    norm_to_float(model)
+    ddp_model = None
 
     ropt_base = optim.Adam(rmodel_base.parameters(), lr=lr)
     rmodel_base, ropt = amp.initialize(rmodel_base, ropt_base, opt_level="O2",
                                        loss_scale=LOSS_SCALE, master_weights=True)
-    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, enable_apex_amp=True, enable_zero=True, allreduce_amp_master_param=True)
+    norm_to_float(rmodel_base)
+    enable_zero = True
+    rmodel = pyrannc.RaNNCModule(rmodel_base, ropt, enable_apex_amp=True, enable_zero=enable_zero, allreduce_amp_master_param=True)
 
     # we manually run allreduce
     pyrannc.delay_grad_allreduce(True)
 
+    i = 0
     lr = 0.01
-    ddp_model = None
     for x, tgt in data_loader:
+        print("i={}".format(i))
+        i += 1
+
         # Create test input
         x = x.to(device)
         tgt = tgt.to(device)
 
-        if not ddp_model:
+        if ddp_model is None:
             jit_model = torch.jit.trace(model, (x, tgt))
             ddp_model = torch.nn.parallel.DistributedDataParallel(jit_model, device_ids=[device], output_device=device)
 
@@ -107,12 +137,13 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         pyrannc.allreduce_grads(rmodel, ropt)
         rmodel.clip_grad_norm(1.0)
 
-        common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=True, opt_exp=opt, opt_act=ropt)
+        common.compare_params(model, rmodel, rtol, atol, fp16=True, zero=enable_zero, opt_exp=opt, opt_act=ropt)
+        common.compare_grads(model, rmodel, rtol, atol, fp16=True, zero=enable_zero, opt_exp=opt, opt_act=ropt)
 
         opt.step()
         ropt.step()
 
-        common.compare_params(model, rmodel, rtol, atol, fp16=True, zero=True, opt_exp=opt, opt_act=ropt)
+        common.compare_params(model, rmodel, rtol, atol, fp16=True, zero=enable_zero, opt_exp=opt, opt_act=ropt)
 
         opt.zero_grad()
         ropt.zero_grad()
@@ -136,7 +167,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
     ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
                                       loss_scale="dynamic", master_weights=True)
-    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True, enable_zero=True)
+    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True, enable_zero=enable_zero)
 
     # Verify parameters
     r_params = {n: p for n, p in rmodel.named_parameters()}
