@@ -156,7 +156,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, **module_args)
 
-    compare_params(model, rmodel, rtol, atol, use_amp)
+    compare_params(model, rmodel, rtol, atol, False)
 
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for x, tgt in data_loader:
@@ -194,7 +194,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             if gather_inputs or pyrannc.get_rank() == 0:
                 if enable_zero:
                     rmodel._sync_orig_params(sync_grad=True)
-                compare_grads(model, rmodel, rtol, atol, use_amp)
+                compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
             opt.step()
             r_opt.step()
@@ -204,10 +204,10 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         if gather_inputs or pyrannc.get_rank() == 0:
             if enable_zero:
                 rmodel._sync_orig_params()
-            compare_params(model, rmodel, rtol, atol, use_amp)
+            compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
     if gather_inputs or pyrannc.get_rank() == 0:
-        compare_params(model, rmodel, rtol, atol, use_amp)
+        compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
     if not has_param:
         print("Done")
@@ -230,9 +230,14 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     loaded_state_dict = torch.load('model.pt')
     ld_model.load_state_dict(loaded_state_dict)
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
-    # ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
-    #                                   loss_scale="dynamic", master_weights=True)
-    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True, enable_zero=enable_zero)
+
+    if use_amp:
+        ld_model = ld_model.to(device)
+        ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
+                                       max_loss_scale=2.**4,
+                                       min_loss_scale=1)
+
+    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=use_amp, **module_args)
 
     # Verify parameters
     r_params = {n: p for n, p in rmodel.named_parameters()}

@@ -21,8 +21,10 @@ test_models = [
     {"model": models.LossOutModel(), "loss_out": True}
 ]
 
+
 @pytest.mark.parametrize("test_model", test_models)
-def test_match(init_dist, batch_size, iteration, test_model):
+@pytest.mark.parametrize("use_amp", [False, True])
+def test_match(init_dist, batch_size, iteration, test_model, use_amp):
 
     for k, v in default_vals.items():
         if k not in test_model:
@@ -30,6 +32,7 @@ def test_match(init_dist, batch_size, iteration, test_model):
 
     common.run(test_model["model"], batch_size, iteration,
                loss_out=test_model["loss_out"],
+               use_amp=use_amp,
                rtol=test_model["rtol"],
                atol=test_model["atol"],
                get_dataset=test_model["get_dataset"]
