@@ -257,7 +257,7 @@ def patch_optimizer(model, optimizer):
 
     def new_state_dict(opt, from_global=False, **kwargs):
         if from_global:
-            global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=model.use_amp_master_params,
+            global_opt_state_dict, _ = gather_optimizer_state_dict(opt, use_amp_master_param=model.enable_apex_amp,
                                                                    enable_zero=model.enable_zero, **kwargs)
             return global_opt_state_dict
         else:

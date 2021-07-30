@@ -209,31 +209,69 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if gather_inputs or pyrannc.get_rank() == 0:
         compare_params(model, rmodel, rtol, atol, use_amp)
 
-    ddp_model = None
-    model.eval()
-    rmodel.eval()
+    if not has_param:
+        print("Done")
+        return
 
-    for x, tgt in data_loader:
-        x = x.to(device)
-        tgt = tgt.to(device)
+    # Save model & opt
+    # state_dict should run on all ranks
+    model_state_dict = rmodel.state_dict()
+    global_opt_state_dict = r_opt.state_dict(from_global=True)
 
-        if not ddp_model:
-            jit_model = trace(model, x, tgt)
-            if has_param:
-                ddp_model = torch.nn.parallel.DistributedDataParallel(
-                    jit_model, device_ids=[device],
-                    output_device=device)
+    if pyrannc.get_rank() == 0:
+        torch.save(model_state_dict, 'model.pt')
+        torch.save(global_opt_state_dict, 'opt_state.pt')
+        rmodel.save_deployment(str("rannc_deployment.bin"))
+
+    pyrannc.barrier()
+
+    ld_model = copy.deepcopy(model_base)
+
+    loaded_state_dict = torch.load('model.pt')
+    ld_model.load_state_dict(loaded_state_dict)
+    ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
+    # ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
+    #                                   loss_scale="dynamic", master_weights=True)
+    ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=True, enable_zero=enable_zero)
+
+    # Verify parameters
+    r_params = {n: p for n, p in rmodel.named_parameters()}
+    ld_params = {n: p for n, p in ld_model.named_parameters()}
+
+    for n, rp in r_params.items():
+        ld_p = ld_params[n]
+        compare_tensors(rp, ld_p, rtol, atol)
+
+    global_opt_state_dict = torch.load('opt_state.pt')
+    opt_state_dict = opt.state_dict()
+
+    for ld_grp, pt_grp in zip(global_opt_state_dict['param_groups'], opt_state_dict['param_groups']):
+        np.testing.assert_(ld_grp.keys(), pt_grp.keys())
+        for k in pt_grp.keys():
+            if k == 'params':
+                np.testing.assert_equal(len(ld_grp['params']), len(pt_grp['params']))
             else:
-                ddp_model = jit_model
+                np.testing.assert_(ld_grp[k] == pt_grp[k])
 
-        p_out = fwd(ddp_model, x, tgt)
-        agg_out = aggregate(p_out)
-        r_out = fwd(rmodel, convert_dtype(x, dtype), convert_dtype(tgt, dtype))
+        for ld_pid, pt_pid in zip(ld_grp['params'], pt_grp['params']):
+            ld_param_state = global_opt_state_dict['state'][ld_pid]
+            pt_param_state = opt_state_dict['state'][pt_pid]
+            np.testing.assert_(ld_param_state.keys() == pt_param_state.keys())
+            for k in pt_param_state.keys():
+                ldv = ld_param_state[k]
+                pv = pt_param_state[k]
+                if isinstance(ldv, torch.Tensor):
+                    compare_tensors(ldv, pv, rtol, atol)
+                    # np.testing.assert_equal(ldv.numel(), pv.numel())
+                    # np.testing.assert_almost_equal(ldv.flatten().tolist(), pv.flatten().tolist(), decimal=ASSERT_DECIMAL)
+                else:
+                    np.testing.assert_(ldv == pv)
 
-        if gather_inputs or pyrannc.get_rank() == 0:
-            compare_tensors(r_out, agg_out, rtol, atol)
+
+    r_opt.load_state_dict(global_opt_state_dict, from_global=True)
 
     pyrannc.clear()
+    print("Done")
 
 
 def run(model_base, batch_size_per_proc, num_iter,
