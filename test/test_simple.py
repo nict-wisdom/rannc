@@ -1,6 +1,6 @@
 import pytest
 
-from . import common, models
+from . import common, models, native_models
 
 default_vals = {
     "rtol": 1e-2,
@@ -16,6 +16,7 @@ test_models = [
     {"model": models.SharedParamModel()},
     {"model": models.OneOpModel()},
     {"model": models.TensorMulModel()},
+    # {"model": native_models.NativeCallModel01()}, # compiles module
     {"model": models.EmbeddingModel(), "get_dataset": models.EmbeddingModel.get_dataset},
     {"model": models.FunctionModel(), "get_dataset": models.FunctionModel.get_dataset},
     {"model": models.LossOutModel(), "loss_out": True}
