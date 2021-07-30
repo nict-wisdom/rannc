@@ -47,9 +47,13 @@ namespace rannc {
     }
 
     void NCCLBulkJobExecutor::addPreCommJob(std::function<void(void)> f) {
+        if (run_immediate_) {
+            ncclGroupStart();
+        }
         doAddJob(f, pre_comm_jobs_);
         if (run_immediate_) {
             ncclGroupEnd();
+            syncStream();
         }
     }
     void NCCLBulkJobExecutor::addCommJob(std::function<void(void)> f) {
@@ -63,10 +67,13 @@ namespace rannc {
         }
     }
     void NCCLBulkJobExecutor::addPostCommJob(std::function<void(void)> f) {
+        if (run_immediate_) {
+            ncclGroupStart();
+        }
         doAddJob(f, post_comm_jobs_);
-        syncStream();
         if (run_immediate_) {
             ncclGroupEnd();
+            syncStream();
         }
     }
 
