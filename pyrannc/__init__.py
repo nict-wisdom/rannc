@@ -196,7 +196,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     """
 
     def __init__(self, model, optimizer=None, gather_inputs=True, load_deployment=None, enable_apex_amp=False,
-                 allreduce_amp_master_param=False, enable_zero=False, check_unused_values=True):
+                 allreduce_amp_master_params=False, enable_zero=False, check_unused_values=True):
         r"""
         :param model: Model to distribute.
         :param optimizer: Optimizer that should work with RaNNC.
@@ -222,11 +222,11 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         self.gather_inputs = gather_inputs
         self.amp_master_param_registered = False
         self.load_deployment = load_deployment
-        self.allreduce_amp_master_param = allreduce_amp_master_param
+        self.allreduce_amp_master_params = allreduce_amp_master_params
         self.enable_apex_amp = enable_apex_amp
         self.enable_zero = enable_zero
 
-        super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_param, enable_zero, check_unused_values)
+        super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_params, enable_zero, check_unused_values)
 
     def __call__(self, *args, **kwargs):
         if len(kwargs) > 0:

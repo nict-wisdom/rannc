@@ -109,7 +109,8 @@ def convert_dtype(t, dtype):
 
 
 def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
-           trace, fwd, aggregate, bwd, dtype, use_amp, rtol, atol, get_dataset,
+           trace, fwd, aggregate, bwd, dtype, use_amp, allreduce_amp_master_params,
+           enable_zero, rtol, atol, get_dataset,
            **kwargs):
     print("Starting test using {}".format(model_base.__class__.__name__))
 
@@ -150,13 +151,12 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
     if "gather_inputs" in kwargs:
         gather_inputs = module_args["gather_inputs"] = kwargs["gather_inputs"]
 
-    enable_zero = False
-    if "enable_zero" in kwargs:
-        enable_zero = module_args["enable_zero"] = kwargs["enable_zero"]
-
-    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, **module_args)
+    rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, enable_zero=enable_zero,
+                                 allreduce_amp_master_params=allreduce_amp_master_params, **module_args)
 
     compare_params(model, rmodel, rtol, atol, False)
+
+    pyrannc.delay_grad_allreduce(allreduce_amp_master_params)
 
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for x, tgt in data_loader:
@@ -190,6 +190,9 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
         if has_param:
             bwd(p_out, tgt, opt, use_amp)
             bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
+
+            if allreduce_amp_master_params:
+                pyrannc.allreduce_grads(rmodel, r_opt)
 
             if gather_inputs or pyrannc.get_rank() == 0:
                 if enable_zero:
@@ -280,7 +283,7 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        dtype=torch.float, loss_out=False, use_amp=False,
+        dtype=torch.float, loss_out=False, use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
         rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
 
@@ -295,7 +298,7 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x, tgt),
                aggregate_out_loss,
                bwd_loss_output,
-               dtype, use_amp, rtol, atol, get_dataset, **kwargs)
+               dtype, use_amp, allreduce_amp_master_params, enable_zero, rtol, atol, get_dataset, **kwargs)
 
     else:
         do_run(model_base, batch_size_per_proc, model_base.INPUT_DIM, model_base.OUTPUT_DIM, num_iter,
@@ -303,5 +306,5 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x),
                lambda out: out,
                bwd_with_criterion,
-               dtype, use_amp, rtol, atol, get_dataset, **kwargs)
+               dtype, use_amp, allreduce_amp_master_params, enable_zero, rtol, atol, get_dataset, **kwargs)
 
