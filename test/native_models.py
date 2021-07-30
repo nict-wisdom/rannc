@@ -25,14 +25,12 @@ torch.utils.cpp_extension.load_inline(
 
 
 def native_compute_trace(z):
-    z = torch.ops.test_ops.d_sigmoid(z)
-    return  z
+    return torch.ops.test_ops.d_sigmoid(z)
 
 
 @torch.jit.script
 def native_compute_script(z):
-    z = torch.ops.test_ops.d_sigmoid(z)
-    return  z
+    return torch.ops.test_ops.d_sigmoid(z)
 
 
 class NativeCallModel01(torch.nn.Module):

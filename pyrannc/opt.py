@@ -232,6 +232,8 @@ def patch_optimizer(model, optimizer):
                         # Record tensor with no element. This is used when saving state_dict.
                         # Keeping only dtype should work.
                         param_zero_dummy[global_order] = torch.empty_like(p)
+                        if model.enable_apex_amp:
+                            param_zero_dummy[global_order] = param_zero_dummy[global_order].to(torch.float).detach()
 
                 if not skip:
                     params.append(p)

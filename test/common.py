@@ -194,6 +194,9 @@ def do_run(model_base, batch_size_per_proc, input_dim, output_dim, num_iter,
             if allreduce_amp_master_params:
                 pyrannc.allreduce_grads(rmodel, r_opt)
 
+            torch.nn.utils.clip_grad_norm_(amp.master_params(opt), 1.0)
+            rmodel.clip_grad_norm(1.0)
+
             if gather_inputs or pyrannc.get_rank() == 0:
                 if enable_zero:
                     rmodel._sync_orig_params(sync_grad=True)
