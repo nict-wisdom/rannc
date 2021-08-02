@@ -186,11 +186,10 @@ namespace rannc {
 
         const auto& clone_results = cloneSharedInputs(irGraph);
         clone_input_ir_graphs_[id] = clone_results.first;
-//        const std::shared_ptr<rannc::IRGraph> input_cloned_graph = clone_results.first;
         input_clone_names_[id] = clone_results.second;
 
 //        std::stringstream ss;
-//        ss << *input_cloned_graph;
+//        ss << *clone_results.first;
 //        spdlog::info("shared_in_graph: {}", ss.str());
 
         ConvertGraph cg;

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-MPI_OPTS=${MPI_OPTS:-}
+#MPI_OPTS=${MPI_OPTS:-"-x LD_PRELOAD=/lustre1/home/mtnk/work/nccl_v2.9.9-1/build/lib/libnccl.so --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll"}
+MPI_OPTS=${MPI_OPTS:-"--mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll"}
 
 export PYTEST=${PYTEST:-pytest}
 

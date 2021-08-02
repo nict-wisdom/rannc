@@ -6,7 +6,7 @@ from . import _pyrannc
 
 
 def store_dist_param(p):
-    _pyrannc.store_dist_param(p)
+    p.data = _pyrannc.store_dist_param(p)
     p.distributed = True
 
 
@@ -14,11 +14,22 @@ def load_dist_param(pid):
     return _pyrannc.load_dist_param(pid)
 
 
+def set_dist_param(pid, src):
+    _pyrannc.set_dist_param(pid, src)
+
+
+def get_dist_param_range(pid):
+    range = _pyrannc.get_dist_param_range(pid)
+    return slice(range[0], range[1])
+
+
 class DistributeModelParams(object):
 
-    def __init__(self, enable=True):
+    def __init__(self, target_cls, enable=True):
         print("DistributeModelParams init")
+        self.target_cls = target_cls
         self.enable = enable
+        self.hooks = []
 
     def __enter__(self):
         print("DistributeModelParams __enter__: enable={}".format(self.enable))
@@ -41,6 +52,8 @@ class DistributeModelParams(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         print("DistributeModelParams __exit__")
+        for subclass in torch.nn.modules.module.Module.__subclasses__():
+            subclass.__init__ = subclass._old_init
 
     def _store_dist_params(self, model):
         print("Storing params by DistributeModelParams: {}".format(model.__class__.__name__))

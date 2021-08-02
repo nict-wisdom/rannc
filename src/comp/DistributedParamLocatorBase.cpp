@@ -87,7 +87,7 @@ namespace rannc {
 
         at::TensorOptions options;
         options = options.dtype(tensor_part.dtype())
-                .requires_grad(tensor_part.requires_grad())
+                .requires_grad(false)
                 .device(c10::Device(c10::DeviceType::CUDA));
         at::Tensor buf = torch::zeros({(int64_t)(segment_sizes_.at(pid)*ranks.size())}, options);
 
@@ -95,14 +95,19 @@ namespace rannc {
         int tag = tag_map.getRankSetTag(ranks);
         nccl_.createCommunicator(tag, ranks);
 
-        at::NoGradGuard no_grad;
-
+        // An error occurs when tensor_part's requires_grad is true.
+        bool requires_grad = tensor_part.requires_grad();
+        tensor_part.set_requires_grad(false);
         at::Tensor sendbuf = torch::zeros({(int64_t)(segment_sizes_.at(pid))}, options);
-        sendbuf.narrow(0, 0, tensor_part.numel()).copy_(tensor_part);
+        auto sendbuf_view = sendbuf.narrow(0, 0, tensor_part.numel());
+        sendbuf_view.copy_(tensor_part);
+        // Recover the flag
+        tensor_part.set_requires_grad(requires_grad);
+
         nccl_.allgather(tag, {sendbuf}, {buf});
 
         return buf.narrow(0, 0, productDim(ir_type.getTensorDim()))
                 .view(ir_type.getTensorDim())
-                .cpu().detach();
+                .cpu().detach().set_requires_grad(requires_grad);
     }
 }

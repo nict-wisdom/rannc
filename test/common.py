@@ -43,6 +43,24 @@ def compare_tensors(v1, v2, rtol, atol):
     np.testing.assert_allclose(v1.tolist(), v2.tolist(), rtol=rtol, atol=atol)
 
 
+def compare_dist_params(model_exp, model_act, rtol, atol):
+    if hasattr(model_exp, "module"): # ddp model
+        model_exp = model_exp.module
+
+    expected_params = {n: p for n, p in model_exp.named_parameters()}
+    actual_params = {n: p for n, p in model_act.named_parameters()}
+
+    dist_param_ranges = {n: pyrannc.get_dist_param_range(id(p)) for n, p in model_act.named_parameters()}
+    for n, range in dist_param_ranges.items():
+        print("dist_param_ranges: {} {}".format(n, range))
+
+    for n, rp in actual_params.items():
+        p = expected_params[n]
+        v_a = rp.flatten()
+        v_e = p.flatten()[dist_param_ranges[n]]
+        compare_tensors(v_a, v_e, rtol, atol)
+
+
 def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, opt_act):
     if hasattr(model_exp, "module"): # ddp model
         model_exp = model_exp.module
@@ -110,7 +128,7 @@ def convert_dtype(t, dtype):
 
 def do_run(model_cls, batch_size_per_proc, num_iter,
            trace, fwd, aggregate, bwd, dtype, use_amp, allreduce_amp_master_params,
-           enable_zero, rtol, atol, get_dataset,
+           enable_zero, dist_params, rtol, atol, get_dataset,
            **kwargs):
     print("Starting test using {}".format(model_cls.__name__))
 
@@ -133,9 +151,17 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                                               max_loss_scale=2.**4,
                                               min_loss_scale=1)
 
-    # We copy the model for verification of parameter update.
-    # You may not need to copy the model in your application.
-    rmodel = copy.deepcopy(model_base)
+    if dist_params:
+        with pyrannc.DistributeModelParams(model_cls):
+            rmodel = model_cls()
+
+        base_named_params = {n: p for n, p in model.named_parameters()}
+        for n, p in rmodel.named_parameters():
+            pyrannc.set_dist_param(id(p), base_named_params[n])
+    else:
+        # We copy the model for verification of parameter update.
+        rmodel = copy.deepcopy(model_base)
+
     rmodel.to(dtype)
 
     r_opt = None
@@ -158,7 +184,10 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, enable_zero=enable_zero,
                                  allreduce_amp_master_params=allreduce_amp_master_params, **module_args)
 
-    compare_params(model, rmodel, rtol, atol, False)
+    if dist_params:
+        compare_dist_params(model, rmodel, rtol, atol)
+    else:
+        compare_params(model, rmodel, rtol, atol, False)
 
     pyrannc.delay_grad_allreduce(allreduce_amp_master_params)
 
@@ -292,7 +321,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
 
 def run(model_base, batch_size_per_proc, num_iter,
         dtype=torch.float, loss_out=False, use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
-        rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
+        dist_params=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
 
     if loss_out:
@@ -306,7 +335,8 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x, tgt),
                aggregate_out_loss,
                bwd_loss_output,
-               dtype, use_amp, allreduce_amp_master_params, enable_zero, rtol, atol, get_dataset, **kwargs)
+               dtype, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               rtol, atol, get_dataset, **kwargs)
 
     else:
         do_run(model_base, batch_size_per_proc, num_iter,
@@ -314,5 +344,6 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x),
                lambda out: out,
                bwd_with_criterion,
-               dtype, use_amp, allreduce_amp_master_params, enable_zero, rtol, atol, get_dataset, **kwargs)
+               dtype, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               rtol, atol, get_dataset, **kwargs)
 

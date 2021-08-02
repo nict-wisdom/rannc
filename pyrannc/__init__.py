@@ -12,7 +12,7 @@ import torch.random
 from . import _pyrannc
 
 from .opt import patch_optimizer
-from .zero_param import store_dist_param, load_dist_param, DistributeModelParams
+from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, DistributeModelParams
 
 # Run backward to set python engine as the default engine
 x = torch.randn(2, 2, requires_grad=True)

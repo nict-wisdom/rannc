@@ -12,7 +12,7 @@
 
 namespace rannc {
 
-    void DistributedParamLocator::store(long pid, const at::Tensor& param) {
+    at::Tensor DistributedParamLocator::store(long pid, const at::Tensor& param) {
         const auto ranks = mpi::getAllRanks();
         doRegister(pid, param, ranks);
 
@@ -35,12 +35,32 @@ namespace rannc {
             dst_buf.copy_(src_buf);
         }
         param_parts_[pid] = part_tensor;
+        return param_parts_[pid];
     }
 
     at::Tensor DistributedParamLocator::load(long pid) {
         assert(contains(param_parts_, pid));
         auto param_part = param_parts_.at(pid);
         return gather(param_part, pid);
+    }
+
+    void DistributedParamLocator::set(long pid, const at::Tensor& src) {
+
+        const auto ranks = mpi::getAllRanks();
+        int local_rank = getLocalRank(ranks, mpi::getRank());
+
+        assert(contains(src_sizes_, pid));
+        int64_t src_size = src_sizes_.at(pid).at(local_rank);
+
+        if (src_size > 0) {
+            torch::NoGradGuard no_grad;
+
+            int64_t offset = offsets_.at(pid).at(local_rank);
+            auto src_buf = torch::flatten(src).slice(0, offset, offset + src_size);
+            assert(contains(param_parts_, pid));
+            auto param_part = param_parts_.at(pid);
+            param_part.copy_(src_buf);
+        }
     }
 
     void DistributedParamLocator::fetchStart() {

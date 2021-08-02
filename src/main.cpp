@@ -175,6 +175,17 @@ PYBIND11_MODULE(_pyrannc, m) {
         return zpl.load(pid);
     });
 
+    m.def("set_dist_param", [](long pid, py::object& param) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        const auto ten = py::cast<at::Tensor>(param);
+        return zpl.set(pid, ten);
+    });
+
+    m.def("get_dist_param_range", [](long pid) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        return zpl.getSegmentRange(pid);
+    });
+
     m.def("get_param_ranks", [](long pid) {
         auto r = RaNNCFactory::get();
         auto param_storage = r->getParamStorage();

@@ -770,8 +770,8 @@ namespace rannc {
             if (distributed(param_id)) {
                 DistributedParamLocator& zpl = DistributedParamLocator::get();
                 at::Tensor &param_tensor = params_.at(param_id);
+                at::Tensor zero_param_tensor = zpl.load(param_id);
                 if (contains(param_ranks, mpi::getRank())) {
-                    at::Tensor zero_param_tensor = zpl.load(param_id);
                     param_tensor.set_data(zero_param_tensor);
                 } else {
                     param_tensor.set_data(torch::zeros({1}));

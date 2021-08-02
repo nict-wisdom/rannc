@@ -20,9 +20,10 @@ namespace rannc {
         DistributedParamLocator(DistributedParamLocator&&) = delete;
         DistributedParamLocator& operator=(DistributedParamLocator&&) = delete;
 
-        void store(long pid, const at::Tensor& param);
+        at::Tensor store(long pid, const at::Tensor& param);
         at::Tensor load(long pid);
         void remove(long pid);
+        void set(long pid, const at::Tensor& src);
 
         void fetchStart();
         at::Tensor fetch(long pid);

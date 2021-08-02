@@ -46,11 +46,7 @@ class SmallParamModel(nn.Module):
     def __init__(self):
         super(SmallParamModel, self).__init__()
         self.fc1 = nn.Linear(3, 2, bias=False)
-        w1 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], requires_grad=True)
-        self.fc1.weight = torch.nn.Parameter(w1)
         self.fc2 = nn.Linear(2, 3, bias=False)
-        w2 = torch.tensor([[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]], requires_grad=True)
-        self.fc2.weight = torch.nn.Parameter(w2)
 
     def forward(self, x):
         x = self.fc1(x)
