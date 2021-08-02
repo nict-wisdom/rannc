@@ -381,9 +381,10 @@ namespace rannc {
 
                                 grads.push_back(segment_fp32);
                             } else {
+                                // Unscale grad because amp does not unscale segments that this process does not own.
                                 const at::Tensor segment = locator->getSegment(pid, i, true);
                                 auto segment_fp32 = segment.to(at::ScalarType::Float, true);
-                                segment_fp32 = segment_fp32.mul(1 / loss_scale).detach();
+                                segment_fp32 = segment_fp32.mul_(1 / loss_scale).detach();
                                 grads.push_back(segment_fp32);
                             }
                         } else {
@@ -585,11 +586,8 @@ namespace rannc {
     void ParamStorage::clipGradNorm(const std::string& graph_id, double max_grad_norm, bool use_amp_master) {
 
         double global_norm = calcGradGlobalL2Norm(graph_id, use_amp_master) + 1e-6;
-        if (!std::isfinite(global_norm)) {
-            logger->warn("The total norm of gradients is not finite. Gradients are set to zero.");
-        }
 
-        if (global_norm > max_grad_norm || !std::isfinite(global_norm)) {
+        if (global_norm > max_grad_norm) {
             for (const auto &it: getParamIDs(graph_id, false)) {
                 long pid = it.second;
                 at::Tensor param;
@@ -604,12 +602,8 @@ namespace rannc {
                 }
 
                 if (param.grad().defined()) {
-                    if (std::isfinite(global_norm)) {
-                        double scale =  max_grad_norm / global_norm;
-                        param.grad().mul_(scale);
-                    } else {
-                        param.grad().zero_();
-                    }
+                    double scale =  max_grad_norm / global_norm;
+                    param.grad().mul_(scale);
                 }
             }
         }
