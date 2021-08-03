@@ -77,6 +77,7 @@ namespace rannc {
         assert(contains(ir_types_, pid));
         auto ir_type = ir_types_.at(pid);
         ir_types_[pid] = IRType::createTensorType(toTensorElemType(stype), ir_type.getTensorDim(), ir_type.requiresGrad());
+        param_parts_[pid].set_requires_grad(ir_type.requiresGrad());
     }
 
     void DistributedParamLocator::fetchStart() {
