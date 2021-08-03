@@ -51,8 +51,6 @@ def compare_dist_params(model_exp, model_act, rtol, atol):
     actual_params = {n: p for n, p in model_act.named_parameters()}
 
     dist_param_ranges = {n: pyrannc.get_dist_param_range(id(p)) for n, p in model_act.named_parameters()}
-    for n, range in dist_param_ranges.items():
-        print("dist_param_ranges: {} {}".format(n, range))
 
     for n, rp in actual_params.items():
         p = expected_params[n]

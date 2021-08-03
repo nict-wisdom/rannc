@@ -101,19 +101,9 @@ class ForkJoinModel(nn.Module):
     def __init__(self):
         super(ForkJoinModel, self).__init__()
         self.fc1 = nn.Linear(3, 3, bias=False)
-        w1 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]], requires_grad=True)
-        self.fc1.weight = torch.nn.Parameter(w1)
         self.fc2 = nn.Linear(3, 3, bias=False)
-        w2 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]], requires_grad=True)
-        self.fc2.weight = torch.nn.Parameter(w2)
-
         self.fc3 = nn.Linear(3, 3, bias=False)
-        w3 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]], requires_grad=True)
-        self.fc3.weight = torch.nn.Parameter(w3)
-
         self.fc4 = nn.Linear(3, 3, bias=False)
-        w4 = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]], requires_grad=True)
-        self.fc4.weight = torch.nn.Parameter(w4)
 
     def forward(self, x):
         x = self.fc1(x)
