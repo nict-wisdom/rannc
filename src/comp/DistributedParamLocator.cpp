@@ -22,17 +22,15 @@ namespace rannc {
         int local_rank = getLocalRank(ranks, mpi::getRank());
         int64_t offset = offsets_.at(pid).at(local_rank);
         int64_t src_size = src_sizes_.at(pid).at(local_rank);
-        int64_t segment_size = segment_sizes_.at(pid);
 
         at::TensorOptions options;
         options = options.dtype(param.dtype()).device(param.device()).requires_grad(param.requires_grad());
-        at::Tensor part_tensor = torch::zeros({segment_size}, options);
+        at::Tensor part_tensor = torch::zeros({src_size}, options);
 
         if (src_size > 0) {
             torch::NoGradGuard no_grad;
-            auto src_buf = torch::flatten(param).slice(0, offset, offset + src_size);
-            auto dst_buf = torch::flatten(part_tensor).slice(0, 0, src_size);
-            dst_buf.copy_(src_buf);
+            auto src_buf = torch::flatten(param).narrow(0, offset, src_size);
+            part_tensor.copy_(src_buf);
         }
         param_parts_[pid] = part_tensor;
         return param_parts_[pid];
@@ -56,7 +54,7 @@ namespace rannc {
             torch::NoGradGuard no_grad;
 
             int64_t offset = offsets_.at(pid).at(local_rank);
-            auto src_buf = torch::flatten(src).slice(0, offset, offset + src_size);
+            auto src_buf = torch::flatten(src).narrow(0, offset, src_size);
             assert(contains(param_parts_, pid));
             auto param_part = param_parts_.at(pid);
             param_part.copy_(src_buf);

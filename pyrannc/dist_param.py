@@ -25,9 +25,8 @@ def get_dist_param_range(pid):
 
 class DistributeModelParams(object):
 
-    def __init__(self, target_cls, enable=True):
+    def __init__(self, enable=True):
         print("DistributeModelParams init")
-        self.target_cls = target_cls
         self.enable = enable
         self.hooks = []
 
