@@ -24,6 +24,8 @@ namespace rannc {
         at::Tensor load(long pid);
         void remove(long pid);
         void set(long pid, const at::Tensor& src);
+        at::Tensor getSegment(long pid);
+        void setScalarType(long pid, const c10::ScalarType& stype);
 
         void fetchStart();
         at::Tensor fetch(long pid);

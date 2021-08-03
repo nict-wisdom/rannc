@@ -42,6 +42,11 @@ namespace rannc {
         return gather(param_part, pid);
     }
 
+    at::Tensor DistributedParamLocator::getSegment(long pid) {
+        assert(contains(param_parts_, pid));
+        return param_parts_.at(pid);
+    }
+
     void DistributedParamLocator::set(long pid, const at::Tensor& src) {
 
         const auto ranks = mpi::getAllRanks();
@@ -59,6 +64,19 @@ namespace rannc {
             auto param_part = param_parts_.at(pid);
             param_part.copy_(src_buf);
         }
+    }
+
+    void DistributedParamLocator::setScalarType(long pid, const c10::ScalarType& stype) {
+        assert(contains(param_parts_, pid));
+        auto param_part = param_parts_.at(pid);
+
+        torch::NoGradGuard no_grad;
+        param_part.set_requires_grad(false);
+        param_parts_[pid] = param_part.to(stype);
+
+        assert(contains(ir_types_, pid));
+        auto ir_type = ir_types_.at(pid);
+        ir_types_[pid] = IRType::createTensorType(toTensorElemType(stype), ir_type.getTensorDim(), ir_type.requiresGrad());
     }
 
     void DistributedParamLocator::fetchStart() {

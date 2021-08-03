@@ -18,9 +18,17 @@ def set_dist_param(pid, src):
     _pyrannc.set_dist_param(pid, src)
 
 
+def get_dist_param_segment(pid):
+    return _pyrannc.get_dist_param_segment(pid)
+
+
 def get_dist_param_range(pid):
     range = _pyrannc.get_dist_param_range(pid)
     return slice(range[0], range[1])
+
+
+def set_dist_param_dtype(pid, dtype):
+    _pyrannc.set_dist_param_dtype(pid, dtype)
 
 
 class DistributeModelParams(object):
@@ -65,9 +73,18 @@ class DistributeModelParams(object):
         # Get param tensors
         def _pre_hook_for_tracing(_model, input):
             for p in _model.parameters(recurse=False):
+                # Convert data type for amp
+                set_dist_param_dtype(id(p), p.dtype)
                 p.data = load_dist_param(id(p))
             for b in _model.buffers(recurse=False):
+                set_dist_param_dtype(id(b), b.dtype)
                 b.data = load_dist_param(id(b))
-            return input
+
+        def _post_hook_for_tracing(_model, input, output):
+            for p in _model.parameters(recurse=False):
+                p.data = get_dist_param_segment(id(p))
+            for b in _model.buffers(recurse=False):
+                b.data = get_dist_param_segment(id(b))
 
         model.register_forward_pre_hook(_pre_hook_for_tracing)
+        model.register_forward_hook(_post_hook_for_tracing)

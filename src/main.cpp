@@ -181,6 +181,18 @@ PYBIND11_MODULE(_pyrannc, m) {
         return zpl.set(pid, ten);
     });
 
+    m.def("get_dist_param_segment", [](long pid) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        return zpl.getSegment(pid);
+    });
+
+    m.def("set_dist_param_dtype", [](long pid, py::object& obj) {
+        auto dtype = reinterpret_cast<THPDtype*>(obj.ptr());
+        const auto stype = dtype->scalar_type;
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        zpl.setScalarType(pid, stype);
+    });
+
     m.def("get_dist_param_range", [](long pid) {
         DistributedParamLocator& zpl = DistributedParamLocator::get();
         return zpl.getSegmentRange(pid);
