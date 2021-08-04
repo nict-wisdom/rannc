@@ -1,4 +1,5 @@
 import functools
+import types
 
 import torch
 
@@ -8,6 +9,17 @@ from . import _pyrannc
 def store_dist_param(p):
     p.data = _pyrannc.store_dist_param(p)
     p.distributed = True
+
+    old_del = None
+    if hasattr(p, "__del__"):
+        old_del = p.__del__
+
+    def new_del(param):
+        remove_dist_param(id(param))
+        if old_del:
+            old_del()
+
+    p.__del__ = types.MethodType(new_del, p)
 
 
 def load_dist_param(pid):
@@ -29,6 +41,10 @@ def get_dist_param_range(pid):
 
 def set_dist_param_dtype(pid, dtype):
     _pyrannc.set_dist_param_dtype(pid, dtype)
+
+
+def remove_dist_param(pid, dtype):
+    _pyrannc.remove_dist_param(pid, dtype)
 
 
 class DistributeModelParams(object):

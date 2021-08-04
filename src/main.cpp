@@ -198,6 +198,11 @@ PYBIND11_MODULE(_pyrannc, m) {
         return zpl.getSegmentRange(pid);
     });
 
+    m.def("remove_dist_param", [](long pid) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        return zpl.remove(pid);
+    });
+
     m.def("get_param_ranks", [](long pid) {
         auto r = RaNNCFactory::get();
         auto param_storage = r->getParamStorage();
