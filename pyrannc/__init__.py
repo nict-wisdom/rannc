@@ -486,7 +486,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if synced_param_cpu is not None:
                 if _pyrannc.get_rank() == 0 or sync_all_ranks:
                     with torch.no_grad():
-                        if param.distributed and param.size() != synced_param_cpu.size():
+                        if (hasattr(param, "distributed") and param.distributed) and param.size() != synced_param_cpu.size():
                             # This param is a dummy. It was originally distributed across all ranks  and then removed
                             # on this rank because the subgraph on this rank does not need this parameter.
                             param.data = synced_param_cpu
