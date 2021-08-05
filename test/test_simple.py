@@ -7,7 +7,8 @@ default_vals = {
     "rtol": 1e-1,
     "atol": 0,
     "get_dataset": None,
-    "loss_out": False
+    "loss_out": False,
+    "preprocess": None
 }
 
 test_models = [
@@ -17,10 +18,11 @@ test_models = [
     {"model": models.SharedParamModel},
     {"model": models.OneOpModel},
     {"model": models.TensorMulModel},
-    {"model": models.EmbeddingModel, "rtol": 1e-1, "get_dataset": models.EmbeddingModel.get_dataset},
+    {"model": models.EmbeddingModel, "get_dataset": models.EmbeddingModel.get_dataset},
     {"model": models.FunctionModel, "get_dataset": models.FunctionModel.get_dataset},
+    {"model": models.LossOutModel, "loss_out": True},
     # {"model": native_models.NativeCallModel01}, # compiles module
-    {"model": models.LossOutModel, "loss_out": True}
+    # {"model": models.LayerNormModel, "preprocess": models.norm_to_float} # DP only
 ]
 
 
@@ -28,11 +30,16 @@ test_models = [
 @pytest.mark.parametrize("use_amp", [False, True])
 @pytest.mark.parametrize("allreduce_amp_master_params", [False, True])
 @pytest.mark.parametrize("enable_zero", [False, True])
-def test_match(init_dist, init_seed, batch_size, iteration, test_model, use_amp, allreduce_amp_master_params, enable_zero):
+@pytest.mark.parametrize("dist_params", [False, True])
+def test_match(init_dist, init_seed, batch_size, iteration, test_model, use_amp, allreduce_amp_master_params,
+               enable_zero, dist_params):
 
     if enable_zero and (not allreduce_amp_master_params):
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
+
+    print("use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={}".format(
+          use_amp, allreduce_amp_master_params, enable_zero, dist_params))
 
     for k, v in default_vals.items():
         if k not in test_model:
@@ -40,9 +47,11 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, use_amp,
 
     common.run(test_model["model"], batch_size, iteration,
                loss_out=test_model["loss_out"],
+               preprocess=test_model["preprocess"],
                use_amp=use_amp,
                allreduce_amp_master_params=allreduce_amp_master_params,
                enable_zero=enable_zero,
+               dist_params=dist_params,
                rtol=test_model["rtol"],
                atol=test_model["atol"],
                get_dataset=test_model["get_dataset"]

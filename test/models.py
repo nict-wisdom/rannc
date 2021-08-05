@@ -113,6 +113,51 @@ class ForkJoinModel(nn.Module):
         return y
 
 
+class BertLayerNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        super(BertLayerNorm, self).__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, x):
+        do_convert = self.weight.dtype != x.dtype
+        input_dtype = x.dtype
+        if do_convert:
+            x = x.to(self.weight.dtype)
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
+        x = self.weight * x + self.bias
+        if do_convert:
+            x = x.to(input_dtype)
+        return x
+
+class LayerNormModel(nn.Module):
+
+    INPUT_DIM = (3,)
+    OUTPUT_DIM = (3,)
+
+    def __init__(self):
+        super(LayerNormModel, self).__init__()
+        self.fc1 = nn.Linear(3, 2, bias=False)
+        self.norm = BertLayerNorm(2)
+        self.fc2 = nn.Linear(2, 3, bias=False)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.norm(x)
+        x = self.fc2(x)
+        return x
+
+
+def norm_to_float(module):
+    for name, _module in module.named_modules():
+        if name.endswith('norm'.lower()):
+            print("changing to fp32={}".format(name))
+            _module.float()
+
+
 class BufferModel1(nn.Module):
 
     INPUT_DIM = (10,)

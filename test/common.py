@@ -74,6 +74,7 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, 
         actual_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_act, opt_act, zero)}
 
         for n, rp in actual_master_params.items():
+            print("comparing {}".format(n))
             p = expected_master_params[n]
             v_a = f(rp).flatten() if zero else f(rp)
             v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
@@ -125,7 +126,7 @@ def convert_dtype(t, dtype):
 
 
 def do_run(model_cls, batch_size_per_proc, num_iter,
-           trace, fwd, aggregate, bwd, dtype, use_amp, allreduce_amp_master_params,
+           trace, fwd, aggregate, bwd, dtype, preprocess, use_amp, allreduce_amp_master_params,
            enable_zero, dist_params, rtol, atol, get_dataset,
            **kwargs):
     print("Starting test using {}".format(model_cls.__name__))
@@ -148,6 +149,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             model, opt = amp.initialize(model, opt, opt_level="O2",
                                               max_loss_scale=2.**4,
                                               min_loss_scale=1)
+        if preprocess:
+            preprocess(model)
 
     if dist_params:
         with pyrannc.DistributeModelParams(model_cls):
@@ -170,6 +173,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             rmodel, r_opt = amp.initialize(rmodel, r_opt, opt_level="O2",
                                             max_loss_scale=2.**4,
                                             min_loss_scale=1)
+        if preprocess:
+            preprocess(rmodel)
 
     module_args = {}
     if "check_unused_values" in kwargs:
@@ -318,7 +323,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        dtype=torch.float, loss_out=False, use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
+        dtype=torch.float, loss_out=False, preprocess=False,
+        use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
         dist_params=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
 
@@ -333,7 +339,7 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x, tgt),
                aggregate_out_loss,
                bwd_loss_output,
-               dtype, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               dtype, preprocess, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
                rtol, atol, get_dataset, **kwargs)
 
     else:
@@ -342,6 +348,6 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x),
                lambda out: out,
                bwd_with_criterion,
-               dtype, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               dtype, preprocess, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
                rtol, atol, get_dataset, **kwargs)
 
