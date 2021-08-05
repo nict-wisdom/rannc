@@ -203,10 +203,33 @@ PYBIND11_MODULE(_pyrannc, m) {
         return zpl.remove(pid);
     });
 
+    m.def("dist_param_registered", [](long pid) {
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        return zpl.registered(pid);
+    });
+
     m.def("get_param_ranks", [](long pid) {
         auto r = RaNNCFactory::get();
         auto param_storage = r->getParamStorage();
         return param_storage->getRanks(pid);
+    });
+
+    m.def("set_tracing_state", [](bool enable) {
+        static std::shared_ptr<torch::jit::tracer::TracingState> state;
+        if (enable) {
+            assert(!torch::jit::tracer::isTracing());
+            if (state) {
+                torch::jit::tracer::setTracingState(state);
+                state.reset();
+            } else {
+                throw std::runtime_error("No valid tracing state is available.");
+            }
+        } else {
+            assert(torch::jit::tracer::isTracing());
+            assert(!state);
+            state = torch::jit::tracer::getTracingState();
+            torch::jit::tracer::setTracingState(nullptr);
+        }
     });
 
     py::class_<RaNNCModule, std::shared_ptr<RaNNCModule>>(m, "RaNNCModule")

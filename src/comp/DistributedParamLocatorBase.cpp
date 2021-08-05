@@ -77,6 +77,10 @@ namespace rannc {
         return ranks_buf.at(index);
     }
 
+    bool DistributedParamLocatorBase::registered(long pid) {
+        return contains(offsets_, pid);
+    }
+
     at::Tensor DistributedParamLocatorBase::gather(const at::Tensor& tensor_part, long pid) {
         assert(contains(segment_sizes_, pid));
         assert(contains(ranks_, pid));

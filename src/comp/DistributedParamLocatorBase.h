@@ -17,6 +17,7 @@ namespace rannc {
         virtual void remove(long pid);
         size_t getSegmentNum(long pid);
         size_t getOwner(long pid, int index);
+        bool registered(long pid);
         std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
         std::pair<int64_t, int64_t> getSegmentRange(long pid);
         at::Tensor gather(const at::Tensor& tensor_part, long pid);

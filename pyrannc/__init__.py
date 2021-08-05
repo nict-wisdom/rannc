@@ -461,6 +461,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         self.undeploy(sync=False)
 
     def __getattr__(self, attr):
+        if not hasattr(self.model, attr):
+            raise AttributeError("This model has no attribute '{}'".format(attr))
+
         model_attr = getattr(self.model, attr)
         def wrapper_func(*args, **kwargs):
             return model_attr(*args, **kwargs)

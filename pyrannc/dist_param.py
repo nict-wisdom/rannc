@@ -7,6 +7,9 @@ from . import _pyrannc
 
 
 def store_dist_param(p):
+    if _pyrannc.dist_param_registered(id(p)):
+        return
+
     p.data = _pyrannc.store_dist_param(p)
     p.distributed = True
 
@@ -43,20 +46,17 @@ def set_dist_param_dtype(pid, dtype):
     _pyrannc.set_dist_param_dtype(pid, dtype)
 
 
-def remove_dist_param(pid, dtype):
-    _pyrannc.remove_dist_param(pid, dtype)
+def remove_dist_param(pid):
+    _pyrannc.remove_dist_param(pid)
 
 
 class DistributeModelParams(object):
 
     def __init__(self, enable=True):
-        print("DistributeModelParams init")
         self.enable = enable
         self.hooks = []
 
     def __enter__(self):
-        print("DistributeModelParams __enter__: enable={}".format(self.enable))
-
         if not self.enable:
             return
 
@@ -74,12 +74,13 @@ class DistributeModelParams(object):
             subclass.__init__ = add_post_process(subclass.__init__)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        print("DistributeModelParams __exit__")
+        if not self.enable:
+            return
+
         for subclass in torch.nn.modules.module.Module.__subclasses__():
             subclass.__init__ = subclass._old_init
 
     def _store_dist_params(self, model):
-        print("Storing params by DistributeModelParams: {}".format(model.__class__.__name__))
         for p in model.parameters(recurse=False):
             store_dist_param(p)
         for b in model.buffers(recurse=False):
@@ -88,6 +89,7 @@ class DistributeModelParams(object):
     def _set_hooks(self, model):
         # Get param tensors
         def _pre_hook_for_tracing(_model, input):
+            _pyrannc.set_tracing_state(False)
             for p in _model.parameters(recurse=False):
                 # Convert data type for amp
                 set_dist_param_dtype(id(p), p.dtype)
@@ -95,6 +97,8 @@ class DistributeModelParams(object):
             for b in _model.buffers(recurse=False):
                 set_dist_param_dtype(id(b), b.dtype)
                 b.data = load_dist_param(id(b))
+            _pyrannc.set_tracing_state(True)
+            return input
 
         def _post_hook_for_tracing(_model, input, output):
             for p in _model.parameters(recurse=False):
