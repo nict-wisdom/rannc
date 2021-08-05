@@ -113,4 +113,9 @@ namespace rannc {
         DistributedParamLocatorBase::remove(pid);
         param_parts_.erase(pid);
     }
+
+    void DistributedParamLocator::clear() {
+        DistributedParamLocatorBase::clear();
+        param_parts_.clear();
+    }
 }

@@ -114,4 +114,14 @@ namespace rannc {
                 .view(ir_type.getTensorDim())
                 .cpu().detach().set_requires_grad(requires_grad);
     }
+
+    void DistributedParamLocatorBase::clear() {
+        offsets_.clear();
+        src_sizes_.clear();
+        global_id_to_local_.clear();
+        ir_types_.clear();
+        segment_sizes_.clear();
+        ranks_.clear();
+        my_indices_.clear();
+    }
 }

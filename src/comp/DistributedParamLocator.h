@@ -36,6 +36,8 @@ namespace rannc {
             return instance;
         }
 
+        void clear();
+
     private:
         DistributedParamLocator() = default;
 

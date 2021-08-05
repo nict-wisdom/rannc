@@ -21,6 +21,7 @@ namespace rannc {
         std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
         std::pair<int64_t, int64_t> getSegmentRange(long pid);
         at::Tensor gather(const at::Tensor& tensor_part, long pid);
+        virtual void clear();
 
     protected:
         NCCLWrapper& nccl_;

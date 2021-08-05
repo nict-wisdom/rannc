@@ -975,6 +975,10 @@ namespace rannc {
         grouped_params_.clear();
         tag_rank_set_.clear();
         use_amp_master_params_.clear();
+
+        dist_ids_.clear();
+        DistributedParamLocator& zpl = DistributedParamLocator::get();
+        zpl.clear();
     }
 
     void ParamStorage::doReleaseParam(long param_id) {
