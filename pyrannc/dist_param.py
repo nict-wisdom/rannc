@@ -4,6 +4,7 @@ import types
 import torch
 
 from . import _pyrannc
+from .tensor_coll import _allreduce_sum
 
 
 def store_dist_param(p):
@@ -56,6 +57,12 @@ class DistributeModelParams(object):
         self.enable = enable
         self.hooks = []
 
+        if enable:
+            # Creation of NCCL communicator failed during tracing.
+            # So we create a communicator including all ranks on initialization.
+            _allreduce_sum(torch.zeros(3, 3).cuda())
+
+
     def __enter__(self):
         if not self.enable:
             return
@@ -101,10 +108,12 @@ class DistributeModelParams(object):
             return input
 
         def _post_hook_for_tracing(_model, input, output):
+            _pyrannc.set_tracing_state(False)
             for p in _model.parameters(recurse=False):
                 p.data = get_dist_param_segment(id(p))
             for b in _model.buffers(recurse=False):
                 b.data = get_dist_param_segment(id(b))
+            _pyrannc.set_tracing_state(True)
 
         model.register_forward_pre_hook(_pre_hook_for_tracing)
         model.register_forward_hook(_post_hook_for_tracing)

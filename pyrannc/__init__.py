@@ -162,6 +162,7 @@ def _set_hooks_for_tracing(model, device):
 
     # Move cpu tensors onto a cuda device
     def _pre_hook_for_tracing(_model, input):
+        _pyrannc.set_tracing_state(False)
         cpu_params[_model] = []
         for n, p in _model.named_parameters(recurse=False):
             if not p.is_cuda:
@@ -171,12 +172,15 @@ def _set_hooks_for_tracing(model, device):
             if not b.is_cuda:
                 cpu_params[_model].append(b)
                 _to_in_place([b], device)
+        _pyrannc.set_tracing_state(True)
         return input
 
     # Move tensors back to host
     def _hook_for_tracing(_model, input, output):
+        _pyrannc.set_tracing_state(False)
         for p in cpu_params[_model]:
             _to_in_place([p], torch.device("cpu"))
+        _pyrannc.set_tracing_state(True)
 
     handles = []
     for name, _module in model.named_modules():
