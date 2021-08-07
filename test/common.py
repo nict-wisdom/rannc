@@ -16,6 +16,7 @@ import pyrannc.amp
 
 RELATIVE_TOLERANCE = 1e-2
 ABSOLUTE_TOLERANCE = 0
+LOSS_SCALE = 2**10
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -74,7 +75,6 @@ def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, 
         actual_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_act, opt_act, zero)}
 
         for n, rp in actual_master_params.items():
-            print("comparing {}".format(n))
             p = expected_master_params[n]
             v_a = f(rp).flatten() if zero else f(rp)
             v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
@@ -147,7 +147,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         opt = optim.Adam(model.parameters(), lr=lr)
         if use_amp:
             model, opt = amp.initialize(model, opt, opt_level="O2",
-                                              max_loss_scale=2.**4,
+                                              max_loss_scale=LOSS_SCALE,
                                               min_loss_scale=1)
         if preprocess:
             preprocess(model)
@@ -171,7 +171,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         if use_amp:
             rmodel = rmodel.to(device)
             rmodel, r_opt = amp.initialize(rmodel, r_opt, opt_level="O2",
-                                            max_loss_scale=2.**4,
+                                            max_loss_scale=LOSS_SCALE,
                                             min_loss_scale=1)
         if preprocess:
             preprocess(rmodel)

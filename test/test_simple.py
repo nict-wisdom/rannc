@@ -12,7 +12,6 @@ default_vals = {
 }
 
 test_models = [
-    # {"model": models.BasicModel, "rtol": 1e-1},
     {"model": models.SmallParamModel},
     {"model": models.ForkJoinModel},
     {"model": models.SharedParamModel},
@@ -21,6 +20,7 @@ test_models = [
     {"model": models.EmbeddingModel, "get_dataset": models.EmbeddingModel.get_dataset},
     {"model": models.FunctionModel, "get_dataset": models.FunctionModel.get_dataset},
     {"model": models.LossOutModel, "loss_out": True},
+    # {"model": models.BasicModel, "rtol": 1e-1},
     # {"model": native_models.NativeCallModel01}, # compiles module
     # {"model": models.LayerNormModel, "preprocess": models.norm_to_float} # DP only
 ]
