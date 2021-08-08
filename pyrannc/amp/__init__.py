@@ -113,16 +113,22 @@ def scale_master_grads(optimizer, scale):
                                  overflow_buf,
                                  [master_grads, master_grads],
                                  scale)
+    return overflow_buf
 
 def allreduce_grads_amp(rmodel, optimizer, prescale=1.0):
 
     scaler = _amp_state.loss_scalers[0]
     if rmodel.enable_zero:
         assert(rmodel.allreduce_amp_master_params)
-        scale_master_grads(optimizer, prescale)
 
         rmodel.allreduce_grads_zero(scaler.loss_scale())
+
+        overflow_buf = scale_master_grads(optimizer, prescale)
+        old_overflow_buf = scaler._overflow_buf
+        scaler._overflow_buf = overflow_buf
         had_overflow = scaler.update_scale()
+        scaler._overflow_buf = old_overflow_buf
+
         return had_overflow
 
     if rmodel.allreduce_amp_master_params:
