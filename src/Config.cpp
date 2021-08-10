@@ -64,6 +64,7 @@ namespace rannc {
         const char COARSEN_BY_TIME[] = "coarsen_by_time";
         const char LIMIT_DEV_NUM_POT[] = "limit_dev_num_pot";
         const char LIMIT_DEV_NUM_MORE_THAN_BS[] = "limit_dev_num_more_than_bs";
+        const char PROFILE_BY_ACC[] = "profile_by_acc";
         const char VERIFY_PARTITIONING[] = "verify_partitioning";
         const char ALLOC_REPL_FLAT[] = "alloc_repl_flat";
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
@@ -151,6 +152,7 @@ namespace rannc {
                     makeConfigItem(COARSEN_BY_TIME, true),
                     makeConfigItem(LIMIT_DEV_NUM_POT, true),
                     makeConfigItem(LIMIT_DEV_NUM_MORE_THAN_BS, true),
+                    makeConfigItem(PROFILE_BY_ACC, false),
                     makeConfigItem(VERIFY_PARTITIONING, false),
                     makeConfigItem(ALLOC_REPL_FLAT, true),
                     makeConfigItem(SYNC_ALLREDUCE, true),

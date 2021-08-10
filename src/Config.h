@@ -58,6 +58,7 @@ namespace rannc {
         extern const char COARSEN_BY_TIME[];
         extern const char LIMIT_DEV_NUM_POT[];
         extern const char LIMIT_DEV_NUM_MORE_THAN_BS[];
+        extern const char PROFILE_BY_ACC[];
         extern const char VERIFY_PARTITIONING[];
         extern const char ALLOC_REPL_FLAT[];
         extern const char SYNC_ALLREDUCE[];

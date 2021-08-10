@@ -495,8 +495,26 @@ namespace rannc {
                             long ar_comm = 0;
                             GraphProfile step_prof;
 
-                            bool do_coarsening = config::Config::get().getVal<bool>(config::DO_COARSENING);
-                            if (do_coarsening) {
+                            bool profile_by_acc = config::Config::get().getVal<bool>(config::PROFILE_BY_ACC);
+                            if (profile_by_acc) {
+                                // Just estimate time by accumulation
+                                step_prof = estimateProf(graph, b_prev, b - 1,
+                                                         (d - d_prev) * replica_num * pipeline_num, checkpointing);
+                                step_val = ::rannc::estimateEval(step_prof,
+                                                                 0, 0,
+                                                                 table[s - 1][b_prev][d_prev].max_fwd,
+                                                                 table[s - 1][b_prev][d_prev].max_bwd,
+                                                                 table[s - 1][b_prev][d_prev].max_allreduce);
+
+                                static int opt_param_factor = config::Config::get().getVal<int>(
+                                        config::OPT_PARAM_FACTOR);
+                                long opt_mem = 0;
+                                for (size_t i = b_prev; i <= (b - 1); i++) {
+                                    const auto &node = graph.nodes.at(i);
+                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev));
+                                }
+                                step_mem = step_prof.max_allocated_mem + opt_mem;
+                            } else {
                                 // merge graphs from j+1 to i (inclusive)
                                 const auto step_graph = merge_helper.merge(b_prev, b - 1);
                                 size_t step_in_comm = calcCommTime(
@@ -516,24 +534,6 @@ namespace rannc {
                                                                  table[s - 1][b_prev][d_prev].max_fwd,
                                                                  table[s - 1][b_prev][d_prev].max_bwd,
                                                                  table[s - 1][b_prev][d_prev].max_allreduce);
-                            } else {
-                                // Just estimate time by accumulation
-                                step_prof = estimateProf(graph, b_prev, b - 1,
-                                                         (d - d_prev) * replica_num * pipeline_num, checkpointing);
-                                step_val = ::rannc::estimateEval(step_prof,
-                                                                 0, 0,
-                                                                 table[s - 1][b_prev][d_prev].max_fwd,
-                                                                 table[s - 1][b_prev][d_prev].max_bwd,
-                                                                 table[s - 1][b_prev][d_prev].max_allreduce);
-
-                                static int opt_param_factor = config::Config::get().getVal<int>(
-                                        config::OPT_PARAM_FACTOR);
-                                long opt_mem = 0;
-                                for (size_t i = b_prev; i <= (b - 1); i++) {
-                                    const auto &node = graph.nodes.at(i);
-                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev));
-                                }
-                                step_mem = step_prof.max_allocated_mem + opt_mem;
                             }
 
                             if (step_mem >= dev_mem_) {
