@@ -17,6 +17,7 @@ import pyrannc.amp
 RELATIVE_TOLERANCE = 1e-2
 ABSOLUTE_TOLERANCE = 0
 LOSS_SCALE = 2**10
+MAX_NORM = 1.0
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -126,7 +127,8 @@ def convert_dtype(t, dtype):
 
 
 def do_run(model_cls, batch_size_per_proc, num_iter,
-           trace, fwd, aggregate, bwd, dtype, preprocess, use_amp, allreduce_amp_master_params,
+           trace, fwd, aggregate, bwd, dtype, preprocess, gradient_accumulation_steps,
+           use_amp, allreduce_amp_master_params,
            enable_zero, dist_params, rtol, atol, get_dataset,
            **kwargs):
     print("Starting test using {}".format(model_cls.__name__))
@@ -192,10 +194,14 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     else:
         compare_params(model, rmodel, rtol, atol, False)
 
-    pyrannc.delay_grad_allreduce(allreduce_amp_master_params)
+    delay_grad_allreduce = allreduce_amp_master_params or gradient_accumulation_steps > 1
+    pyrannc.delay_grad_allreduce(delay_grad_allreduce)
 
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
-    for x, tgt in data_loader:
+    for step, (x, tgt) in enumerate(data_loader):
+
+        run_update = step % gradient_accumulation_steps == 0 if delay_grad_allreduce else True
+
         # Create test input
         x = x.to(device)
         tgt = tgt.to(device)
@@ -213,7 +219,11 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                 ddp_model = jit_model
 
         with torch.random.fork_rng(devices=[device]):
-            p_out = fwd(ddp_model, x, tgt)
+            if run_update or (not has_param):
+                p_out = fwd(ddp_model, x, tgt)
+            else: # delay allreduce by ddp
+                with ddp_model.no_sync():
+                    p_out = fwd(ddp_model, x, tgt)
             agg_out = aggregate(p_out)
 
         r_out = fwd(rmodel, convert_dtype(x, dtype), convert_dtype(tgt, dtype))
@@ -227,21 +237,22 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             bwd(p_out, tgt, opt, use_amp)
             bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
-            if allreduce_amp_master_params:
+            if run_update:
                 pyrannc.allreduce_grads(rmodel, r_opt)
 
-            torch.nn.utils.clip_grad_norm_(amp.master_params(opt), 1.0)
-            rmodel.clip_grad_norm(1.0)
+            torch.nn.utils.clip_grad_norm_(amp.master_params(opt), MAX_NORM)
+            rmodel.clip_grad_norm(MAX_NORM)
 
-            if gather_inputs or pyrannc.get_rank() == 0:
-                if enable_zero:
-                    rmodel._sync_orig_params(sync_grad=True)
-                compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
+            if run_update:
+                if gather_inputs or pyrannc.get_rank() == 0:
+                    if enable_zero:
+                        rmodel._sync_orig_params(sync_grad=True)
+                    compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
-            opt.step()
-            r_opt.step()
-            opt.zero_grad()
-            r_opt.zero_grad()
+                opt.step()
+                r_opt.step()
+                opt.zero_grad()
+                r_opt.zero_grad()
 
         if gather_inputs or pyrannc.get_rank() == 0:
             if enable_zero:
@@ -309,8 +320,6 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                 pv = pt_param_state[k]
                 if isinstance(ldv, torch.Tensor):
                     compare_tensors(ldv, pv, rtol, atol)
-                    # np.testing.assert_equal(ldv.numel(), pv.numel())
-                    # np.testing.assert_almost_equal(ldv.flatten().tolist(), pv.flatten().tolist(), decimal=ASSERT_DECIMAL)
                 else:
                     np.testing.assert_(ldv == pv)
 
@@ -323,7 +332,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
 
 
 def run(model_base, batch_size_per_proc, num_iter,
-        dtype=torch.float, loss_out=False, preprocess=False,
+        dtype=torch.float, loss_out=False, preprocess=False, gradient_accumulation_steps=1,
         use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
         dist_params=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
@@ -339,7 +348,8 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x, tgt),
                aggregate_out_loss,
                bwd_loss_output,
-               dtype, preprocess, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               dtype, preprocess, gradient_accumulation_steps,
+               use_amp, allreduce_amp_master_params, enable_zero, dist_params,
                rtol, atol, get_dataset, **kwargs)
 
     else:
@@ -348,6 +358,7 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda model, x, tgt: model(x),
                lambda out: out,
                bwd_with_criterion,
-               dtype, preprocess, use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               dtype, preprocess, gradient_accumulation_steps,
+               use_amp, allreduce_amp_master_params, enable_zero, dist_params,
                rtol, atol, get_dataset, **kwargs)
 

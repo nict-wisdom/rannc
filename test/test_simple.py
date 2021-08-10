@@ -27,11 +27,13 @@ test_models = [
 
 
 @pytest.mark.parametrize("test_model", test_models)
+@pytest.mark.parametrize("gradient_accumulation_steps", [1, 2, 4])
 @pytest.mark.parametrize("use_amp", [False, True])
 @pytest.mark.parametrize("allreduce_amp_master_params", [False, True])
 @pytest.mark.parametrize("enable_zero", [False, True])
 @pytest.mark.parametrize("dist_params", [False, True])
-def test_match(init_dist, init_seed, batch_size, iteration, test_model, use_amp, allreduce_amp_master_params,
+def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
+               use_amp, allreduce_amp_master_params,
                enable_zero, dist_params):
 
     if enable_zero and (not allreduce_amp_master_params):
@@ -48,6 +50,7 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, use_amp,
     common.run(test_model["model"], batch_size, iteration,
                loss_out=test_model["loss_out"],
                preprocess=test_model["preprocess"],
+               gradient_accumulation_steps=gradient_accumulation_steps,
                use_amp=use_amp,
                allreduce_amp_master_params=allreduce_amp_master_params,
                enable_zero=enable_zero,
