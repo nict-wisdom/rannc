@@ -132,21 +132,20 @@ def allreduce_grads_amp(rmodel, optimizer, prescale=1.0):
         return had_overflow
 
     if rmodel.allreduce_amp_master_params:
-        scale_master_grads(optimizer, prescale)
+        overflow_buf = scale_master_grads(optimizer, prescale)
     else:
         master_grads_to_model_grads(optimizer, scaler.loss_scale()*prescale)
 
     # rannc's allreduce
     rmodel.allreduce_grads()
 
-    if rmodel.allreduce_amp_master_params:
-        had_overflow = scaler.update_scale()
-    else:
+    if not rmodel.allreduce_amp_master_params:
         overflow_buf = model_grads_to_master_grads(optimizer, 1./scaler.loss_scale())
-        old_overflow_buf = scaler._overflow_buf
-        scaler._overflow_buf = overflow_buf
-        had_overflow = scaler.update_scale()
-        scaler._overflow_buf = old_overflow_buf
+
+    old_overflow_buf = scaler._overflow_buf
+    scaler._overflow_buf = overflow_buf
+    had_overflow = scaler.update_scale()
+    scaler._overflow_buf = old_overflow_buf
 
     return had_overflow
 
