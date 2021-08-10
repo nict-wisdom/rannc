@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 import random
@@ -24,8 +25,11 @@ def init_dist(request):
     rank = int(request.config.getoption('--rank'))
     world_size = int(request.config.getoption('--world-size'))
 
-    torch.backends.cudnn.enabled = True
-    # torch.set_deterministic(True)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     comm_backend = "nccl"
     init_method = "tcp://{}:{}".format(master_addr, master_port)
 
