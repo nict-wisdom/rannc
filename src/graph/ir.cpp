@@ -590,9 +590,13 @@ namespace rannc {
             if (val.isParam()) {
                 if (use_amp_master_param) {
                     if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
-                        sum += val.getSizeInByte()
-                               * 2 // amp holds both param and grad
+                        sum += val.getSizeInByte() // amp holds params
+                                * 2 // FP32
+                                / zero_dist_num; // Each rank holds only fragments of FP32 master params
+                        sum += val.getSizeInByte()  // amp holds grads
                                * 2; // FP32
+                               // We don't divide the size of gradients by zero_dist num
+                               // because allreduce in FP32 needs buffer for the whole parameters
                         sum += val.getSizeInByte() // optimizer state
                                * 2 // FP32
                                * opt_param_factor
