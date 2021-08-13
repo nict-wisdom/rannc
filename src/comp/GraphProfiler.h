@@ -87,6 +87,7 @@ namespace rannc {
                  batch_size_(batch_size),
                  dev_num_(dev_num),
                  min_pipeline_num_(min_pipeline_num) {
+            cache_param_values_ = false;
         }
 
         ~GraphProfiler() {
@@ -100,6 +101,17 @@ namespace rannc {
         void clear();
         void load(const std::string& file);
         void save(const std::string& file);
+
+        bool isCacheParamValues() const {
+            return cache_param_values_;
+        }
+
+        void setCacheParamValues(bool cacheParamValues) {
+            cache_param_values_ = cacheParamValues;
+            if (!cacheParamValues) {
+                param_cache_.clear();
+            }
+        }
 
     private:
         std::shared_ptr<ParamStorage> param_storage_;
@@ -115,6 +127,9 @@ namespace rannc {
 
         IValueMap values_;
         ProfileDB profile_db_;
+
+        bool cache_param_values_;
+        std::unordered_map<std::string, at::Tensor> param_cache_;
 
         void backward(const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs, int split_idx);
         ProfilingResult compute(

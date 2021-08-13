@@ -384,7 +384,18 @@ namespace rannc {
         auto ir_params = graphParamValues(graph);
         for (const auto &irp: ir_params) {
             assert(contains(graph_params_, irp.getName()));
-            graph_param_tensors[irp.getName()] = param_storage_->getParamTensor(graph_params_.at(irp.getName()));
+
+            if (cache_param_values_) {
+                if (contains(param_cache_, irp.getName())) {
+                    graph_param_tensors[irp.getName()]  = param_cache_.at(irp.getName());
+                } else {
+                    logger->info("Gathering distributed param: {}", irp.getName());
+                    const auto param_tensor = param_storage_->getParamTensor(graph_params_.at(irp.getName()));
+                    graph_param_tensors[irp.getName()] = param_cache_[irp.getName()] = param_tensor;
+                }
+            } else {
+                graph_param_tensors[irp.getName()] = param_storage_->getParamTensor(graph_params_.at(irp.getName()));
+            }
         }
         return graph_param_tensors;
     }

@@ -224,6 +224,8 @@ namespace rannc {
                                                     function_storage,
                                                     batch_size, mpi::getSize(), min_pipeline);
 
+            sg_prof->setCacheParamValues(true);
+
             bool load_profile = config::Config::get().getVal<bool>(config::LOAD_GRAPH_PROFILE);
             std::string graph_profile_file = config::Config::get().getVal<std::string>(config::GRAPH_PROFILE_FILE);
             if (load_profile) {
@@ -334,6 +336,8 @@ namespace rannc {
                     save(deployment_file_, deployment_, mpi::getSize(), dev_info.total_mem);
                 }
             }
+
+            sg_prof->setCacheParamValues(false);
 
             for (const auto& it: deployment_.subgraphs) {
                 logger->trace("subgraph {}", toString(*it.second));
