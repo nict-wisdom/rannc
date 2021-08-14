@@ -68,7 +68,7 @@ namespace rannc {
         const char VERIFY_PARTITIONING[] = "verify_partitioning";
         const char ALLOC_REPL_FLAT[] = "alloc_repl_flat";
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
-        const char SHOW_DP_SUMMARY[] = "show_dp_summary";
+        const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
 
         const char CONF_DIR[] = "conf_dir";
 
@@ -156,7 +156,7 @@ namespace rannc {
                     makeConfigItem(VERIFY_PARTITIONING, false),
                     makeConfigItem(ALLOC_REPL_FLAT, true),
                     makeConfigItem(SYNC_ALLREDUCE, true),
-                    makeConfigItem(SHOW_DP_SUMMARY, false),
+                    makeConfigItem(DUMP_DP_NODE_PROFILES, std::string("")),
 
                     makeConfigItem(CONF_DIR, "")
             };

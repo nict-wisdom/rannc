@@ -5,6 +5,8 @@
 #include <cuda/CudaUtil.h>
 #include "DPStaging.h"
 
+#include <json.hpp>
+
 namespace {
     int isPowerOfTwo(size_t x)
     {
@@ -136,55 +138,55 @@ namespace rannc {
         return max_fwd_val + max_bwd_val;
     }
 
-    std::string DPStaging::doMakeNodeSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num,
-                                             const std::string &label,
-                                             const std::function<long(const GraphProfile &prof, const MLNode &node,
-                                                                      size_t repl)> &f) {
-        std::stringstream ss;
-        ss << label << std::endl;
-        ss << "repl:";
-        for (size_t d = 1; d <= dev_num; d++) {
-            ss << " " << d * pipeline_num;
-        }
-        ss << std::endl;
-        int node_idx = 1;
+    void DPStaging::dumpNodeProfiles(const std::string& path, const MLGraph &graph, size_t dev_num,
+                                     size_t pipeline_num) {
+        int node_idx = 0;
+        nlohmann::ordered_json nodes_prof;
+        nlohmann::json graphs;
+
         for (const auto &node: graph.nodes) {
-            ss << node_idx++ << " " << node.id << " (#op=" << node.graph->getNodes().size() << ",#subnodes="
-               << node.getSize() << "):";
+            nlohmann::json node_obj;
+            node_obj["name"] = node.graph->getName();
+            node_obj["param_size"] = node.graph->getParamSizeInByte();
+            node_obj["input_size"] = calcInputSize(node.graph);
+            node_obj["output_size"] = calcOutputSize(node.graph);
+            graphs[node.graph->getName()] = toString(*node.graph);
+
+            nlohmann::ordered_json prof_dev;
             for (size_t d = 1; d <= dev_num; d++) {
-                int repl = d * pipeline_num;
-                const auto prof = prof_util_.profile(node.graph, batch_size_, repl);
-                long eval = f(prof, node, repl);
-                ss << " " << eval;
+                nlohmann::ordered_json prof_obj;
+                prof_obj["global_batch_size"] = batch_size_;
+                prof_obj["prof_batch_size"] = size_t(ceil(batch_size_ / (double) (d * pipeline_num)));
+                prof_obj["dev_num"] = d;
+                prof_obj["pipeline_num"] = pipeline_num;
+
+                const auto prof = prof_util_.profile(node.graph, batch_size_, d * pipeline_num, pipeline_num > 1);
+                prof_obj["fwd_time"] = prof.fwd_time;
+                prof_obj["bwd_time"] = prof.bwd_time;
+                prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
+                prof_obj["checkpointing"] = prof.checkpointing;
+
+                prof_dev[std::to_string(d)] = prof_obj;
             }
-            ss << std::endl;
+            node_obj["profiles"] = prof_dev;
+            nodes_prof[std::to_string(node_idx)] = node_obj;
+
+            node_idx++;
         }
-        return ss.str();
-    }
 
-    std::string DPStaging::makeNodeEvalSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num) {
-        return doMakeNodeSummary(graph, dev_num, pipeline_num, "[Node eval]",
-                                 [](const GraphProfile &prof, const MLNode &node, size_t repl) {
-                                     return ::rannc::estimateEval(prof, calcInputCommTime(node.graph, repl),
-                                                                  calcOutputCommTime(node.graph, repl),
-                                                                  0, 0, 0);
-                                 });
-    }
+        logger->info("Saving node profiles to {}", path);
 
-    std::string DPStaging::makeNodeMemSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num) {
-        return doMakeNodeSummary(graph, dev_num, pipeline_num, "[Node mem]",
-                                 [](const GraphProfile &prof, const MLNode &node, size_t repl) {
-                                     return prof.max_allocated_mem;
-                                 });
-    }
+        std::ofstream out(path, std::ios::out);
+        if (!out) {
+            throw std::invalid_argument("Failed to open file: " + path);
+        }
 
-
-    std::string DPStaging::makeCommBufSummary(const MLGraph &graph, size_t dev_num, size_t pipeline_num) {
-        return doMakeNodeSummary(graph, dev_num, pipeline_num, "[Comm buf]",
-                                 [pipeline_num](const GraphProfile &prof, const MLNode &node, size_t repl) {
-                                     size_t comm_buf = calcCommBufSize(node.graph, pipeline_num);
-                                     return comm_buf / repl;
-                                 });
+        nlohmann::ordered_json dump_obj;
+        dump_obj["total_dev_num"] = dev_num;
+        dump_obj["node_profiles"] = nodes_prof;
+        dump_obj["graphs"] = graphs;
+        out << dump_obj.dump(4);
+        out.close();
     }
 
     long DPStaging::estimateTime(const AllocSolution &sol) {
@@ -238,21 +240,22 @@ namespace rannc {
 
     AllocSolution DPStaging::runDpComm(const MLGraph &graph, size_t dev_num) {
 
-        int min_pipeline_num = config::Config::get().getVal<int>(config::MIN_PIPELINE);
-        int max_pipeline_num = config::Config::get().getVal<int>(config::MAX_PIPELINE);
+        config::Config& config = config::Config::get();
+        int min_pipeline_num = config.getVal<int>(config::MIN_PIPELINE);
+        int max_pipeline_num = config.getVal<int>(config::MAX_PIPELINE);
 
         // Forcibly set pipeline num for debugging
-        int cfg_pipeline_num = config::Config::get().getVal<int>(config::PIPELINE_NUM);
+        int cfg_pipeline_num = config.getVal<int>(config::PIPELINE_NUM);
         if (cfg_pipeline_num != 0) {
             min_pipeline_num = cfg_pipeline_num;
             max_pipeline_num = cfg_pipeline_num;
         }
-        size_t cfg_stage_num = config::Config::get().getVal<int>(config::PARTITION_NUM);
+        size_t cfg_stage_num = config.getVal<int>(config::PARTITION_NUM);
 
         logger->trace("DPStaging::runDpComm starting: batch_size={} dev_num={} min_pipeline_num={}",
                       batch_size_, dev_num, min_pipeline_num);
 
-        const bool dp_search_all = config::Config::get().getVal<bool>(config::DP_SEARCH_ALL);
+        const bool dp_search_all = config.getVal<bool>(config::DP_SEARCH_ALL);
 
         int dev_per_node = std::min((int) dev_num, getCudaDeviceCount());
 
@@ -261,15 +264,9 @@ namespace rannc {
         }
         int node_num_total = dev_num / dev_per_node;
 
-        if (config::Config::get().getVal<bool>(config::SHOW_DP_SUMMARY)) {
-//            size_t idx = 0;
-//            for (const auto& n: graph.nodes) {
-//                logger->trace("{} {}", idx++, toString(*n.graph));
-//            }
-
-            logger->trace(makeNodeEvalSummary(graph, dev_num, min_pipeline_num));
-            logger->trace(makeNodeMemSummary(graph, dev_num, min_pipeline_num));
-//            logger->trace(makeCommBufSummary(graph, dev_num, min_pipeline_num));
+        const std::string dump_dp_node_profiles = config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
+        if (!dump_dp_node_profiles.empty()) {
+            dumpNodeProfiles(dump_dp_node_profiles, graph, dev_num, min_pipeline_num);
         }
 
         std::vector <AllocSolution> pl_sols;
