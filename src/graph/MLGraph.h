@@ -20,6 +20,8 @@ namespace rannc {
             os << "src_node: " << edge.src_id << " tgt_node: " << edge.tgt_id << " value: " << edge.value.getName();
             return os;
         }
+
+        MSGPACK_DEFINE(src_id, tgt_id, value);
     };
 
     struct MLEdge {
@@ -33,6 +35,8 @@ namespace rannc {
                << "] base_edges: [" << edge.base_edges << "]";
             return os;
         }
+
+        MSGPACK_DEFINE(src_id, tgt_id, sub_edges, base_edges);
     };
 
     struct MLGraph;
@@ -64,6 +68,8 @@ namespace rannc {
             }
             return sum;
         }
+
+        MSGPACK_DEFINE(id, graph, sub_nodes, sub_edges);
     };
 
     struct MLGraph {
@@ -87,6 +93,8 @@ namespace rannc {
             }
             return sum;
         }
+
+        MSGPACK_DEFINE(nodes, edges);
     };
 
     using MLEdgeKey = std::pair<std::string, std::string>;
@@ -102,7 +110,6 @@ namespace rannc {
     std::string dumpMLGraph(const MLGraph& g);
     std::string dumpMLNode(const MLNode& n, int indent=0);
     std::string dumpMLEdge(const std::vector<MLEdge>& edges, int indent=0);
-
 
     typedef boost::adjacency_list<boost::listS, boost::vecS, boost::bidirectionalS, MLNode, MLEdge> MLBGraph;
     typedef boost::graph_traits<MLBGraph>::vertex_descriptor MLVertex;
@@ -198,8 +205,6 @@ namespace rannc {
         }
         const MLBGraph& graph_;
   };
-
-
 }
 
 

@@ -69,6 +69,7 @@ namespace rannc {
         const char ALLOC_REPL_FLAT[] = "alloc_repl_flat";
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
         const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
+        const char DUMP_DP_CACHE[] = "dump_dp_cache";
 
         const char CONF_DIR[] = "conf_dir";
 
@@ -157,6 +158,7 @@ namespace rannc {
                     makeConfigItem(ALLOC_REPL_FLAT, true),
                     makeConfigItem(SYNC_ALLREDUCE, true),
                     makeConfigItem(DUMP_DP_NODE_PROFILES, std::string("")),
+                    makeConfigItem(DUMP_DP_CACHE, std::string("")),
 
                     makeConfigItem(CONF_DIR, "")
             };

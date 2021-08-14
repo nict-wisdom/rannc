@@ -498,8 +498,10 @@ namespace rannc {
         std::unordered_map<std::string, int> repl_nums;
         int pipeline_num;
         bool checkpointing;
+        std::vector <size_t> boundaries;
+        std::vector <size_t> dev_nums;
 
-        MSGPACK_DEFINE(graphs, repl_nums, pipeline_num, checkpointing);
+        MSGPACK_DEFINE(graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums);
     };
 }
 

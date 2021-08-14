@@ -63,6 +63,7 @@ namespace rannc {
         extern const char ALLOC_REPL_FLAT[];
         extern const char SYNC_ALLREDUCE[];
         extern const char DUMP_DP_NODE_PROFILES[];
+        extern const char DUMP_DP_CACHE[];
         extern const char CONF_DIR[]; // this is special because Config itself sets this item
 
         enum class ConfigType {

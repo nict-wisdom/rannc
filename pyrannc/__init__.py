@@ -536,3 +536,7 @@ def allreduce_grads(rmodel, optimizer, prescale=1.0):
         rmodel.allreduce_grads()
 
     return False
+
+
+def run_dp_dry(path):
+    _pyrannc.run_dp_dry(path)

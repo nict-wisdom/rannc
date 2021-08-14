@@ -35,29 +35,6 @@ namespace rannc {
     int deviceToInt(const c10::Device &dev);
     c10::Device deviceFromInt(int val);
 
-    template <typename T>
-    std::vector<char> serialize(const T data) {
-        std::stringstream buffer;
-        msgpack::pack(buffer, data);
-
-        buffer.seekg(0);
-        std::string str_buf(buffer.str());
-
-        std::vector<char> vec_buf(str_buf.size());
-        memcpy(&vec_buf[0], str_buf.c_str(), str_buf.size());
-        return vec_buf;
-    }
-
-    template <typename T>
-    T deserialize(const std::vector<char>& data) {
-        msgpack::object_handle oh = msgpack::unpack(&data[0], data.size());
-        msgpack::object deserialized = oh.get();
-
-        T obj;
-        deserialized.convert(obj);
-        return obj;
-    }
-
     struct RouteDP {
         RouteDP() = default;
         RouteDP(IValueLocation location, std::vector<int> sources, std::vector<int> dests, int tag, int source_tag, RouteTypeDP type):

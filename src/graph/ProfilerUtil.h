@@ -38,6 +38,8 @@ namespace rannc {
         bool operator!=(const MLProfileKey &rhs) const {
             return !(rhs == *this);
         }
+
+        MSGPACK_DEFINE(id, batch_size, checkpointing);
     };
 
     struct MLProfileKeyHash {
@@ -56,6 +58,14 @@ namespace rannc {
             profiler_(std::move(profiler)) {};
         GraphProfile profile(const std::shared_ptr <IRGraph> &g, size_t batch_size, size_t replica_num,
                              bool checkpointing=false);
+
+        const MLProfileCache &getProfileCache() const {
+            return profile_cache_;
+        }
+
+        void setProfileCache(const MLProfileCache &profileCache) {
+            profile_cache_ = profileCache;
+        }
 
         static const long ERROR_VAL = LONG_MAX / 1024;
 

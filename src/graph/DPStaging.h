@@ -27,13 +27,24 @@ namespace rannc {
         DPStaging(std::shared_ptr<GraphProfiler> profiler, size_t batch_size, size_t dev_mem,
                   bool use_amp_master_params, bool enable_zero)
             :prof_util_(std::move(profiler)), batch_size_(batch_size), dev_mem_(dev_mem),
-            use_amp_master_params_(use_amp_master_params), enable_zero_(enable_zero) {}
+            use_amp_master_params_(use_amp_master_params), enable_zero_(enable_zero) {
+
+            config::Config& config = config::Config::get();
+            dump_dp_node_profiles_ = config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
+            dump_dp_cache_ = config.getVal<std::string>(config::DUMP_DP_CACHE);
+            min_pipeline_num_ = config.getVal<int>(config::MIN_PIPELINE);
+            max_pipeline_num_ = config.getVal<int>(config::MAX_PIPELINE);
+            cfg_pipeline_num_ = config.getVal<int>(config::PIPELINE_NUM);
+            cfg_stage_num_ = config.getVal<int>(config::PARTITION_NUM);
+
+        }
         AllocSolution runDpComm(const MLGraph& graph, size_t dev_num);
 
-    private:
+    protected:
         AllocSolution doRunDpComm(const MLGraph& graph, size_t stage_num, size_t dev_num_per_group,
                 int replica_num, int pipeline_num, bool checkpointing);
-        long estimateTime(const AllocSolution& sol);
+        long estimateTime(const AllocSolution& sol, const MLGraph &graph);
+        virtual GraphProfile estimateSolutionGraph(const AllocSolution &sol, const MLGraph& graph, size_t g_idx);
 
         GraphProfile estimateProf(const MLGraph& graph, size_t from, size_t to, size_t dev_num,
                 bool checkpointing);
@@ -43,14 +54,68 @@ namespace rannc {
         ProfilerUtil prof_util_;
         size_t batch_size_;
         size_t dev_mem_;
-        GraphMergeCache graph_merge_cache_;
+        int min_pipeline_num_;
+        int max_pipeline_num_;
+        int cfg_pipeline_num_;
+        size_t cfg_stage_num_;
+
         bool use_amp_master_params_;
         bool enable_zero_;
 
+        GraphMergeCache graph_merge_cache_;
+
+        std::string dump_dp_node_profiles_;
+        std::string dump_dp_cache_;
+
         const std::shared_ptr<spdlog::logger> logger = getLogger("DPStaging");
     };
-}
 
+    struct DPStagingCache {
+        MLGraph graph;
+        MLProfileCache ml_profile_cache;
+        size_t dev_num;
+        size_t batch_size;
+        size_t dev_mem;
+        int min_pipeline_num;
+        int max_pipeline_num;
+        int cfg_pipeline_num;
+        size_t cfg_stage_num;
+        bool use_amp_master_params;
+        bool enable_zero;
+
+        MSGPACK_DEFINE(graph, ml_profile_cache, dev_num, batch_size, dev_mem,
+                       min_pipeline_num, max_pipeline_num, cfg_pipeline_num, cfg_stage_num,
+                       use_amp_master_params, enable_zero);
+    };
+
+    class DPDryStaging : public DPStaging {
+    public:
+        DPDryStaging(const DPStagingCache& cache)
+        :graph_(cache.graph), dev_num_(cache.dev_num),
+        DPStaging(std::shared_ptr<GraphProfiler>(nullptr), cache.batch_size, cache.dev_mem, cache.use_amp_master_params, cache.enable_zero) {
+            prof_util_.setProfileCache(cache.ml_profile_cache);
+
+            min_pipeline_num_ = cache.min_pipeline_num;
+            max_pipeline_num_ = cache.max_pipeline_num;
+            cfg_pipeline_num_ = cache.cfg_pipeline_num;
+            cfg_stage_num_ = cache.cfg_stage_num;
+
+            dump_dp_node_profiles_.clear();
+            dump_dp_cache_.clear();
+        }
+
+        AllocSolution runDpComm() {
+            return DPStaging::runDpComm(graph_, dev_num_);
+        }
+
+    protected:
+        virtual GraphProfile estimateSolutionGraph(const AllocSolution &sol, const MLGraph& graph, size_t g_idx);
+
+    private:
+        MLGraph graph_;
+        size_t dev_num_;
+    };
+}
 
 
 #endif //PYRANNC_DPSTAGING_H

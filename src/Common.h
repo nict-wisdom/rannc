@@ -13,6 +13,8 @@
 #include <numeric>
 #include <random>
 
+#include <msgpack.hpp>
+
 #include "Logging.h"
 
 namespace fs = boost::filesystem;
@@ -379,6 +381,52 @@ namespace rannc {
             a = gcd(a, v[i]);
         }
         return a;
+    }
+
+    template <typename T>
+    std::vector<char> serialize(const T data) {
+        std::stringstream buffer;
+        msgpack::pack(buffer, data);
+
+        buffer.seekg(0);
+        std::string str_buf(buffer.str());
+
+        std::vector<char> vec_buf(str_buf.size());
+        memcpy(&vec_buf[0], str_buf.c_str(), str_buf.size());
+        return vec_buf;
+    }
+
+    template <typename T>
+    T deserialize(const std::vector<char>& data) {
+        msgpack::object_handle oh = msgpack::unpack(&data[0], data.size());
+        msgpack::object deserialized = oh.get();
+
+        T obj;
+        deserialized.convert(obj);
+        return obj;
+    }
+
+    template<typename T>
+    void saveToFile(const std::string& path, const T& obj) {
+        const auto cache_data = serialize(obj);
+
+        std::ofstream out(path, std::ios::out | std::ios::binary);
+        if (!out) {
+            throw std::invalid_argument("Failed to open file: " + path);
+        }
+        out.write(reinterpret_cast<const char*>(&cache_data[0]), cache_data.size());
+        out.close();
+    }
+
+    template<typename T>
+    T loadFromFile(const std::string& path) {
+        std::ifstream input(path, std::ios::in | std::ios::binary);
+        if (!input) {
+            throw std::invalid_argument("Failed to open file: " + path);
+        }
+
+        std::vector<char> buffer(std::istreambuf_iterator<char>(input), {});
+        return deserialize<T>(buffer);
     }
 }
 

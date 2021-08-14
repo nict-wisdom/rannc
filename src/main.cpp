@@ -9,6 +9,7 @@
 #include <comm/ObjectComm.h>
 #include <bind/PybindUtil.h>
 #include <comp/EventRecorder.h>
+#include <graph/DPStaging.h>
 
 #include "Logging.h"
 #include "comm/MPIUtil.h"
@@ -326,46 +327,18 @@ PYBIND11_MODULE(_pyrannc, m) {
                 self.destroy();
             });
 
-    m.def("send_bytes", [](const py::bytes& data, int dest) {
-        const auto str_data = static_cast<std::string>(data);
-
-        size_t size = str_data.size();
-        mpi::checkMPIResult(MPI_Send((void*) &size, 1, MPI_LONG, dest, 10, MPI_COMM_WORLD));
-
-        size_t offset = 0;
-        while (size > offset) {
-            size_t remaining = size - offset;
-            size_t chunk_size = std::min((size_t) INT_MAX, remaining);
-            mpi::checkMPIResult(MPI_Send((void*) (str_data.c_str() + offset), chunk_size, MPI_BYTE, dest, 10, MPI_COMM_WORLD));
-            offset += chunk_size;
-        }
-    });
-
-    m.def("recv_bytes", [](int src) {
-        size_t size;
-        MPI_Status st;
-        mpi::checkMPIResult(MPI_Recv((void*) &size, 1, MPI_LONG, src, 10, MPI_COMM_WORLD, &st));
-
-        std::string buf;
-        buf.resize(size);
-
-        size_t offset = 0;
-        while (size > offset) {
-            size_t remaining = size - offset;
-            size_t chunk_size = std::min((size_t) INT_MAX, remaining);
-            mpi::checkMPIResult(MPI_Recv((void*) (buf.c_str() + offset), chunk_size, MPI_BYTE, src, 10, MPI_COMM_WORLD, &st));
-            offset += chunk_size;
-        }
-
-        return py::bytes(buf);
-    });
-
     m.def("bcast_bytes", [](const py::bytes& data, int root) {
         std::string str_data = static_cast<std::string>(data);
 
         ObjectComm& ocomm = ObjectComm::get();
         const std::string recv_data = ocomm.bcast(str_data, root, MPI_COMM_WORLD);
         return py::bytes(recv_data);
+    });
+
+    m.def("run_dp_dry", [](const std::string& path) {
+        DPStagingCache cache = loadFromFile<DPStagingCache>(path);
+        DPDryStaging dp(cache);
+        dp.runDpComm();
     });
 
 #ifdef VERSION_INFO

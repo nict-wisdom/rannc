@@ -189,41 +189,32 @@ namespace rannc {
         out.close();
     }
 
-    long DPStaging::estimateTime(const AllocSolution &sol) {
+    long DPStaging::estimateTime(const AllocSolution &sol, const MLGraph& graph) {
 
         std::unordered_map<std::string, long> fwd_times;
         std::unordered_map<std::string, long> bwd_times;
-        bool cp = sol.pipeline_num > 1;
 
         long comp_time = 0;
         for (int step = 0; step < sol.pipeline_num + sol.graphs.size() - 1; step++) {
             size_t g_from = std::max(0, step - sol.pipeline_num + 1);
             size_t g_to_excl = std::min(step + 1, (int) sol.graphs.size());
 
-//            spdlog::info("step={} pipeline_num={} g_from={} g_to_excl={}", step, sol.pipeline_num, g_from, g_to_excl);
-
             long max_fwd_time = 0;
             long max_bwd_time = 0;
             for (size_t g_idx = g_from; g_idx < g_to_excl; g_idx++) {
                 const auto &sg = sol.graphs.at(g_idx);
-                assert(contains(sol.repl_nums, sg->getName()));
-                int repl = sol.repl_nums.at(sg->getName());
 
-                const auto prof = prof_util_.profile(sg, batch_size_, repl * sol.pipeline_num, cp);
+                const auto prof = estimateSolutionGraph(sol, graph, g_idx);
+
+                int repl = sol.repl_nums.at(sg->getName());
                 long comm_time = calcInputCommTime(sg, repl * sol.pipeline_num) +
-                                 calcOutputCommTime(sg, repl * sol.pipeline_num);
+                        calcOutputCommTime(sg, repl * sol.pipeline_num);
                 long fwd_time = prof.fwd_time + comm_time;
                 max_fwd_time = std::max(max_fwd_time, fwd_time);
 
                 long bwd_time = prof.bwd_time + comm_time;
                 max_bwd_time = std::max(max_bwd_time, bwd_time);
-
-//                spdlog::info("step={} g_idx={} fwd={} fwd_max={} bwd={} bwd_max={}", step, g_idx,
-//                        fwd_time, max_fwd_time, bwd_time, max_bwd_time);
             }
-
-//            spdlog::info("step={} fwd_max={} bwd_max={}", step,
-//                         max_fwd_time, max_bwd_time);
 
             comp_time += max_fwd_time + max_bwd_time;
         }
@@ -232,28 +223,30 @@ namespace rannc {
         for (const auto &sg: sol.graphs) {
             long ar_time = calcAllReduceTime(sg->getParamSizeInByte());
             max_ar_time = std::max(max_ar_time, ar_time);
-//            spdlog::info("ar_time={}", ar_time);
         }
 
         return comp_time + max_ar_time;
     }
 
+    GraphProfile DPStaging::estimateSolutionGraph(const AllocSolution &sol, const MLGraph& graph, size_t g_idx) {
+        const auto &sg = sol.graphs.at(g_idx);
+        assert(contains(sol.repl_nums, sg->getName()));
+        int repl = sol.repl_nums.at(sg->getName());
+        return prof_util_.profile(sg, batch_size_, repl * sol.pipeline_num, sol.pipeline_num > 1);
+    }
+
     AllocSolution DPStaging::runDpComm(const MLGraph &graph, size_t dev_num) {
 
         config::Config& config = config::Config::get();
-        int min_pipeline_num = config.getVal<int>(config::MIN_PIPELINE);
-        int max_pipeline_num = config.getVal<int>(config::MAX_PIPELINE);
 
         // Forcibly set pipeline num for debugging
-        int cfg_pipeline_num = config.getVal<int>(config::PIPELINE_NUM);
-        if (cfg_pipeline_num != 0) {
-            min_pipeline_num = cfg_pipeline_num;
-            max_pipeline_num = cfg_pipeline_num;
+        if (cfg_pipeline_num_ != 0) {
+            min_pipeline_num_ = cfg_pipeline_num_;
+            max_pipeline_num_ = cfg_pipeline_num_;
         }
-        size_t cfg_stage_num = config.getVal<int>(config::PARTITION_NUM);
 
         logger->trace("DPStaging::runDpComm starting: batch_size={} dev_num={} min_pipeline_num={}",
-                      batch_size_, dev_num, min_pipeline_num);
+                      batch_size_, dev_num, min_pipeline_num_);
 
         const bool dp_search_all = config.getVal<bool>(config::DP_SEARCH_ALL);
 
@@ -264,9 +257,8 @@ namespace rannc {
         }
         int node_num_total = dev_num / dev_per_node;
 
-        const std::string dump_dp_node_profiles = config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
-        if (!dump_dp_node_profiles.empty()) {
-            dumpNodeProfiles(dump_dp_node_profiles, graph, dev_num, min_pipeline_num);
+        if (!dump_dp_node_profiles_.empty()) {
+            dumpNodeProfiles(dump_dp_node_profiles_, graph, dev_num, min_pipeline_num_);
         }
 
         std::vector <AllocSolution> pl_sols;
@@ -278,12 +270,12 @@ namespace rannc {
             size_t stage_num_min = (dev_per_node * (node_num_used - 1)) + 1;
             size_t stage_num_max = dev_per_node * node_num_used;
             // Forcibly set stage num for debugging
-            if (cfg_stage_num != 0) {
-                if (cfg_stage_num < stage_num_min || stage_num_max < stage_num_min) {
+            if (cfg_stage_num_ != 0) {
+                if (cfg_stage_num_ < stage_num_min || stage_num_max < stage_num_min) {
                     continue;
                 }
-                stage_num_min = cfg_stage_num;
-                stage_num_max = cfg_stage_num;
+                stage_num_min = cfg_stage_num_;
+                stage_num_max = cfg_stage_num_;
             }
 
             // graph can be very small
@@ -292,8 +284,8 @@ namespace rannc {
 
             for (size_t stage_num = stage_num_min; stage_num <= stage_num_max; stage_num++) {
 
-                for (int pipeline_num = std::max(1, min_pipeline_num);
-                     pipeline_num <= std::min((int) batch_size_, max_pipeline_num);
+                for (int pipeline_num = std::max(1, min_pipeline_num_);
+                     pipeline_num <= std::min((int) batch_size_, max_pipeline_num_);
                      pipeline_num *= 2) {
                     bool checkpointing = pipeline_num > 1;
                     int replica_num = node_num_total / node_num_used;
@@ -321,6 +313,24 @@ namespace rannc {
             }
         }
 
+        if (!dump_dp_cache_.empty()) {
+            DPStagingCache cache;
+            cache.graph = graph;
+            cache.ml_profile_cache = prof_util_.getProfileCache();
+            cache.dev_num = dev_num;
+            cache.batch_size = batch_size_;
+            cache.dev_mem = dev_mem_;
+            cache.min_pipeline_num = min_pipeline_num_;
+            cache.max_pipeline_num = max_pipeline_num_;
+            cache.cfg_pipeline_num = cfg_pipeline_num_;
+            cache.cfg_stage_num = cfg_stage_num_;
+            cache.use_amp_master_params = use_amp_master_params_;
+            cache.enable_zero = enable_zero_;
+
+            logger->info("Saving DP cache to {}", dump_dp_cache_);
+            saveToFile(dump_dp_cache_, cache);
+        }
+
         if (pl_sols.empty()) {
             throw std::runtime_error("Failed to find a feasible allocation.");
         }
@@ -328,8 +338,7 @@ namespace rannc {
         long best_time = LONG_MAX;
         AllocSolution best_sol;
         for (const auto &sol: pl_sols) {
-            long est_time = estimateTime(sol);
-//            spdlog::info("sol stage_num={} pipeline={} time={}", sol.graphs.size(), sol.pipeline_num, est_time);
+            long est_time = estimateTime(sol, graph);
             if (est_time < best_time) {
                 best_time = est_time;
                 best_sol = sol;
@@ -338,14 +347,14 @@ namespace rannc {
 
         logger->info("Estimated profiles of subgraphs (#partition(s)={}: batch_size={} ranks={} pipeline_num={} zero={})",
                      best_sol.graphs.size(), batch_size_, mpi::getSize(), best_sol.pipeline_num, enable_zero_);
+        size_t g_idx = 0;
         for (const auto &g: best_sol.graphs) {
             int repl_num = best_sol.repl_nums.at(g->getName());
-            const auto prof = prof_util_.profile(g, batch_size_, repl_num * best_sol.pipeline_num,
-                                                 best_sol.checkpointing);
+            const auto prof = estimateSolutionGraph(best_sol, graph, g_idx);
 
             long ar_time = calcAllReduceTime(g->getParamSizeInByte());
 
-            int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
+            int opt_param_factor = config.getVal<int>(config::OPT_PARAM_FACTOR);
             size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
             size_t total = prof.max_allocated_mem + opt_mem;
 
@@ -355,6 +364,8 @@ namespace rannc {
                     prof.fwd_time, prof.bwd_time, ar_time,
                     calcInputSize(g), calcOutputSize(g),
                     total, prof.max_allocated_mem, opt_mem);
+
+            g_idx++;
         }
 
         return best_sol;
@@ -650,6 +661,14 @@ namespace rannc {
         logger->trace("sol boundaries={}", join_as_str(boundaries));
         logger->trace("sol dev_nums={}", join_as_str(dev_nums));
 
-        return AllocSolution{sol_graphs, repl_nums, pipeline_num, checkpointing};
+        return AllocSolution{sol_graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums};
+    }
+
+    GraphProfile DPDryStaging::estimateSolutionGraph(const AllocSolution &sol, const MLGraph& graph, size_t g_idx) {
+        int repl = sol.dev_nums.at(g_idx + 1) - sol.dev_nums.at(g_idx);
+        return this->estimateProf(graph,
+                                  sol.boundaries.at(g_idx),
+                                  sol.boundaries.at(g_idx + 1) - 1,
+                                  repl * sol.pipeline_num, sol.pipeline_num > 1);
     }
 }
