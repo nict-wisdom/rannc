@@ -237,7 +237,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             bwd(p_out, tgt, opt, use_amp)
             bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
-            if run_update:
+            if delay_grad_allreduce and run_update:
                 pyrannc.allreduce_grads(rmodel, r_opt)
 
             torch.nn.utils.clip_grad_norm_(amp.master_params(opt), MAX_NORM)
