@@ -130,4 +130,101 @@ namespace rannc {
         }
         return profile_cache_.at(k);
     }
+
+    GraphProfile accProfileValues(ProfilerUtil& prof_util, size_t batch_size,
+                                  const std::vector<std::shared_ptr<IRGraph>> graphs,
+                                  size_t from, size_t to, size_t dev_num,
+                                  bool checkpointing) {
+        assert(from <= to);
+        assert(to < graphs.size());
+
+        GraphProfile prof_sum{"MERGED", 0, 0, 0};
+
+        for (size_t i = from; i <= to; i++) {
+            const auto &graph = graphs.at(i);
+            const auto prof = prof_util.profile(graph, batch_size, dev_num, checkpointing);
+
+            prof_sum.fwd_time += prof.fwd_time;
+            prof_sum.bwd_time += prof.bwd_time;
+            prof_sum.max_allocated_mem += prof.max_allocated_mem;
+        }
+        return prof_sum;
+    }
+
+    std::string displayGraphProfiles(const std::vector<std::shared_ptr<IRGraph>>& graphs,
+                                     size_t batch_size, int pipeline_num,
+                                     bool use_amp_master_params, bool enable_zero,
+                                     const std::unordered_map<std::string, int>& repl_nums,
+                                     const std::unordered_map<std::string, GraphProfile>& profiles) {
+        std::stringstream ss;
+
+        ss << "Estimated profiles of subgraphs: batch_size=" << batch_size
+            << " np=" << mpi::getSize()
+            << " pipeline=" << pipeline_num
+            << " use_amp=" << use_amp_master_params
+            << " zero=" << enable_zero
+            << std::endl;
+
+        size_t idx = 0;
+        for (const auto& g: graphs) {
+            const auto& name = g->getName();
+            assert(contains(repl_nums, name));
+            assert(contains(profiles, name));
+
+            int repl_num = repl_nums.at(name);
+            const auto& prof = profiles.at(name);
+
+            int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
+            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params, enable_zero, repl_num);
+
+            size_t bs = ceil(batch_size / (double) (repl_num*pipeline_num));
+            auto scaled = std::make_shared<IRGraph>("scaled", *g);
+            scaled->setBatchSize(bs);
+            size_t comm_buf = calcCommBufSize(scaled, pipeline_num);
+
+            long ar_time = calcAllReduceTime(g->getParamSizeInByte());
+
+            size_t total = prof.max_allocated_mem + opt_mem + comm_buf;
+
+            size_t fp32params = 0;
+            size_t fp16params = 0;
+            for (const auto& in_name: g->getInputNames()) {
+                const auto& in_v = g->getValue(in_name);
+                if (in_v.isParam()) {
+                    assert(in_v.getType().getBaseType() == IRBaseType::TENSOR);
+                    if (in_v.getType().getTensorElemType() == IRTensorElemType::FLOAT) {
+                        fp32params += in_v.getSizeInByte();
+                    } else if (in_v.getType().getTensorElemType() == IRTensorElemType::HALF
+                               || in_v.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
+                        fp16params += in_v.getSizeInByte();
+                    } else {
+                        spdlog::debug("Unknown elem type of parameter {}: {}", in_name,
+                                      toString(in_v.getType().getTensorElemType()));
+                    }
+                }
+            }
+
+            ss << "  graph=" << g->getName()
+                << " repl=" << repl_num
+                << " fwd_time=" << prof.fwd_time
+                << " bwd_time=" << prof.bwd_time
+                << " ar_time=" << ar_time
+                << " in_size=" << calcInputSize(scaled)
+                << " out_size=" << calcOutputSize(scaled)
+                << " fp32param_size=" << fp32params
+                << " fp16param_size=" << fp16params
+                << " total_mem=" << total
+                << " (fwd+bwd=" << prof.max_allocated_mem
+                << " opt=" << opt_mem
+                << " comm=" << comm_buf
+                << ")";
+
+            if (idx < graphs.size()-1) {
+                ss << std::endl;
+            }
+            idx++;
+        }
+
+        return ss.str();
+    }
 }

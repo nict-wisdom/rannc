@@ -74,5 +74,16 @@ namespace rannc {
         std::unordered_map<bool, std::unordered_map<std::string, size_t>> max_batch_size_cache_;
         std::shared_ptr<GraphProfiler> profiler_;
     };
+
+    GraphProfile accProfileValues(ProfilerUtil& prof_util, size_t batch_size,
+                                  const std::vector<std::shared_ptr<IRGraph>> graphs,
+                                  size_t from, size_t to, size_t dev_num,
+                                  bool checkpointing);
+
+    std::string displayGraphProfiles(const std::vector<std::shared_ptr<IRGraph>>& graphs,
+                                     size_t batch_size, int pipeline_num,
+                                     bool use_amp_master_params, bool enable_zero,
+                                     const std::unordered_map<std::string, int>& repl_nums,
+                                     const std::unordered_map<std::string, GraphProfile>& profiles);
 }
 #endif //PYRANNC_PROFILERUTIL_H

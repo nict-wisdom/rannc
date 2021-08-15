@@ -113,20 +113,13 @@ namespace rannc {
 
     GraphProfile DPStaging::estimateProf(const MLGraph &graph, size_t from, size_t to, size_t dev_num,
                                          bool checkpointing) {
-        assert(from <= to);
-        assert(to < graph.nodes.size());
 
-        GraphProfile prof_sum{"MERGED", 0, 0, 0};
-
-        for (size_t i = from; i <= to; i++) {
-            const auto &node = graph.nodes.at(i);
-            const auto prof = prof_util_.profile(node.graph, batch_size_, dev_num, checkpointing);
-
-            prof_sum.fwd_time += prof.fwd_time;
-            prof_sum.bwd_time += prof.bwd_time;
-            prof_sum.max_allocated_mem += prof.max_allocated_mem;
+        std::vector<std::shared_ptr<IRGraph>> graphs;
+        for (const auto& node: graph.nodes) {
+            graphs.push_back(node.graph);
         }
-        return prof_sum;
+
+        return accProfileValues(prof_util_, batch_size_, graphs, from, to, dev_num, checkpointing);
     }
 
     long estimateEval(const GraphProfile &step_prof,
@@ -345,28 +338,37 @@ namespace rannc {
             }
         }
 
-        logger->info("Estimated profiles of subgraphs (#partition(s)={}: batch_size={} ranks={} pipeline_num={} zero={})",
-                     best_sol.graphs.size(), batch_size_, mpi::getSize(), best_sol.pipeline_num, enable_zero_);
-        size_t g_idx = 0;
-        for (const auto &g: best_sol.graphs) {
-            int repl_num = best_sol.repl_nums.at(g->getName());
-            const auto prof = estimateSolutionGraph(best_sol, graph, g_idx);
-
-            long ar_time = calcAllReduceTime(g->getParamSizeInByte());
-
-            int opt_param_factor = config.getVal<int>(config::OPT_PARAM_FACTOR);
-            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
-            size_t total = prof.max_allocated_mem + opt_mem;
-
-            logger->info(
-                    "  graph={} repl={} cp={} fwd_time={} bwd_time={} ar_time={} in_size={} out_size={} mem={} (fwd+bwd={} opt={})",
-                    g->getName(), repl_num, best_sol.checkpointing,
-                    prof.fwd_time, prof.bwd_time, ar_time,
-                    calcInputSize(g), calcOutputSize(g),
-                    total, prof.max_allocated_mem, opt_mem);
-
-            g_idx++;
+        std::unordered_map<std::string, GraphProfile> profiles;
+        for (size_t g_idx=0; g_idx<best_sol.graphs.size(); g_idx++) {
+            profiles[best_sol.graphs.at(g_idx)->getName()] = estimateSolutionGraph(best_sol, graph, g_idx);
         }
+        logger->info(displayGraphProfiles(best_sol.graphs,
+                             batch_size_, best_sol.pipeline_num,
+                             use_amp_master_params_, enable_zero_,
+                             best_sol.repl_nums, profiles));
+
+//        logger->info("Estimated profiles of subgraphs (#partition(s)={}: batch_size={} ranks={} pipeline_num={} zero={})",
+//                     best_sol.graphs.size(), batch_size_, mpi::getSize(), best_sol.pipeline_num, enable_zero_);
+//        size_t g_idx = 0;
+//        for (const auto &g: best_sol.graphs) {
+//            int repl_num = best_sol.repl_nums.at(g->getName());
+//            const auto prof = estimateSolutionGraph(best_sol, graph, g_idx);
+//
+//            long ar_time = calcAllReduceTime(g->getParamSizeInByte());
+//
+//            int opt_param_factor = config.getVal<int>(config::OPT_PARAM_FACTOR);
+//            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
+//            size_t total = prof.max_allocated_mem + opt_mem;
+//
+//            logger->info(
+//                    "  graph={} repl={} cp={} fwd_time={} bwd_time={} ar_time={} in_size={} out_size={} mem={} (fwd+bwd={} opt={})",
+//                    g->getName(), repl_num, best_sol.checkpointing,
+//                    prof.fwd_time, prof.bwd_time, ar_time,
+//                    calcInputSize(g), calcOutputSize(g),
+//                    total, prof.max_allocated_mem, opt_mem);
+//
+//            g_idx++;
+//        }
 
         return best_sol;
     }

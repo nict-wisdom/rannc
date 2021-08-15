@@ -271,54 +271,25 @@ namespace rannc {
                 deployment_ = load(deployment_file_, mpi::getSize(), dev_info.total_mem);
                 deployment_.id = id_;
 
+
+                std::unordered_map<std::string, GraphProfile> profiles;
                 ProfilerUtil prof_util(sg_prof);
-                logger->info("Estimated profiles of subgraphs: batch_size={} ranks={} pipeline_num={} zero={}",
-                        batch_size, mpi::getSize(), deployment_.pipeline_num, enable_zero_);
-                for (const auto& it: deployment_.subgraphs) {
-                    assert(contains(deployment_.allocation, it.first));
-                    int repl_num = deployment_.allocation.at(it.first).size();
-                    const auto& g = it.second;
-                    const auto prof = prof_util.profile(g, batch_size, repl_num*deployment_.pipeline_num,
+                std::vector<std::shared_ptr<IRGraph>> graphs;
+                std::unordered_map<std::string, int> repl_nums;
+
+                for (const auto& it: deployment_.fwd_graph_order) {
+                    const auto& g = deployment_.subgraphs.at(it);
+                    int repl_num = deployment_.allocation.at(it).size();
+
+                    graphs.push_back(g);
+                    repl_nums[it] = repl_num;
+                    profiles[it] = prof_util.profile(g, batch_size, repl_num*deployment_.pipeline_num,
                                                         deployment_.checkpointing);
-
-                    int opt_param_factor = config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-                    size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
-
-                    size_t bs = ceil(batch_size / (double) (repl_num*deployment_.pipeline_num));
-                    auto scaled = std::make_shared<IRGraph>("scaled", *g);
-                    scaled->setBatchSize(bs);
-                    size_t comm_buf = calcCommBufSize(scaled, deployment_.pipeline_num);
-
-                    long ar_time = calcAllReduceTime(g->getParamSizeInByte());
-
-                    size_t total = prof.max_allocated_mem + opt_mem + comm_buf;
-
-                    size_t fp32params = 0;
-                    size_t fp16params = 0;
-                    for (const auto& in_name: g->getInputNames()) {
-                        const auto& in_v = g->getValue(in_name);
-                        if (in_v.isParam()) {
-                            assert(in_v.getType().getBaseType() == IRBaseType::TENSOR);
-                            if (in_v.getType().getTensorElemType() == IRTensorElemType::FLOAT) {
-                                fp32params += in_v.getSizeInByte();
-                            } else if (in_v.getType().getTensorElemType() == IRTensorElemType::HALF
-                                    || in_v.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
-                                fp16params += in_v.getSizeInByte();
-                            } else {
-                                logger->debug("Unknown elem type of parameter {}: {}", in_name,
-                                             toString(in_v.getType().getTensorElemType()));
-                            }
-                        }
-                    }
-
-                    logger->info("  graph={} repl={} fwd_time={} bwd_time={} ar_time={} in_size={} out_size={}"
-                                 " fp32param_size={} fp16params_size={} mem={} (fwd+bwd={} opt={} comm={})",
-                                  g->getName(), repl_num,
-                                  prof.fwd_time, prof.bwd_time, ar_time,
-                                  calcInputSize(scaled), calcOutputSize(scaled),
-                                  fp32params, fp16params,
-                                  total, prof.max_allocated_mem, opt_mem, comm_buf);
                 }
+                logger->info(displayGraphProfiles(graphs,
+                                                  batch_size, deployment_.pipeline_num,
+                                                  use_amp_master_params_, enable_zero_,
+                                                  repl_nums, profiles));
 
                 logger->info("Allocations: dev_num={}", mpi::getSize());
                 for (const auto& it: deployment_.subgraphs) {
