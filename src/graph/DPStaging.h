@@ -49,7 +49,8 @@ namespace rannc {
         GraphProfile estimateProf(const MLGraph& graph, size_t from, size_t to, size_t dev_num,
                 bool checkpointing);
 
-        void dumpNodeProfiles(const std::string& path, const MLGraph &graph, size_t dev_num, size_t pipeline_num);
+        void dumpNodeProfiles(const std::string& path, const MLGraph &graph, size_t dev_num, size_t min_pipeline_num,
+                              size_t max_pipeline_num);
 
         ProfilerUtil prof_util_;
         size_t batch_size_;

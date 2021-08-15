@@ -810,7 +810,7 @@ namespace rannc {
         return std::make_shared<IRGraph>(g->getName(), new_g->getNodes(), new_vals, new_inputs, new_outputs);
     }
 
-    size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g, int pipeline_num) {
+    size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g) {
         size_t input_size = 0;
         for (const auto& in_name: g->getInputNames()) {
             const IRValue& in_val = g->getValue(in_name);
@@ -852,9 +852,6 @@ namespace rannc {
             }
         }
 
-        return (input_size + output_size + ingrad_size) * pipeline_num + clone_input_size;
+        return input_size + output_size + ingrad_size + clone_input_size;
     }
-
-
-
 }

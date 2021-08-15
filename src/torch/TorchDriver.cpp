@@ -277,7 +277,6 @@ namespace rannc {
             if (contains(clone_names, in.first.value_name)) {
                 for (const auto& cl_name: clone_names.at(in.first.value_name)) {
                     std::stringstream ss;
-//                    ss << "[SHARED_IN]" << id << "_" << cl_name << "_split=" << split_idx;
                     ss << "[SHARED_IN]" << id << "_" << cl_name;
 
                     const auto cl_ivalue = cloneTensorsInIValueWithBuffer(in.second, ss.str(), buffer_cache_[id]);

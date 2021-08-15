@@ -111,6 +111,43 @@ namespace rannc {
         return base->graph;
     }
 
+    size_t estimateCommValueSize(const std::vector<std::shared_ptr<IRGraph>>& graphs,
+                             const std::function<std::vector<std::string>(const std::shared_ptr<IRGraph>&)>& get_targets,
+                             const std::function<std::vector<std::string>(const std::shared_ptr<IRGraph>&)>& to_erase) {
+
+        std::unordered_map<std::string, IRValue> target_values;
+
+        for (const auto& g: graphs) {
+            for (const auto& tgt_name: get_targets(g)) {
+                target_values[tgt_name] = g->getValue(tgt_name);
+            }
+        }
+
+        for (const auto& g: graphs) {
+            for (const auto& erase_name: to_erase(g)) {
+                target_values.erase(erase_name);
+            }
+        }
+
+        size_t size_sum = 0;
+        for (const auto& it: target_values) {
+            size_sum += it.second.getSizeInByte();
+        }
+        return size_sum;
+    }
+
+    size_t estimateInputSize(const std::vector<std::shared_ptr<IRGraph>>& graphs) {
+        return estimateCommValueSize(graphs,
+                              [](const std::shared_ptr<IRGraph>& g) {return g->getInputNames();},
+                              [](const std::shared_ptr<IRGraph>& g) {return g->getOutputNames();});
+    }
+
+    size_t estimateOutputSize(const std::vector<std::shared_ptr<IRGraph>>& graphs) {
+        return estimateCommValueSize(graphs,
+                                     [](const std::shared_ptr<IRGraph>& g) {return g->getOutputNames();},
+                                     [](const std::shared_ptr<IRGraph>& g) {return g->getInputNames();});
+    }
+
     GraphProfile DPStaging::estimateProf(const MLGraph &graph, size_t from, size_t to, size_t dev_num,
                                          bool checkpointing) {
 
@@ -132,7 +169,7 @@ namespace rannc {
     }
 
     void DPStaging::dumpNodeProfiles(const std::string& path, const MLGraph &graph, size_t dev_num,
-                                     size_t pipeline_num) {
+                                     size_t min_pipeline_num, size_t max_pipeline_num) {
         int node_idx = 0;
         nlohmann::ordered_json nodes_prof;
         nlohmann::json graphs;
@@ -145,21 +182,26 @@ namespace rannc {
             node_obj["output_size"] = calcOutputSize(node.graph);
             graphs[node.graph->getName()] = toString(*node.graph);
 
-            nlohmann::ordered_json prof_dev;
-            for (size_t d = 1; d <= dev_num; d++) {
-                nlohmann::ordered_json prof_obj;
-                prof_obj["global_batch_size"] = batch_size_;
-                prof_obj["prof_batch_size"] = size_t(ceil(batch_size_ / (double) (d * pipeline_num)));
-                prof_obj["dev_num"] = d;
-                prof_obj["pipeline_num"] = pipeline_num;
+            std::vector<nlohmann::json> prof_dev;
 
-                const auto prof = prof_util_.profile(node.graph, batch_size_, d * pipeline_num, pipeline_num > 1);
-                prof_obj["fwd_time"] = prof.fwd_time;
-                prof_obj["bwd_time"] = prof.bwd_time;
-                prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
-                prof_obj["checkpointing"] = prof.checkpointing;
+            for (int pipeline_num = std::max(1, (int) min_pipeline_num);
+                    pipeline_num <= std::min((int) batch_size_, (int) max_pipeline_num);
+                    pipeline_num *= 2) {
+                for (size_t d = 1; d <= dev_num; d++) {
+                    nlohmann::ordered_json prof_obj;
+                    prof_obj["global_batch_size"] = batch_size_;
+                    prof_obj["prof_batch_size"] = size_t(ceil(batch_size_ / (double) (d * pipeline_num)));
+                    prof_obj["dev_num"] = d;
+                    prof_obj["pipeline_num"] = pipeline_num;
 
-                prof_dev[std::to_string(d)] = prof_obj;
+                    const auto prof = prof_util_.profile(node.graph, batch_size_, d * pipeline_num, pipeline_num > 1);
+                    prof_obj["fwd_time"] = prof.fwd_time;
+                    prof_obj["bwd_time"] = prof.bwd_time;
+                    prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
+                    prof_obj["checkpointing"] = prof.checkpointing;
+
+                    prof_dev.push_back(prof_obj);
+                }
             }
             node_obj["profiles"] = prof_dev;
             nodes_prof[std::to_string(node_idx)] = node_obj;
@@ -251,7 +293,7 @@ namespace rannc {
         int node_num_total = dev_num / dev_per_node;
 
         if (!dump_dp_node_profiles_.empty()) {
-            dumpNodeProfiles(dump_dp_node_profiles_, graph, dev_num, min_pipeline_num_);
+            dumpNodeProfiles(dump_dp_node_profiles_, graph, dev_num, min_pipeline_num_, max_pipeline_num_);
         }
 
         std::vector <AllocSolution> pl_sols;
@@ -346,29 +388,6 @@ namespace rannc {
                              batch_size_, best_sol.pipeline_num,
                              use_amp_master_params_, enable_zero_,
                              best_sol.repl_nums, profiles));
-
-//        logger->info("Estimated profiles of subgraphs (#partition(s)={}: batch_size={} ranks={} pipeline_num={} zero={})",
-//                     best_sol.graphs.size(), batch_size_, mpi::getSize(), best_sol.pipeline_num, enable_zero_);
-//        size_t g_idx = 0;
-//        for (const auto &g: best_sol.graphs) {
-//            int repl_num = best_sol.repl_nums.at(g->getName());
-//            const auto prof = estimateSolutionGraph(best_sol, graph, g_idx);
-//
-//            long ar_time = calcAllReduceTime(g->getParamSizeInByte());
-//
-//            int opt_param_factor = config.getVal<int>(config::OPT_PARAM_FACTOR);
-//            size_t opt_mem = getOptMemSize(g, opt_param_factor, use_amp_master_params_, enable_zero_, repl_num);
-//            size_t total = prof.max_allocated_mem + opt_mem;
-//
-//            logger->info(
-//                    "  graph={} repl={} cp={} fwd_time={} bwd_time={} ar_time={} in_size={} out_size={} mem={} (fwd+bwd={} opt={})",
-//                    g->getName(), repl_num, best_sol.checkpointing,
-//                    prof.fwd_time, prof.bwd_time, ar_time,
-//                    calcInputSize(g), calcOutputSize(g),
-//                    total, prof.max_allocated_mem, opt_mem);
-//
-//            g_idx++;
-//        }
 
         return best_sol;
     }
@@ -510,8 +529,20 @@ namespace rannc {
                                 // Just estimate time by accumulation
                                 step_prof = estimateProf(graph, b_prev, b - 1,
                                                          (d - d_prev) * replica_num * pipeline_num, checkpointing);
+
+                                std::vector<std::shared_ptr<IRGraph>> ir_graphs;
+                                assert(graph.nodes.size() > b - 1);
+                                for (size_t i = b_prev; i <= b - 1; i++) {
+                                    ir_graphs.push_back(graph.nodes.at(i).graph);
+                                }
+
+                                size_t input_size = estimateInputSize(ir_graphs);
+                                size_t step_in_comm = calcCommTime(input_size / ((d - d_prev) * replica_num * pipeline_num));
+                                size_t output_size = estimateOutputSize(ir_graphs);
+                                size_t step_out_comm = calcCommTime(output_size / ((d - d_prev) * replica_num * pipeline_num));
+
                                 step_val = ::rannc::estimateEval(step_prof,
-                                                                 0, 0,
+                                                                 step_in_comm, step_out_comm,
                                                                  table[s - 1][b_prev][d_prev].max_fwd,
                                                                  table[s - 1][b_prev][d_prev].max_bwd,
                                                                  table[s - 1][b_prev][d_prev].max_allreduce);
@@ -523,7 +554,8 @@ namespace rannc {
                                     const auto &node = graph.nodes.at(i);
                                     opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev));
                                 }
-                                step_mem = step_prof.max_allocated_mem + opt_mem;
+                                step_mem = step_prof.max_allocated_mem + opt_mem
+                                        + (step_in_comm + step_out_comm) + 2;
                             } else {
                                 // merge graphs from j+1 to i (inclusive)
                                 const auto step_graph = merge_helper.merge(b_prev, b - 1);

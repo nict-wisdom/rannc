@@ -62,7 +62,7 @@ namespace rannc {
         size_t bs = ceil(batch_size / (double) (replica_num*pipeline_num));
         auto scaled = std::make_shared<IRGraph>("scaled", *g);
         scaled->setBatchSize(bs);
-        return calcGraphMem(g, prof, use_amp_master_params, enable_zero, replica_num) + calcCommBufSize(scaled, pipeline_num);
+        return calcGraphMem(g, prof, use_amp_master_params, enable_zero, replica_num) + calcCommBufSize(scaled);
     }
 
     bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
@@ -180,7 +180,7 @@ namespace rannc {
             size_t bs = ceil(batch_size / (double) (repl_num*pipeline_num));
             auto scaled = std::make_shared<IRGraph>("scaled", *g);
             scaled->setBatchSize(bs);
-            size_t comm_buf = calcCommBufSize(scaled, pipeline_num);
+            size_t comm_buf = calcCommBufSize(scaled);
 
             long ar_time = calcAllReduceTime(g->getParamSizeInByte());
 

@@ -89,7 +89,6 @@ namespace rannc {
     private:
         void displayValue(const std::string& prefix, size_t count, int split_index,
                           bool grad_mode, const IValueMap &vals);
-        std::vector<torch::autograd::Edge> createOutputEdges(const std::string& id, const IValueMap& graphIn);
         std::vector<at::Tensor> getParamInputTensors(const std::string& id, bool init);
 
         /**
