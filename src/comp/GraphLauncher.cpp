@@ -77,6 +77,22 @@ namespace rannc {
         }
     }
 
+    std::unordered_map<std::string, IValueMap> toCPU(const std::unordered_map<std::string, IValueMap>& inputs, bool detach) {
+        std::unordered_map<std::string, IValueMap> ret;
+        for (const auto& it: inputs) {
+            ret[it.first] = toCPU(it.second, detach);
+        }
+        return ret;
+    }
+
+    std::unordered_map<std::string, IValueMap> toCUDAIfAvailable(const std::unordered_map<std::string, IValueMap>& inputs, bool detach) {
+        std::unordered_map<std::string, IValueMap> ret;
+        for (const auto& it: inputs) {
+            ret[it.first] = toCUDAIfAvailable(it.second, detach);
+        }
+        return ret;
+    }
+
     void GraphLauncher::deployGraph(const Deployment &deployment) {
 
         logger->trace("GraphLauncher::deployGraph starting");
@@ -195,7 +211,7 @@ namespace rannc {
                 logger->trace("Received input via route {} split={} {}", toString(r), i, toString(toIRType(in)));
 
                 if (!in.isNone()) {
-                    split_inputs[r.dest_graph][r.location] = in;
+                    split_inputs[r.dest_graph][r.location] = toCPU(in, true);
                 }
             }
 
@@ -216,11 +232,11 @@ namespace rannc {
             int64_t split_bs = split_batch_sizes.at(i);
             set_bs(split_bs);
             scomm.startSplit(i);
+            const auto& inputs = toCUDAIfAvailable(graph_inputs.at(i), true);
             if (is_bwd) {
-                split_driver_out = driver_[id]->backward(id, graph_inputs.at(i), i);
+                split_driver_out = driver_[id]->backward(id, inputs, i);
             } else {
-                split_driver_out = driver_[id]->forward(id, graph_inputs.at(i), i,
-                                                        torch::autograd::GradMode::is_enabled());
+                split_driver_out = driver_[id]->forward(id, inputs, i, torch::autograd::GradMode::is_enabled());
             }
             graph_driver_out.push_back(split_driver_out);
         }
@@ -263,7 +279,7 @@ namespace rannc {
                                   toString(route), i);
 
                     if (!out.isNone()) {
-                        split_out[sg_name][loc] = out;
+                        split_out[sg_name][loc] = cloneTensorsInIValue(out);
                     }
                 }
             }

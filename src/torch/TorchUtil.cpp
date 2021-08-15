@@ -177,6 +177,14 @@ namespace rannc {
         return to(iv, torch::Device(torch::kCPU), detach);
     }
 
+    IValueMap toCPU(const IValueMap& iv_map, bool detach) {
+        IValueMap ret;
+        for (const auto& it: iv_map) {
+            ret[it.first] = toCPU(it.second, true);
+        }
+        return ret;
+    }
+
     torch::jit::IValue toCUDAIfAvailable(const torch::jit::IValue& iv, bool detach) {
         if (torch::cuda::is_available()) {
             return to(iv, torch::Device(torch::kCUDA), detach);
@@ -193,6 +201,14 @@ namespace rannc {
             auto dret = ret.detach();
             dret.set_requires_grad(t.requires_grad());
             return dret;
+        }
+        return ret;
+    }
+
+    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach) {
+        IValueMap ret;
+        for (const auto& it: iv_map) {
+            ret[it.first] = toCUDAIfAvailable(it.second, true);
         }
         return ret;
     }

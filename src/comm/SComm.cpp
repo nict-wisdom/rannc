@@ -716,8 +716,7 @@ namespace rannc {
 
     std::string SComm::getKey(const RouteDP& route) const {
         std::stringstream ss;
-        ss << "[PREFIX=" << prefix_ << "]" << toString(route.location) << "[TAG=" << route.tag << "]"
-           << "[SPLIT=" << split_index_ << "]";
+        ss << "[PREFIX=" << prefix_ << "]" << toString(route.location) << "[TAG=" << route.tag << "]";
         return ss.str();
     }
 

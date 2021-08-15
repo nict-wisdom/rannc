@@ -94,11 +94,11 @@ namespace rannc {
         /**
          * Inputs used in the previous forward().
          */
-        std::unordered_map<std::string, std::vector<IValueMap>> last_inputs_;
+        std::unordered_map<std::string, IValueMap> last_inputs_;
         /**
          * Outputs of the previous forward().
          */
-        std::unordered_map<std::string, std::vector<IValueMap>> last_outputs_;
+        std::unordered_map<std::string, IValueMap> last_outputs_;
 
         /**
          * Graphs in IR.  The key is a graph ID.

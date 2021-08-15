@@ -265,10 +265,6 @@ namespace rannc {
 
         displayValue("forward input", fwd_count_, split_idx, grad_mode, inputs);
 
-        while (last_inputs_[id].size() <= split_idx) {
-            last_inputs_[id].push_back(IValueMap());
-        }
-
         recordStart(getFuncKey("forward_copy_in", id, split_idx, grad_mode));
 
         IValueMap graphIn;
@@ -307,11 +303,7 @@ namespace rannc {
 
         recordEnd(getFuncKey("forward_copy_in", id, split_idx, grad_mode));
 
-        while (last_outputs_[id].size() <= split_idx) {
-            last_outputs_[id].push_back(IValueMap());
-        }
-
-        IValueMap &graphOut = last_outputs_[id][split_idx];
+        IValueMap &graphOut = last_outputs_[id];
         graphOut.clear();
 
         // get the order of inputs from IRGraph and create an input tuple
@@ -355,7 +347,7 @@ namespace rannc {
 
         fwd_count_++;
 
-        last_inputs_[id][split_idx] = graphIn;
+        last_inputs_[id] = graphIn;
         last_split_idx_ = split_idx;
 
         logger->trace("TorchDriver::forward finished. id={} split={}", id, split_idx);
@@ -429,7 +421,7 @@ namespace rannc {
             }
         }
 
-        IValueMap &graphOut = last_outputs_[id][split_idx];
+        IValueMap &graphOut = last_outputs_[id];
 
         displayValue("backward input", bwd_count_, split_idx, false, required_inputs);
 
@@ -445,7 +437,7 @@ namespace rannc {
             return inGrads;
         }
 
-        auto &graphLastIn = last_inputs_[id][split_idx];
+        auto &graphLastIn = last_inputs_[id];
 
         for (const auto& in_name: ir_graphs_[id]->getInputNames()) {
             const auto& val = irGraph->getValue(in_name);
@@ -502,7 +494,7 @@ namespace rannc {
                 std::unordered_map<std::string, std::vector<std::string>>& clone_names = input_clone_names_[id];
                 std::vector<torch::jit::IValue> input_ivals;
                 std::stringstream ss;
-                ss << "[IN_GRAD]" <<  id << "_" << in_name << "_split=" << split_idx;
+                ss << "[IN_GRAD]" <<  id << "_" << in_name;
 
                 if (contains(clone_names, in_name)) {
                     for (const auto& cl_name: clone_names.at(in_name)) {

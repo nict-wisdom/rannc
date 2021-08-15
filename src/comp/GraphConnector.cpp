@@ -162,6 +162,7 @@ namespace rannc {
     }
 
     void GraphConnector::deployGraph(const Deployment& deployment) {
+        assert (deployment.pipeline_num <= 1 || deployment.checkpointing);
 
         graphs_ = getGraphsOnRank(deployment, mpi::getRank());
 
@@ -370,7 +371,7 @@ namespace rannc {
             this->rng_states_[id][split_index] = getRngState();
 
             if (cp.at(id)) {
-                inputs_[id][split_index] = inputs;
+                inputs_[id][split_index] = toCPU(inputs, true);
 
                 torch::NoGradGuard no_grad;
 
@@ -452,7 +453,7 @@ namespace rannc {
                     torch::autograd::AutoGradMode gm(true);
                     setRngState(this->rng_states_.at(id).at(split_index));
 
-                    const auto outputs = driver_.forward(id, inputs_[id][split_index], split_index);
+                    const auto outputs = driver_.forward(id, toCUDAIfAvailable(inputs_[id][split_index], true), split_index);
 
                     // for debugging
                     if (verify_recomp_) {

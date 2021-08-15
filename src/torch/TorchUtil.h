@@ -62,6 +62,9 @@ namespace rannc {
     using IValueMap = std::unordered_map<IValueLocation, torch::jit::IValue, IValueLocationHash>;
     std::vector<IValueLocation> getKeys(const IValueMap &map);
 
+    IValueMap toCPU(const IValueMap& iv_map, bool detach);
+    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach);
+
     enum class IRTensorElemType;
     IRTensorElemType toTensorElemType(const c10::ScalarType& scalarType);
     class IRType;
