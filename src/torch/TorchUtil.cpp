@@ -157,6 +157,10 @@ namespace rannc {
     torch::jit::IValue to(const torch::jit::IValue &iv, const torch::Device &device,
                           bool detach) {
         return processTensorInIValue(iv, [&device, detach](at::Tensor t) {
+            if (t.numel() == 0) {
+                return t;
+            }
+
             auto ret = t.to(device, false, true);
             if (detach) {
                 auto dret = ret.detach();
