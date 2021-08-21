@@ -560,7 +560,9 @@ namespace rannc {
     }
 
     torch::jit::IValue SComm::distribute(const torch::jit::IValue& val, const RouteDP& route, bool is_bwd, int split_delay) {
-        return distribute(val, route, is_bwd, reduceRouteTypes(toIRType(val), route), split_delay);
+        auto ir_type = route.ir_value.getType();
+        ir_type.setBatchSize(batch_size_);
+        return distribute(val, route, is_bwd, ir_type, split_delay);
     }
 
     torch::jit::IValue SComm::distribute(const torch::jit::IValue& val, const RouteDP& route, bool is_bwd,

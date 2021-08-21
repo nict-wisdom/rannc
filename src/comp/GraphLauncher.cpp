@@ -203,11 +203,8 @@ namespace rannc {
                             "Unexpected type of graph input. route=" + toString(r));
                 }
 
-                auto ir_type = r.ir_value.getType();
-                ir_type.setBatchSize(split_bs);
-
                 logger->trace("Sending input via route {} split={} {}", toString(r), i, toString(toIRType(send_val)));
-                const auto in = scomm.distribute(send_val, r, is_bwd, ir_type);
+                const auto in = scomm.distribute(send_val, r, is_bwd);
                 logger->trace("Received input via route {} split={} {}", toString(r), i, toString(toIRType(in)));
 
                 if (!in.isNone()) {
@@ -271,10 +268,7 @@ namespace rannc {
                     }
                     logger->trace("Sending output {} via route {} split={}", toString(toIRType(send_val)),
                                   toString(route), i);
-                    auto ir_type = route.ir_value.getType();
-                    ir_type.setBatchSize(split_bs);
-
-                    const auto out = scomm.distribute(send_val, route, is_bwd, ir_type);
+                    const auto out = scomm.distribute(send_val, route, is_bwd);
                     logger->trace("Received output {} via route: {} split={}", toString(toIRType(out)),
                                   toString(route), i);
 
