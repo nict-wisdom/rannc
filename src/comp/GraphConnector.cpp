@@ -371,7 +371,10 @@ namespace rannc {
             this->rng_states_[id][split_index] = getRngState();
 
             if (cp.at(id)) {
+                const auto to_cpu_key = getFuncKey("input_to_cpu", id, split_index, false);
+                recordStart(to_cpu_key);
                 inputs_[id][split_index] = toCPU(inputs, true);
+                recordEnd(to_cpu_key);
 
                 torch::NoGradGuard no_grad;
 
@@ -453,7 +456,11 @@ namespace rannc {
                     torch::autograd::AutoGradMode gm(true);
                     setRngState(this->rng_states_.at(id).at(split_index));
 
-                    const auto outputs = driver_.forward(id, toCUDAIfAvailable(inputs_[id][split_index], true), split_index);
+                    const auto to_gpu_key = getFuncKey("input_to_gpu", id, split_index, false);
+                    recordStart(to_gpu_key);
+                    const auto inputs = toCUDAIfAvailable(inputs_[id][split_index], true);
+                    recordEnd(to_gpu_key);
+                    const auto outputs = driver_.forward(id, inputs, split_index);
 
                     // for debugging
                     if (verify_recomp_) {
