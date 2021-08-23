@@ -11,6 +11,8 @@
 #include "GraphValueStorage.h"
 #include "ParamStorage.h"
 
+#include <ATen/cuda/CUDAEvent.h>
+
 namespace rannc {
 
     //
@@ -89,6 +91,7 @@ namespace rannc {
 
         std::unordered_map<std::string, std::unordered_map<int, RngState>> rng_states_;
         std::unordered_map<int, bool> skip_fwd_split_;
+        std::unordered_map<std::string, std::unordered_map<int, at::cuda::CUDAEvent>> copy_events_;
 
         torch::jit::IValue distributeOutput(bool is_bwd, const RouteDP& r, int split_index, int flush_offset,
                                             const std::unordered_map<std::string, int>& graph_order);

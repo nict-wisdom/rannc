@@ -155,13 +155,13 @@ namespace rannc {
     }
 
     torch::jit::IValue to(const torch::jit::IValue &iv, const torch::Device &device,
-                          bool detach) {
-        return processTensorInIValue(iv, [&device, detach](at::Tensor t) {
+                          bool detach, bool non_blocking) {
+        return processTensorInIValue(iv, [&device, detach, non_blocking](at::Tensor t) {
             if (t.numel() == 0) {
                 return t;
             }
 
-            auto ret = t.to(device, false, true);
+            auto ret = t.to(device, non_blocking, true);
             if (detach) {
                 auto dret = ret.detach();
                 dret.set_requires_grad(t.requires_grad());
@@ -177,29 +177,29 @@ namespace rannc {
         });
     }
 
-    torch::jit::IValue toCPU(const torch::jit::IValue& iv, bool detach) {
-        return to(iv, torch::Device(torch::kCPU), detach);
+    torch::jit::IValue toCPU(const torch::jit::IValue& iv, bool detach, bool non_blocking) {
+        return to(iv, torch::Device(torch::kCPU), detach, non_blocking);
     }
 
-    IValueMap toCPU(const IValueMap& iv_map, bool detach) {
+    IValueMap toCPU(const IValueMap& iv_map, bool detach, bool non_blocking) {
         IValueMap ret;
         for (const auto& it: iv_map) {
-            ret[it.first] = toCPU(it.second, true);
+            ret[it.first] = toCPU(it.second, true, non_blocking);
         }
         return ret;
     }
 
-    torch::jit::IValue toCUDAIfAvailable(const torch::jit::IValue& iv, bool detach) {
+    torch::jit::IValue toCUDAIfAvailable(const torch::jit::IValue& iv, bool detach, bool non_blocking) {
         if (torch::cuda::is_available()) {
-            return to(iv, torch::Device(torch::kCUDA), detach);
+            return to(iv, torch::Device(torch::kCUDA), detach, non_blocking);
         }
         return iv;
     }
 
-    at::Tensor toCUDAIfAvailable(const at::Tensor& t, bool detach) {
+    at::Tensor toCUDAIfAvailable(const at::Tensor& t, bool detach, bool non_blocking) {
         auto ret = t;
         if (torch::cuda::is_available()) {
-            ret = t.to(torch::Device(torch::kCUDA), false, true);
+            ret = t.to(torch::Device(torch::kCUDA), non_blocking, true);
         }
         if (detach) {
             auto dret = ret.detach();
@@ -209,10 +209,10 @@ namespace rannc {
         return ret;
     }
 
-    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach) {
+    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach, bool non_blocking) {
         IValueMap ret;
         for (const auto& it: iv_map) {
-            ret[it.first] = toCUDAIfAvailable(it.second, true);
+            ret[it.first] = toCUDAIfAvailable(it.second, true, non_blocking);
         }
         return ret;
     }

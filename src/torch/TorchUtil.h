@@ -47,11 +47,11 @@ namespace rannc {
         std::unordered_map<std::string, IRType> types_;
     };
 
-    torch::jit::IValue to(const torch::jit::IValue &iv, const torch::Device &device, bool detach);
+    torch::jit::IValue to(const torch::jit::IValue &iv, const torch::Device &device, bool detach, bool non_blocking=false);
     torch::jit::IValue detach(const torch::jit::IValue &iv);
-    torch::jit::IValue toCPU(const torch::jit::IValue& iv, bool detach);
-    torch::jit::IValue toCUDAIfAvailable(const torch::jit::IValue& iv, bool detach);
-    at::Tensor toCUDAIfAvailable(const at::Tensor& t, bool detach);
+    torch::jit::IValue toCPU(const torch::jit::IValue& iv, bool detach, bool non_blocking=false);
+    torch::jit::IValue toCUDAIfAvailable(const torch::jit::IValue& iv, bool detach, bool non_blocking=false);
+    at::Tensor toCUDAIfAvailable(const at::Tensor& t, bool detach, bool non_blocking=false);
     void toCUDAInPlace(at::Tensor& t);
     void toCPUInPlace(at::Tensor& t);
     torch::jit::IValue contiguous(const torch::jit::IValue &iv);
@@ -62,8 +62,8 @@ namespace rannc {
     using IValueMap = std::unordered_map<IValueLocation, torch::jit::IValue, IValueLocationHash>;
     std::vector<IValueLocation> getKeys(const IValueMap &map);
 
-    IValueMap toCPU(const IValueMap& iv_map, bool detach);
-    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach);
+    IValueMap toCPU(const IValueMap& iv_map, bool detach, bool non_blocking=false);
+    IValueMap toCUDAIfAvailable(const IValueMap& iv_map, bool detach, bool non_blocking=false);
 
     enum class IRTensorElemType;
     IRTensorElemType toTensorElemType(const c10::ScalarType& scalarType);
