@@ -15,6 +15,8 @@
 
 namespace rannc {
 
+    static constexpr size_t COMM_SIZE_LIMIT = 128L * 1024L * 1024L;
+
     std::vector<long> getSortedParamIDs(const std::unordered_map<std::string, long>& param_map) {
         std::vector<long> param_ids;
         param_ids.reserve(param_map.size());
@@ -333,6 +335,24 @@ namespace rannc {
         recordEnd(ss.str());
     }
 
+    void runReduceWithBucket(int tag, std::vector<at::Tensor>& grads_running, std::vector<int>& roots,
+                             std::vector<at::Tensor>& grads) {
+        // Wail for the "previous" reduce to finish
+        syncStream();
+        // now you can free buffer
+        grads_running.clear();
+
+        // start the next call
+        NCCLWrapper& ar = NCCLWrapper::get();
+        ar.reduce(tag, grads, roots);
+        // copy grads to keep references
+        grads_running = grads;
+
+        // clean the state
+        grads.clear();
+        roots.clear();
+    }
+
     void ParamStorage::allReduceParamGradsZero(const std::string& graph_id, double loss_scale) {
         const auto& graph_grouped_params = grouped_params_[graph_id];
 
@@ -350,18 +370,20 @@ namespace rannc {
 
         NCCLWrapper& ar = NCCLWrapper::get();
 
+        auto locator = zero_grad_locators_.at(graph_id);
         std::vector<int> sorted_tags = sortCommTags(graph_id);
+        std::vector<at::Tensor> grads_running;
         for (int tag: sorted_tags) {
             assert(contains(tag_rank_set_, tag));
             const auto& ranks = tag_rank_set_.at(tag);
             if (contains(ranks, mpi::getRank())) {
                 const auto &param_ids = graph_grouped_params.at(tag);
                 std::vector<at::Tensor> grads;
-
-                auto locator = zero_grad_locators_.at(graph_id);
                 std::vector<int> roots;
                 grads.reserve(param_ids.size()*ranks.size());
                 roots.reserve(param_ids.size()*ranks.size());
+                size_t comm_size = 0;
+
                 for (long pid: param_ids) {
                     for (int i=0; i<locator->getSegmentNum(pid); i++) {
                         const auto range = locator->getSegmentRange(pid, i);
@@ -380,22 +402,34 @@ namespace rannc {
                                 assert(segment_fp32.scalar_type() == at::ScalarType::Float || segment_fp32.scalar_type() == at::ScalarType::Double);
 
                                 grads.push_back(segment_fp32);
+                                comm_size += segment_fp32.nbytes();
                             } else {
                                 // Unscale grad because amp does not unscale segments that this process does not own.
+                                // Note: Be careful about the lifetime of segment_fp32.
+
                                 const at::Tensor segment = locator->getSegment(pid, i, true);
                                 auto segment_fp32 = segment.to(at::ScalarType::Float, true);
                                 segment_fp32 = segment_fp32.mul_(1 / loss_scale).detach();
                                 grads.push_back(segment_fp32);
+
+                                comm_size += segment_fp32.nbytes();
                             }
                         } else {
                             const auto segment = locator->getSegment(pid, i, true);
                             grads.push_back(segment);
+
+                            comm_size += segment.nbytes();
                         }
                         roots.push_back(i);
                     }
                     locator->setGradToLocalParamSegment(pid);
+
+                    if (comm_size > COMM_SIZE_LIMIT) {
+                        runReduceWithBucket(tag, grads_running, roots, grads);
+                        comm_size = 0;
+                    }
                 }
-                ar.reduce(tag, grads, roots);
+                runReduceWithBucket(tag, grads_running, roots, grads);
             }
         }
 
