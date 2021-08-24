@@ -385,22 +385,28 @@ namespace rannc {
                 {
                     c10::cuda::CUDAStreamGuard guard(stream);
                     inputs_[id][split_index] = toCPU(inputs, true, true);
+                    at::cuda::CUDAEvent& evt = copy_to_cpu_events_[id][split_index];
+                    evt.record(stream);
                 }
                 recordEnd(to_cpu_key);
 
                 // After computing the *last* split in pipeline, start moving inputs for the *first* split to gpu
-                const auto to_gpu_key = getFuncKey("input_to_gpu", id, 0, false);
-                recordStart(to_gpu_key);
                 if (split_index + 1 == pipeline_num_) { //
+                    const auto to_gpu_key = getFuncKey("input_to_gpu", id, 0, false);
+                    recordStart(to_gpu_key);
                     c10::cuda::CUDAStreamGuard guard(stream);
+
+                    // Make sure that copy to cpu has finished
+                    at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][0];
+                    prev_evt.block(stream);
+
                     inputs_[id][0] = toCUDAIfAvailable(inputs_[id][0], true, true);
-                    at::cuda::CUDAEvent& evt = copy_events_[id][0];
+                    at::cuda::CUDAEvent& evt = copy_to_gpu_events_[id][0];
                     evt.record(stream);
+                    recordEnd(to_gpu_key);
                 }
-                recordEnd(to_gpu_key);
 
                 torch::NoGradGuard no_grad;
-
                 auto outputs = driver.forward(id, inputs, split_index);
 
                 // for debugging
@@ -491,15 +497,20 @@ namespace rannc {
                         const auto to_gpu_key = getFuncKey("input_to_gpu", id, split_index+1, false);
                         recordStart(to_gpu_key);
                         c10::cuda::CUDAStreamGuard guard(stream);
+
+                        // Make sure that copy to cpu has finished
+                        at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][split_index+1];
+                        prev_evt.block(stream);
+
                         inputs_[id][split_index+1] = toCUDAIfAvailable(inputs_[id][split_index+1], true, true);
                         recordEnd(to_gpu_key);
 
-                        at::cuda::CUDAEvent& evt = copy_events_[id][split_index+1];
+                        at::cuda::CUDAEvent& evt = copy_to_gpu_events_[id][split_index + 1];
                         evt.record(stream);
                     }
 
                     // We have to wait for inputs back to gpu
-                    copy_events_[id][split_index].block(c10::cuda::getCurrentCUDAStream());
+                    copy_to_gpu_events_[id][split_index].block(c10::cuda::getCurrentCUDAStream());
                     const auto outputs = driver_.forward(id, inputs_[id][split_index], split_index);
 
                     // for debugging
