@@ -87,7 +87,6 @@ namespace rannc {
         bool checkpointing_enabled_ = false;
         bool use_amp_master_params_;
         bool check_unused_values_;
-        bool skip_grad_scaling_;
         bool allreduce_amp_master_param_;
         bool enable_zero_;
 

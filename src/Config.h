@@ -25,7 +25,6 @@ namespace rannc {
         extern const char VALIDATE_COMM[];
         extern const char DISPLAY_COMM_VALUE[];
         extern const char CONSOLIDATE_GRADS[];
-        extern const char SKIP_GRAD_SCALING[];
         extern const char PROFILING_ITER[];
         extern const char CHECKPOINTING[];
         extern const char CHECKPOINTING_NO_LAST[];
@@ -64,6 +63,7 @@ namespace rannc {
         extern const char SYNC_ALLREDUCE[];
         extern const char DUMP_DP_NODE_PROFILES[];
         extern const char DUMP_DP_CACHE[];
+        extern const char PARTITIONING_DRY_RUN_NP[];
         extern const char CONF_DIR[]; // this is special because Config itself sets this item
 
         enum class ConfigType {

@@ -79,7 +79,6 @@ namespace rannc {
              graph_id_(std::move(graph_id)), value_name_(std::move(name)), path_(std::move(path)),
              param_ids_on_rank_(std::move(param_ids_on_rank)),
              enable_zero_(enable_zero) {
-        skip_grad_scaling_ = config::Config::get().getVal<bool>(config::SKIP_GRAD_SCALING);
     }
 
     bool RaNNCTensorBackward::delay_grad_allreduce_ = false;

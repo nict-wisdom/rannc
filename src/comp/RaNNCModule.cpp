@@ -108,7 +108,6 @@ namespace rannc {
         load_deployment_ = conf.getVal<bool>(config::LOAD_DEPLOYMENT);
         save_deployment_ = conf.getVal<bool>(config::SAVE_DEPLOYMENT);
         deployment_file_ = conf.getVal<std::string>(config::DEPLOYMENT_FILE);
-        skip_grad_scaling_ = conf.getVal<bool>(config::SKIP_GRAD_SCALING);
 
         param_storage_ = master_->getParamStorage();
         param_storage_->useAmpMasterParams(id_, use_amp_master_params_);
@@ -214,10 +213,11 @@ namespace rannc {
         FunctionStorage function_storage;
         function_storage.deploy(graph);
 
+        config::Config& conf = config::Config::get();
         DistributedParamLocator& zpl = DistributedParamLocator::get();
         zpl.fetchStart();
         if (mpi::isMaster()) {
-            const int min_pipeline = config::Config::get().getVal<int>(config::MIN_PIPELINE);
+            const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
             std::shared_ptr<GraphProfiler> sg_prof =
                     std::make_shared<GraphProfiler>(param_storage_, ir_graph_, non_param_inputs, graph_params,
                                                     value_storage->getValues(),
@@ -226,8 +226,8 @@ namespace rannc {
 
             sg_prof->setCacheParamValues(true);
 
-            bool load_profile = config::Config::get().getVal<bool>(config::LOAD_GRAPH_PROFILE);
-            std::string graph_profile_file = config::Config::get().getVal<std::string>(config::GRAPH_PROFILE_FILE);
+            bool load_profile = conf.getVal<bool>(config::LOAD_GRAPH_PROFILE);
+            std::string graph_profile_file = conf.getVal<std::string>(config::GRAPH_PROFILE_FILE);
             if (load_profile) {
                 logger->info("Loading graph profiles from {}", graph_profile_file);
                 sg_prof->load(graph_profile_file);
@@ -271,7 +271,6 @@ namespace rannc {
                 deployment_ = load(deployment_file_, mpi::getSize(), dev_info.total_mem);
                 deployment_.id = id_;
 
-
                 std::unordered_map<std::string, GraphProfile> profiles;
                 ProfilerUtil prof_util(sg_prof);
                 std::vector<std::shared_ptr<IRGraph>> graphs;
@@ -299,7 +298,7 @@ namespace rannc {
             } else {
                 MetaDecomposer decomposer(sg_prof, mpi::getSize(), batch_size, prof_results.node_profiles,
                                           dev_info.total_mem, use_amp_master_params_, enable_zero_);
-                const auto decomp_name = config::Config::get().getVal<std::string>(config::DECOMPOSER);
+                const auto decomp_name = conf.getVal<std::string>(config::DECOMPOSER);
                 deployment_ = decomposer.decompose(decomp_name, ir_graph_);
 
                 if (save_deployment_) {
@@ -335,13 +334,13 @@ namespace rannc {
             verifyDeployment(deployment_);
             logger->info("Routes verification passed.");
 
-            bool save_profile = config::Config::get().getVal<bool>(config::SAVE_GRAPH_PROFILE);
+            bool save_profile = conf.getVal<bool>(config::SAVE_GRAPH_PROFILE);
             if (save_profile) {
                 logger->info("Saving graph profiles to {}", graph_profile_file);
                 sg_prof->save(graph_profile_file);
             }
 
-            if (config::Config::get().getVal<bool>(config::VERIFY_PARTITIONING)) {
+            if (conf.getVal<bool>(config::VERIFY_PARTITIONING)) {
                 if (distributed) {
                     logger->warn("Verification was disabled because zero param distribution is enabled.");
                 } else {

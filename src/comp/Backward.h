@@ -49,7 +49,6 @@ struct RaNNCTensorBackward : public torch::autograd::TraceableFunction {
         const std::string value_name_;
         PathInIValue path_;
         std::vector<long> param_ids_on_rank_;
-        bool skip_grad_scaling_;
         bool enable_zero_;
 
         static bool delay_grad_allreduce_;

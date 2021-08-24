@@ -31,7 +31,6 @@ namespace rannc {
         const char VALIDATE_COMM[] = "validate_comm";
         const char DISPLAY_COMM_VALUE[] = "display_comm_value";
         const char CONSOLIDATE_GRADS[] = "consolidate_grads";
-        const char SKIP_GRAD_SCALING[] = "skip_grad_scaling";
         const char PROFILING_ITER[] = "profiling_iter";
         const char CHECKPOINTING[] = "checkpointing";
         const char CHECKPOINTING_NO_LAST[] = "checkpointing_no_last";
@@ -70,6 +69,7 @@ namespace rannc {
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
         const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
         const char DUMP_DP_CACHE[] = "dump_dp_cache";
+        const char PARTITIONING_DRY_RUN_NP[] = "PARTITIONING_DRY_RUN_NP";
 
         const char CONF_DIR[] = "conf_dir";
 
@@ -120,7 +120,6 @@ namespace rannc {
                     makeConfigItem(VALIDATE_COMM, false),
                     makeConfigItem(DISPLAY_COMM_VALUE, false),
                     makeConfigItem(CONSOLIDATE_GRADS, true),
-                    makeConfigItem(SKIP_GRAD_SCALING, true),
                     makeConfigItem(PROFILING_ITER, 1),
                     makeConfigItem(CHECKPOINTING, false),
                     makeConfigItem(CHECKPOINTING_NO_LAST, false),
@@ -159,6 +158,7 @@ namespace rannc {
                     makeConfigItem(SYNC_ALLREDUCE, true),
                     makeConfigItem(DUMP_DP_NODE_PROFILES, std::string("")),
                     makeConfigItem(DUMP_DP_CACHE, std::string("")),
+                    makeConfigItem(PARTITIONING_DRY_RUN_NP, 0),
 
                     makeConfigItem(CONF_DIR, "")
             };
