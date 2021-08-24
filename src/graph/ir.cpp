@@ -594,9 +594,8 @@ namespace rannc {
                                 * 2 // FP32
                                 / zero_dist_num; // Each rank holds only fragments of FP32 master params
                         sum += val.getSizeInByte()  // amp holds grads
-                               * 2; // FP32
-                               // We don't divide the size of gradients by zero_dist num
-                               // because allreduce in FP32 needs buffer for the whole parameters
+                               * 2 // FP32
+                               / zero_dist_num;
                         sum += val.getSizeInByte() // optimizer state
                                * 2 // FP32
                                * opt_param_factor
