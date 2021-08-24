@@ -69,7 +69,7 @@ namespace rannc {
         const char SYNC_ALLREDUCE[] = "sync_allreduce";
         const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
         const char DUMP_DP_CACHE[] = "dump_dp_cache";
-        const char PARTITIONING_DRY_RUN_NP[] = "PARTITIONING_DRY_RUN_NP";
+        const char PARTITIONING_DRY_RUN_NP[] = "partitioning_dry_run_np";
 
         const char CONF_DIR[] = "conf_dir";
 

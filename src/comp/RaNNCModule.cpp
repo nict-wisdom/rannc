@@ -214,6 +214,8 @@ namespace rannc {
         function_storage.deploy(graph);
 
         config::Config& conf = config::Config::get();
+        int dry_run_np = conf.getVal<int>(config::PARTITIONING_DRY_RUN_NP);
+
         DistributedParamLocator& zpl = DistributedParamLocator::get();
         zpl.fetchStart();
         if (mpi::isMaster()) {
@@ -265,7 +267,6 @@ namespace rannc {
             }
 
             const auto dev_info = ::rannc::getCudaDeviceInfo(getCurrentCudaDeviceId());
-
             if (load_deployment_) {
                 logger->info("Loading deployment state from {}", deployment_file_);
                 deployment_ = load(deployment_file_, mpi::getSize(), dev_info.total_mem);
@@ -296,14 +297,23 @@ namespace rannc {
                     logger->info("   {} ranks={}", it.first, join_as_str(deployment_.allocation.at(it.first)));
                 }
             } else {
-                MetaDecomposer decomposer(sg_prof, mpi::getSize(), batch_size, prof_results.node_profiles,
+                int np = mpi::getSize();
+                int decomp_batch_size = batch_size;
+
+                if (dry_run_np > 0) {
+                    np = dry_run_np;
+                    decomp_batch_size = local_batch_size * dry_run_np;
+                    logger->info("Starting dry run of partitioning ... (np={} batch_size={})", dry_run_np, decomp_batch_size);
+                }
+
+                MetaDecomposer decomposer(sg_prof, np, decomp_batch_size, prof_results.node_profiles,
                                           dev_info.total_mem, use_amp_master_params_, enable_zero_);
                 const auto decomp_name = conf.getVal<std::string>(config::DECOMPOSER);
                 deployment_ = decomposer.decompose(decomp_name, ir_graph_);
 
                 if (save_deployment_) {
                     logger->info("Saving deployment state to {}", deployment_file_);
-                    save(deployment_file_, deployment_, mpi::getSize(), dev_info.total_mem);
+                    save(deployment_file_, deployment_, np, dev_info.total_mem);
                 }
             }
 
@@ -357,6 +367,13 @@ namespace rannc {
         emptyCache();
         zpl.fetchEnd();
         MPI_Barrier(MPI_COMM_WORLD);
+
+        if (dry_run_np > 0) {
+            if (mpi::getRank() == 0) {
+                logger->info("The dry run for partitioning finished. Exiting ...");
+            }
+            std::exit(0);
+        }
 
         ObjectComm& ocomm = ObjectComm::get();
         if (mpi::getRank() == 0) {

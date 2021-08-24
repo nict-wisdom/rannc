@@ -43,22 +43,22 @@ namespace rannc {
         Deployment deployment;
         switch (type_map.at(name)) {
             case DecomposerType::FAIR_WEIGHT: {
-                FairWeightDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, dev_mem_);
+                FairWeightDecomposer decomposer(sg_prof_, worker_num_, batch_size_, dev_mem_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
             }
             case DecomposerType::PROFILED_WEIGHT: {
-                ProfiledWeightDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, dev_mem_);
+                ProfiledWeightDecomposer decomposer(sg_prof_, worker_num_, batch_size_, dev_mem_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
             }
             case DecomposerType::SCHEDULING: {
-                SchedulingDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, node_profiles_, dev_mem_);
+                SchedulingDecomposer decomposer(sg_prof_, worker_num_, batch_size_, node_profiles_, dev_mem_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
             }
             case DecomposerType::ML_PART: {
-                MLPartDecomposer decomposer(sg_prof_, mpi::getSize(), batch_size_, node_profiles_, dev_mem_,
+                MLPartDecomposer decomposer(sg_prof_, worker_num_, batch_size_, node_profiles_, dev_mem_,
                                             use_amp_master_params_, enable_zero_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
