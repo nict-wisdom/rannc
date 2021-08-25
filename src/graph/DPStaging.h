@@ -24,10 +24,10 @@ namespace rannc {
 
     class DPStaging {
     public:
-        DPStaging(std::shared_ptr<GraphProfiler> profiler, size_t batch_size, size_t dev_mem,
+        DPStaging(std::shared_ptr<GraphProfiler> profiler, std::shared_ptr<IRGraph> ir_graph, size_t batch_size, size_t dev_mem,
                   bool use_amp_master_params, bool enable_zero)
-            :prof_util_(std::move(profiler)), batch_size_(batch_size), dev_mem_(dev_mem),
-            use_amp_master_params_(use_amp_master_params), enable_zero_(enable_zero) {
+                  :prof_util_(std::move(profiler)), ir_graph_(ir_graph), batch_size_(batch_size), dev_mem_(dev_mem),
+                   use_amp_master_params_(use_amp_master_params), enable_zero_(enable_zero) {
 
             config::Config& config = config::Config::get();
             dump_dp_node_profiles_ = config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
@@ -36,8 +36,8 @@ namespace rannc {
             max_pipeline_num_ = config.getVal<int>(config::MAX_PIPELINE);
             cfg_pipeline_num_ = config.getVal<int>(config::PIPELINE_NUM);
             cfg_stage_num_ = config.getVal<int>(config::PARTITION_NUM);
-
         }
+
         AllocSolution runDpComm(const MLGraph& graph, size_t dev_num);
 
     protected:
@@ -67,6 +67,7 @@ namespace rannc {
 
         std::string dump_dp_node_profiles_;
         std::string dump_dp_cache_;
+        std::shared_ptr<IRGraph> ir_graph_;
 
         const std::shared_ptr<spdlog::logger> logger = getLogger("DPStaging");
     };
@@ -83,17 +84,19 @@ namespace rannc {
         size_t cfg_stage_num;
         bool use_amp_master_params;
         bool enable_zero;
+        std::shared_ptr<IRGraph> ir_graph;
 
         MSGPACK_DEFINE(graph, ml_profile_cache, dev_num, batch_size, dev_mem,
                        min_pipeline_num, max_pipeline_num, cfg_pipeline_num, cfg_stage_num,
-                       use_amp_master_params, enable_zero);
+                       use_amp_master_params, enable_zero, ir_graph);
     };
 
     class DPDryStaging : public DPStaging {
     public:
         DPDryStaging(const DPStagingCache& cache)
-        :graph_(cache.graph), dev_num_(cache.dev_num),
-        DPStaging(std::shared_ptr<GraphProfiler>(nullptr), cache.batch_size, cache.dev_mem, cache.use_amp_master_params, cache.enable_zero) {
+        :graph_(cache.graph), dev_num_(cache.dev_num), batch_size_(cache.batch_size), ir_graph_(cache.ir_graph),
+        DPStaging(std::shared_ptr<GraphProfiler>(nullptr), cache.ir_graph, cache.batch_size, cache.dev_mem,
+                  cache.use_amp_master_params, cache.enable_zero) {
             prof_util_.setProfileCache(cache.ml_profile_cache);
 
             min_pipeline_num_ = cache.min_pipeline_num;
@@ -105,15 +108,15 @@ namespace rannc {
             dump_dp_cache_.clear();
         }
 
-        AllocSolution runDpComm() {
-            return DPStaging::runDpComm(graph_, dev_num_);
-        }
+        Deployment partition();
 
     protected:
         virtual GraphProfile estimateSolutionGraph(const AllocSolution &sol, const MLGraph& graph, size_t g_idx);
 
     private:
         MLGraph graph_;
+        size_t batch_size_;
+        std::shared_ptr<IRGraph> ir_graph_;
         size_t dev_num_;
     };
 }

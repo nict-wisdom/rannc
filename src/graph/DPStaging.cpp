@@ -300,10 +300,15 @@ namespace rannc {
 
         bool sol_found = false;
         size_t MIN_SEARCH_STAGE_NUM = 1;
+        size_t prev_stage_num_max = 0;
         for (int node_num_used = 1; node_num_used <= node_num_total; node_num_used++) {
+            if (node_num_total % node_num_used != 0) {
+                continue;
+            }
 
-            size_t stage_num_min = (dev_per_node * (node_num_used - 1)) + 1;
-            size_t stage_num_max = dev_per_node * node_num_used;
+            size_t stage_num_min = prev_stage_num_max + 1;
+            size_t stage_num_max = prev_stage_num_max = dev_per_node * node_num_used;
+
             // Forcibly set stage num for debugging
             if (cfg_stage_num_ != 0) {
                 if (cfg_stage_num_ < stage_num_min || stage_num_max < stage_num_min) {
@@ -318,7 +323,6 @@ namespace rannc {
             stage_num_max = std::min(stage_num_max, graph.nodes.size());
 
             for (size_t stage_num = stage_num_min; stage_num <= stage_num_max; stage_num++) {
-
                 for (int pipeline_num = std::max(1, min_pipeline_num_);
                      pipeline_num <= std::min((int) batch_size_, max_pipeline_num_);
                      pipeline_num *= 2) {
@@ -361,6 +365,7 @@ namespace rannc {
             cache.cfg_stage_num = cfg_stage_num_;
             cache.use_amp_master_params = use_amp_master_params_;
             cache.enable_zero = enable_zero_;
+            cache.ir_graph = ir_graph_;
 
             logger->info("Saving DP cache to {}", dump_dp_cache_);
             saveToFile(dump_dp_cache_, cache);
@@ -552,10 +557,10 @@ namespace rannc {
                                 long opt_mem = 0;
                                 for (size_t i = b_prev; i <= (b - 1); i++) {
                                     const auto &node = graph.nodes.at(i);
-                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev));
+                                    opt_mem += getOptMemSize(node.graph, opt_param_factor, use_amp_master_params_, enable_zero_, (d - d_prev)*replica_num);
                                 }
                                 step_mem = step_prof.max_allocated_mem + opt_mem
-                                        + (step_in_comm + step_out_comm) + 2;
+                                        + (step_in_comm + step_out_comm) * 2;
                             } else {
                                 // merge graphs from j+1 to i (inclusive)
                                 const auto step_graph = merge_helper.merge(b_prev, b - 1);
@@ -704,5 +709,49 @@ namespace rannc {
                                   sol.boundaries.at(g_idx),
                                   sol.boundaries.at(g_idx + 1) - 1,
                                   repl * sol.pipeline_num, sol.pipeline_num > 1);
+    }
+
+    Deployment DPDryStaging::partition() {
+        const auto sol =  DPStaging::runDpComm(graph_, dev_num_);
+        Partition new_part = createPartition(ir_graph_, sol.graphs);
+
+        // graph names in new_part are different with those in sol.repl_nums
+        std::vector<std::string> ordered_graph_ids;
+        for (const auto& g: sol.graphs) {
+            ordered_graph_ids.push_back(g->getName());
+        }
+        assert(ordered_graph_ids.size() == new_part.order.size());
+        std::unordered_map<std::string, int> repl_nums;
+        for (const auto& it: new_part.subgraphs) {
+            assert(contains(sol.repl_nums, it.first));
+            repl_nums[it.first] = sol.repl_nums.at(it.first);
+        }
+
+        const auto repl = replicate(new_part, repl_nums, batch_size_);
+        logger->trace("Partitioning finished: id={}", ir_graph_->getName());
+
+        std::unordered_map<std::string, std::unordered_set<int>> alloc;
+
+        if (config::Config::get().getVal<bool>(config::ALLOC_REPL_FLAT)) {
+            logger->trace("searchAllocationFlat");
+            alloc = searchAllocationFlat(repl, dev_num_, dev_mem_);
+        } else {
+            logger->trace("searchAllocationSimple");
+            alloc = searchAllocationSimple(repl, dev_num_, dev_mem_);
+        }
+
+        if (alloc.empty()) {
+            throw std::runtime_error("Failed to allocate gpus to subgraphs.");
+        }
+
+        for (const auto &it: alloc) {
+            logger->info(" Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
+        }
+        Deployment deployment = createDeployment(repl, alloc, dev_num_);
+        deployment.pipeline_num = sol.pipeline_num;
+        deployment.checkpointing = sol.checkpointing;
+        logger->trace("Created deployment finished");
+
+        return deployment;
     }
 }

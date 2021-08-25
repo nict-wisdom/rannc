@@ -373,10 +373,11 @@ namespace rannc {
     }
 
     std::vector<int> getGraphRanks(const std::string &graph_id,
-                                   const std::unordered_map<std::string, std::unordered_set<int>> &allocation) {
+                                   const std::unordered_map<std::string, std::unordered_set<int>> &allocation,
+                                   int np) {
         if (graph_id == MASTER_NAME) {
             std::unordered_set<int> ranks;
-            for (int i = 0; i < mpi::getSize(); i++) {
+            for (int i = 0; i < np; i++) {
                 ranks.insert(i);
             }
             return setToVector(ranks);
@@ -456,7 +457,9 @@ namespace rannc {
         return sorted_graph_id;
     }
 
-    Deployment createDeployment(const PartitionDP &partition, const std::unordered_map<std::string, std::unordered_set<int>> &allocation) {
+    Deployment createDeployment(const PartitionDP &partition,
+                                const std::unordered_map<std::string, std::unordered_set<int>> &allocation,
+                                int np) {
 
         const auto logger = getLogger(LOGGER_NAME);
         logger->trace("createDeployment starting. id={} #connections={}", partition.id,
@@ -487,9 +490,9 @@ namespace rannc {
 
             RouteDP fwd_route;
             fwd_route.location = con.value;
-            fwd_route.sources = getGraphRanks(con.src, allocation);
+            fwd_route.sources = getGraphRanks(con.src, allocation, np);
             fwd_route.source_graph = con.src;
-            fwd_route.dests = getGraphRanks(con.dest, allocation);
+            fwd_route.dests = getGraphRanks(con.dest, allocation, np);
             fwd_route.dest_graph = con.dest;
             fwd_route.type = chooseRouteType(val.isBatch(), val.isLoss(), true);
             fwd_route.ir_value = val;
@@ -512,9 +515,9 @@ namespace rannc {
             if (passedForBackward(val.getType())) {
                 RouteDP bwd_route;
                 bwd_route.location = con.value;
-                bwd_route.sources = getGraphRanks(con.dest, allocation);
+                bwd_route.sources = getGraphRanks(con.dest, allocation, np);
                 bwd_route.source_graph = con.dest;
-                bwd_route.dests = getGraphRanks(con.src, allocation);
+                bwd_route.dests = getGraphRanks(con.src, allocation, np);
                 bwd_route.dest_graph = con.src;
                 bwd_route.tag = tag;
                 bwd_route.source_tag = tag_map.getRouteSourceTag(bwd_route);
@@ -1393,4 +1396,81 @@ namespace rannc {
         }
     }
 
+
+    Partition createPartition(const std::shared_ptr<IRGraph>& ir_graph,
+                              const std::vector<std::shared_ptr<IRGraph>>& subgraphs) {
+
+        // value name -> graph id
+        // a value can be an input of one or more graphs
+        std::unordered_map<std::string, std::unordered_set<std::string>> in_vals;
+        // Only one graph produces a value
+        std::unordered_map<std::string, std::string> out_vals;
+        std::unordered_map<std::string, std::shared_ptr<IRGraph>> sg_map;
+        std::vector<std::string> sg_order;
+
+        // graph id -> input value names
+        std::unordered_map<std::string, std::unordered_set<std::string>> created_cons;
+
+        for (const auto& sg: subgraphs) {
+            for (const auto& in: sg->getInputNames()) {
+                if (!sg->getValue(in).isParam()) {
+                    in_vals[in].insert(sg->getName());
+                }
+            }
+            for (const auto& out: sg->getOutputNames()) {
+                if (!contains(ir_graph->getInputNames(), out)) {
+                    out_vals[out] = sg->getName();
+                }
+            }
+
+            sg_map[sg->getName()] = sg;
+            sg_order.push_back(sg->getName());
+        }
+
+        std::vector<GraphConnection> connections;
+        for (const auto& sg: subgraphs) {
+            for (const auto& in: sg->getInputNames()) {
+                if (!sg->getValue(in).isParam()) {
+                    if (contains(out_vals, in)) {
+                        const auto &src_id = out_vals.at(in);
+                        const auto &tgt_id = sg->getName();
+                        if (src_id != tgt_id) {
+                            GraphConnection con{in, src_id, tgt_id, src_id + "_" + in,
+                                                tgt_id + "_" + in};
+                            connections.push_back(con);
+
+                            created_cons[tgt_id].insert(in);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const auto& in: ir_graph->getInputNames()) {
+            if (!ir_graph->getValue(in).isParam()) {
+                if(!contains(in_vals, in)) {
+                    // unused input
+                    continue;
+                }
+                for (const auto &tgt_id: in_vals.at(in)) {
+                    if (!contains(created_cons[tgt_id], in)) { ;
+                        GraphConnection con{in, "MASTER", tgt_id, "MASTER_" + in,
+                                            tgt_id + "_" + in};
+                        connections.push_back(con);
+                        created_cons[tgt_id].insert(in);
+                    }
+                }
+            }
+        }
+
+        for (const auto& out: ir_graph->getOutputNames()) {
+            assert(contains(out_vals, out));
+            const auto& src_id = out_vals.at(out);
+            GraphConnection con{out, src_id, "MASTER", src_id + "_" + out,
+                                "MASTER_" + out};
+            connections.push_back(con);
+        }
+
+        return Partition{ir_graph->getName(), ir_graph, sg_map, connections, sg_order};
+    }
 }

@@ -582,7 +582,7 @@ namespace rannc {
         for (const auto& it: alloc) {
             logger->info(" Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
         }
-        Deployment deployment = createDeployment(partitionDp, alloc);
+        Deployment deployment = createDeployment(partitionDp, alloc, mpi::getSize());
         deployment.pipeline_num = pconf.pipe;
         logger->trace("ProfiledWeightDecomposer::decompose finished");
 

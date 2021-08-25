@@ -169,6 +169,9 @@ namespace rannc {
 
     void verifyDeployment(const Deployment& deployment);
 
+    Partition createPartition(const std::shared_ptr<IRGraph>& ir_graph,
+                              const std::vector<std::shared_ptr<IRGraph>>& subgraphs);
+
     template<typename Vertex, typename Graph>
     std::vector<Vertex> all_nodes(const Graph &g) {
         std::vector<Vertex> nodes;
@@ -462,7 +465,9 @@ namespace rannc {
     std::shared_ptr<IRGraph> scaleGraph(const std::shared_ptr<IRGraph>& graph, int num, int64_t batch_size);
     PartitionDP replicate(const PartitionDP &partition, const std::unordered_map<std::string, int>& repl_nums,
                           int64_t batch_size);
-    Deployment createDeployment(const PartitionDP &partition, const std::unordered_map<std::string, std::unordered_set<int>> &allocation);
+    Deployment createDeployment(const PartitionDP &partition,
+                                const std::unordered_map<std::string, std::unordered_set<int>> &allocation,
+                                int np);
 
     std::vector<IRValue> searchGraphValuesByName(const std::shared_ptr<IRGraph> &ir_graph,
                                                  const std::string &val_name);

@@ -18,6 +18,7 @@
 #include "bind/Tracer.h"
 #include "bind/RaNNCFactory.h"
 #include "comp/DistributedParamLocator.h"
+#include "graph/DeploymentSerializer.h"
 
 
 namespace py = pybind11;
@@ -338,7 +339,11 @@ PYBIND11_MODULE(_pyrannc, m) {
     m.def("run_dp_dry", [](const std::string& path) {
         DPStagingCache cache = loadFromFile<DPStagingCache>(path);
         DPDryStaging dp(cache);
-        dp.runDpComm();
+        const auto deployment = dp.partition();
+
+        const auto deployment_file = config::Config::get().getVal<std::string>(config::DEPLOYMENT_FILE);
+        spdlog::info("Saving deployment state to {}", deployment_file);
+        save(deployment_file, deployment, cache.dev_num, cache.dev_mem);
     });
 
 #ifdef VERSION_INFO

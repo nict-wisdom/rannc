@@ -81,8 +81,6 @@ set(RANNC_SRCS
         src/graph/Decomposition.cpp
         src/graph/GuessValueTypes.cpp
         src/graph/FairWeightDecomposer.cpp
-        src/graph/SchedulingDecomposer.cpp
-#        src/graph/ManualDecomposer.cpp
         src/graph/ProfiledWeightDecomposer.cpp
         src/graph/MLGraph.cpp
         src/graph/DPStaging.cpp

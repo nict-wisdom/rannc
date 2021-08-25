@@ -158,8 +158,13 @@ namespace rannc {
                                      const std::unordered_map<std::string, GraphProfile>& profiles) {
         std::stringstream ss;
 
+        int dev_num = 0;
+        for (const auto& it: repl_nums) {
+            dev_num += it.second;
+        }
+
         ss << "Estimated profiles of subgraphs: batch_size=" << batch_size
-            << " np=" << mpi::getSize()
+            << " np=" << dev_num
             << " pipeline=" << pipeline_num
             << " use_amp=" << use_amp_master_params
             << " zero=" << enable_zero

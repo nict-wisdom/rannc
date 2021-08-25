@@ -8,83 +8,6 @@
 
 namespace rannc {
 
-    Partition createPartition(const std::shared_ptr<IRGraph>& ir_graph,
-                              const std::vector<std::shared_ptr<IRGraph>>& subgraphs) {
-
-        // value name -> graph id
-        // a value can be an input of one or more graphs
-        std::unordered_map<std::string, std::unordered_set<std::string>> in_vals;
-        // Only one graph produces a value
-        std::unordered_map<std::string, std::string> out_vals;
-        std::unordered_map<std::string, std::shared_ptr<IRGraph>> sg_map;
-        std::vector<std::string> sg_order;
-
-        // graph id -> input value names
-        std::unordered_map<std::string, std::unordered_set<std::string>> created_cons;
-
-        for (const auto& sg: subgraphs) {
-            for (const auto& in: sg->getInputNames()) {
-                if (!sg->getValue(in).isParam()) {
-                    in_vals[in].insert(sg->getName());
-                }
-            }
-            for (const auto& out: sg->getOutputNames()) {
-                if (!contains(ir_graph->getInputNames(), out)) {
-                    out_vals[out] = sg->getName();
-                }
-            }
-
-            sg_map[sg->getName()] = sg;
-            sg_order.push_back(sg->getName());
-        }
-
-        std::vector<GraphConnection> connections;
-        for (const auto& sg: subgraphs) {
-            for (const auto& in: sg->getInputNames()) {
-                if (!sg->getValue(in).isParam()) {
-                    if (contains(out_vals, in)) {
-                        const auto &src_id = out_vals.at(in);
-                        const auto &tgt_id = sg->getName();
-                        if (src_id != tgt_id) {
-                            GraphConnection con{in, src_id, tgt_id, src_id + "_" + in,
-                                                tgt_id + "_" + in};
-                            connections.push_back(con);
-
-                            created_cons[tgt_id].insert(in);
-                        }
-                    }
-                }
-            }
-        }
-
-        for (const auto& in: ir_graph->getInputNames()) {
-            if (!ir_graph->getValue(in).isParam()) {
-                if(!contains(in_vals, in)) {
-                    // unused input
-                    continue;
-                }
-                for (const auto &tgt_id: in_vals.at(in)) {
-                    if (!contains(created_cons[tgt_id], in)) { ;
-                        GraphConnection con{in, "MASTER", tgt_id, "MASTER_" + in,
-                                            tgt_id + "_" + in};
-                        connections.push_back(con);
-                        created_cons[tgt_id].insert(in);
-                    }
-                }
-            }
-        }
-
-        for (const auto& out: ir_graph->getOutputNames()) {
-            assert(contains(out_vals, out));
-            const auto& src_id = out_vals.at(out);
-            GraphConnection con{out, src_id, "MASTER", src_id + "_" + out,
-                                "MASTER_" + out};
-            connections.push_back(con);
-        }
-
-        return Partition{ir_graph->getName(), ir_graph, sg_map, connections, sg_order};
-    }
-
     Deployment MLPartDecomposer::decompose(const std::shared_ptr<IRGraph> &ir_graph) {
 
         logger->trace("MLPartDecomposer::decompose starting");
@@ -114,7 +37,7 @@ namespace rannc {
         ///////////
         logger->trace("Starting DP: id={} #nodes={}", ir_graph->getName(),
                       part_graph.nodes.size());
-        DPStaging dp(sg_prof_, batch_size_, dev_mem_, use_amp_master_params_, enable_zero_);
+        DPStaging dp(sg_prof_, ir_graph, batch_size_, dev_mem_, use_amp_master_params_, enable_zero_);
         AllocSolution sol = dp.runDpComm(part_graph, worker_num_);
         logger->trace("Finished DP: id={}", ir_graph->getName());
 
@@ -152,7 +75,7 @@ namespace rannc {
         for (const auto &it: alloc) {
             logger->info(" Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
         }
-        Deployment deployment = createDeployment(repl, alloc);
+        Deployment deployment = createDeployment(repl, alloc, worker_num_);
         deployment.pipeline_num = sol.pipeline_num;
         deployment.checkpointing = sol.checkpointing;
         logger->trace("MLPartDecomposer::decompose finished");
