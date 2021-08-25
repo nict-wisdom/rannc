@@ -4,13 +4,11 @@
 
 #include "MetaDecomposer.h"
 #include "FairWeightDecomposer.h"
-#include "ProfiledWeightDecomposer.h"
 #include "MLPartDecomposer.h"
 
 namespace rannc {
     enum class DecomposerType {
         FAIR_WEIGHT,
-        PROFILED_WEIGHT,
         ML_PART
     };
 
@@ -21,7 +19,6 @@ namespace rannc {
 
     DecomposerInfo decomp_table[] = {
         {"fair_weight", DecomposerType::FAIR_WEIGHT},
-        {"profiled_weight", DecomposerType::PROFILED_WEIGHT},
         {"ml_part", DecomposerType::ML_PART}
     };
 
@@ -41,11 +38,6 @@ namespace rannc {
         switch (type_map.at(name)) {
             case DecomposerType::FAIR_WEIGHT: {
                 FairWeightDecomposer decomposer(sg_prof_, worker_num_, batch_size_, dev_mem_);
-                deployment = decomposer.decompose(ir_graph);
-                break;
-            }
-            case DecomposerType::PROFILED_WEIGHT: {
-                ProfiledWeightDecomposer decomposer(sg_prof_, worker_num_, batch_size_, dev_mem_);
                 deployment = decomposer.decompose(ir_graph);
                 break;
             }

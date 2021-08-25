@@ -81,7 +81,6 @@ set(RANNC_SRCS
         src/graph/Decomposition.cpp
         src/graph/GuessValueTypes.cpp
         src/graph/FairWeightDecomposer.cpp
-        src/graph/ProfiledWeightDecomposer.cpp
         src/graph/MLGraph.cpp
         src/graph/DPStaging.cpp
         src/graph/ProfilerUtil.cpp
@@ -89,8 +88,6 @@ set(RANNC_SRCS
         src/graph/MetaDecomposer.cpp
         src/graph/DeploymentSerializer.cpp
         src/graph/Partitioner.cpp
-        src/graph/balancer/AdjacentBalancer.cpp
-        src/graph/balancer/VarianceBalancer.cpp
         src/graph/ir.cpp
         src/comm/SComm.cpp
         src/comm/SCommCommon.cpp
