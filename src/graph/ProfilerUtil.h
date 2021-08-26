@@ -76,7 +76,7 @@ namespace rannc {
     };
 
     GraphProfile accProfileValues(ProfilerUtil& prof_util, size_t batch_size,
-                                  const std::vector<std::shared_ptr<IRGraph>> graphs,
+                                  const std::vector<std::shared_ptr<IRGraph>>& graphs,
                                   size_t from, size_t to, size_t dev_num,
                                   bool checkpointing);
 

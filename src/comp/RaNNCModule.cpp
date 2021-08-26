@@ -162,6 +162,12 @@ namespace rannc {
         int64_t local_batch_size = guessBatchSize(input_ivals);
         int64_t batch_size = gather_inputs ? mpi::allReduceSumBatchSize(local_batch_size) : local_batch_size;
 
+        config::Config& conf = config::Config::get();
+        int dry_run_np = conf.getVal<int>(config::PARTITIONING_DRY_RUN_NP);
+        if (dry_run_np > 0) {
+            batch_size = local_batch_size * dry_run_np;
+        }
+
         if (mpi::isMaster()) {
             logger->info("Tracing model ...");
         }
@@ -212,9 +218,6 @@ namespace rannc {
 
         FunctionStorage function_storage;
         function_storage.deploy(graph);
-
-        config::Config& conf = config::Config::get();
-        int dry_run_np = conf.getVal<int>(config::PARTITIONING_DRY_RUN_NP);
 
         DistributedParamLocator& zpl = DistributedParamLocator::get();
         zpl.fetchStart();
@@ -298,15 +301,12 @@ namespace rannc {
                 }
             } else {
                 int np = mpi::getSize();
-                int decomp_batch_size = batch_size;
-
                 if (dry_run_np > 0) {
                     np = dry_run_np;
-                    decomp_batch_size = local_batch_size * dry_run_np;
-                    logger->info("Starting dry run of partitioning ... (np={} batch_size={})", dry_run_np, decomp_batch_size);
+                    logger->info("Starting dry run of partitioning ... (np={} batch_size={})", dry_run_np, batch_size);
                 }
 
-                MetaDecomposer decomposer(sg_prof, np, decomp_batch_size, prof_results.node_profiles,
+                MetaDecomposer decomposer(sg_prof, np, batch_size, prof_results.node_profiles,
                                           dev_info.total_mem, use_amp_master_params_, enable_zero_);
                 const auto decomp_name = conf.getVal<std::string>(config::DECOMPOSER);
                 deployment_ = decomposer.decompose(decomp_name, ir_graph_);

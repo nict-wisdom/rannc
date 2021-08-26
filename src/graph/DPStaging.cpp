@@ -306,16 +306,13 @@ namespace rannc {
                 continue;
             }
 
-            size_t stage_num_min = prev_stage_num_max + 1;
-            size_t stage_num_max = prev_stage_num_max = dev_per_node * node_num_used;
-
+            size_t stage_num_min, stage_num_max;
             // Forcibly set stage num for debugging
             if (cfg_stage_num_ != 0) {
-                if (cfg_stage_num_ < stage_num_min || stage_num_max < stage_num_min) {
-                    continue;
-                }
-                stage_num_min = cfg_stage_num_;
-                stage_num_max = cfg_stage_num_;
+                stage_num_min = stage_num_max = cfg_stage_num_;
+            } else {
+                stage_num_min = prev_stage_num_max + 1;
+                stage_num_max = prev_stage_num_max = dev_per_node * node_num_used;
             }
 
             // graph can be very small
