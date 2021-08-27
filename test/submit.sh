@@ -22,7 +22,6 @@ TASK_NAME=rannc_tests_${PARAMS}
 LOG_DIR=${BASE_DIR}/pbs_logs
 mkdir -p ${LOG_DIR}
 STD_LOG=${LOG_DIR}/${TASK_NAME}_${TIMESTAMP}.out
-ERR_LOG=${LOG_DIR}/${TASK_NAME}_${TIMESTAMP}.err
 
 echo "Submitting ${TASK_NAME}"
 
