@@ -113,6 +113,33 @@ class ForkJoinModel(nn.Module):
         return y
 
 
+class SharedInputModel(nn.Module):
+
+    INPUT_DIM = (3,)
+    OUTPUT_DIM = (3,)
+
+    def __init__(self):
+        super(SharedInputModel, self).__init__()
+        self.fc1 = nn.Linear(3, 3, bias=False)
+        self.fc2 = nn.Linear(3, 3, bias=False)
+        self.fc3 = nn.Linear(3, 3, bias=False)
+        self.fc4 = nn.Linear(3, 3, bias=False)
+
+        with torch.no_grad():
+            w = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
+            self.fc1.weight.copy_(w)
+            self.fc2.weight.copy_(w)
+            self.fc3.weight.copy_(w)
+            self.fc4.weight.copy_(w)
+
+    def forward(self, x):
+        y1 = self.fc1(x)
+        y2 = self.fc2(y1)
+        y3 = self.fc3(y1)
+        y4 = self.fc4(y1)
+        return y1 + y2 + y3 + y4
+
+
 class BertLayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
         super(BertLayerNorm, self).__init__()

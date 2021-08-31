@@ -210,179 +210,11 @@ namespace rannc {
         tags_ = ocomm.bcast(tags_);
     }
 
-    IRType SComm::reduceRouteSourceBatchTypes(const IRType& type, const RouteDP& route) {
-        return reduceBatchTypes(type, getRouteSourcesCommunicator(route));
-    }
-
-    IRType SComm::sendTypeBcast(IRType local_type, const RouteDP& route) {
-        ObjectComm& ocomm = ObjectComm::get();
-        int root = route.sources.front();
-        return ocomm.bcast(local_type, getLocalRank(getRanksInRoute(route), root), getRouteCommunicator(route));
-    }
-
-    IRType SComm::recvTypeBcast(const RouteDP& route) {
-        ObjectComm& ocomm = ObjectComm::get();
-        int root = route.sources.front();
-        IRType dummy_type;
-        return ocomm.bcast(dummy_type, getLocalRank(getRanksInRoute(route), root), getRouteCommunicator(route));
-    }
-
-    SComm::SComm(): batch_size_(0), split_index_(0), is_bwd_(false) {}
+    SComm::SComm(): split_index_(0), is_bwd_(false) {}
 
     SComm& SComm::get() {
         static SComm instance;
         return instance;
-    }
-
-    void SComm::sendTensorRedist(const torch::jit::IValue& send_val, const RouteDP& route, const IRType& global_type) {
-        assert(contains(route.sources, mpi::getRank()));
-
-        // setup and run alltoall here
-        const auto& global_dim = global_type.getTensorDim();
-        if (batch_size_ < 1) {
-            batch_size_ = global_dim.front();
-        }
-        assert(send_val.isTensor());
-        at::Tensor send_ten = send_val.toTensor();
-
-        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim,
-                                               vectorToSet(route.sources), vectorToSet(route.dests), split_index_);
-
-        syncStream();
-        assert(send_ten.is_contiguous());
-
-        MPI_Datatype datatype = scalarTypeToMPIDatatype(send_ten.type().scalarType());
-        const auto route_ranks = getRanksInRoute(route);
-
-        // for profiling
-        int size_sum = 0;
-        for (size_t i=0; i<route_ranks.size(); i++) {
-            size_sum += redist_args.sendcounts[i];
-        }
-
-        std::stringstream ss;
-        ss << "sendTensorRedist_size=" << (size_sum * mpi::getTypeSize(datatype));
-        scomm_time_counter.start(ss.str());
-
-        bool cfg_p2p = config::Config::get().getVal<bool>(config::P2P_COMM);
-        if (cfg_p2p) {
-            int type_size = mpi::getTypeSize(datatype);
-            std::vector<int> dests = route.dests;
-            std::sort(dests.begin(), dests.end());
-
-            for (const int dest: dests) {
-                int dest_local_rank = getLocalRank(route_ranks, dest);
-                mpi::checkMPIResult(MPI_Send((char*) send_ten.data_ptr() + redist_args.sdispls[dest_local_rank]*type_size,
-                                             redist_args.sendcounts[dest_local_rank], datatype,
-                                             dest,
-                                             route.tag, MPI_COMM_WORLD));
-            }
-        } else {
-            mpi::checkMPIResult(MPI_Alltoallv(send_ten.data_ptr(), &redist_args.sendcounts[0], &redist_args.sdispls[0], datatype,
-                                              nullptr, &redist_args.recvcounts[0], &redist_args.rdispls[0], datatype,
-                                              getRouteCommunicator(route)));
-        }
-
-        scomm_time_counter.stop(ss.str());
-    }
-
-    torch::jit::IValue SComm::recvTensorRedist(const RouteDP& route, const IRType& global_type) {
-        // setup and run alltoall here
-        const auto& global_dim = global_type.getTensorDim();
-        if (batch_size_ < 1) {
-            batch_size_ = global_dim.front();
-        }
-        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size_, global_dim,
-                                               vectorToSet(route.sources), vectorToSet(route.dests), split_index_);
-
-        at::ScalarType stype = fromIRTensorElemTypeToScalarType(global_type.getTensorElemType());
-        MPI_Datatype datatype = scalarTypeToMPIDatatype(stype);
-
-        int recv_sum = 0;
-        for (int s: redist_args.recvcounts) {
-            recv_sum += s;
-        }
-        size_t sizeInByte = recv_sum * mpi::getTypeSize(datatype);
-
-        std::stringstream ss;
-        ss << "recvTensorRedist_size=" << sizeInByte;
-        scomm_time_counter.start(ss.str());
-
-        std::unordered_map<int, std::vector<int64_t>> dest_dist =
-                rannc::calcDistBatchDims(batch_size_, global_dim, rannc::vectorToSet(route.dests), split_index_);
-        const auto& local_dim = dest_dist.at(mpi::getRank());
-        at::Tensor ret = buf_cache_.get(getKey(route), setDimToIRType(global_type, local_dim));
-        void* resultBuf = ret.data_ptr();
-
-        bool cfg_p2p = config::Config::get().getVal<bool>(config::P2P_COMM);
-        if (cfg_p2p) {
-            int type_size = mpi::getTypeSize(datatype);
-            std::vector<int> sources = route.sources;
-            std::sort(sources.begin(), sources.end());
-            for (const int src: sources) {
-                int src_local_rank = getLocalRank(getRanksInRoute(route), src);
-                MPI_Status st;
-                mpi::checkMPIResult(MPI_Recv((char *) resultBuf + redist_args.rdispls[src_local_rank] * type_size,
-                                             redist_args.recvcounts[src_local_rank], datatype,
-                                             src,
-                                             route.tag, MPI_COMM_WORLD, &st));
-            }
-        } else {
-            mpi::checkMPIResult(MPI_Alltoallv(nullptr, &redist_args.sendcounts[0], &redist_args.sdispls[0], datatype,
-                                              resultBuf, &redist_args.recvcounts[0], &redist_args.rdispls[0], datatype,
-                                              getRouteCommunicator(route)));
-        }
-
-        scomm_time_counter.stop(ss.str());
-
-        return ret;
-    }
-
-    void SComm::sendIValue(const torch::jit::IValue& ivalue, const RouteDP& route) {
-        const IRType global_type = reduceRouteSourceBatchTypes(toIRType(ivalue), route);
-        sendTypeBcast(global_type, route);
-
-        if (global_type.getBaseType() == IRBaseType::TENSOR) {
-            assert(ivalue.isTensor());
-            auto ten = ivalue.toTensor();
-            sendTensorRedist(ivalue, route, global_type);
-        } else if (global_type.getBaseType() == IRBaseType::LIST &&
-                        global_type.getListType() == IRListType::TENSOR) {
-            assert(ivalue.isTensorList());
-            int idx = 0;
-            const auto& types = global_type.getCompoundTypes();
-            for (const auto& t: ivalue.toTensorVector()) {
-                const auto& type = types.at(idx);
-                sendTensorRedist(t, route, type);
-                idx++;
-            }
-        } else {
-            throw std::invalid_argument("sendIValue only supports tensor or tensor list. route=" + toString(route));
-        }
-    }
-
-    torch::jit::IValue SComm::recvIValue(const RouteDP& route) {
-        const IRType global_type = recvTypeBcast(route);
-
-        if (global_type.getBaseType() == IRBaseType::TENSOR) {
-            auto ret = recvTensorRedist(route, global_type);
-            return ret;
-        } else if (global_type.getBaseType() == IRBaseType::LIST &&
-                   global_type.getListType() == IRListType::TENSOR) {
-            int idx = 0;
-            c10::List<at::Tensor> tensor_list;
-            for (const auto& type: global_type.getCompoundTypes()) {
-                auto ret = recvTensorRedist(route, type);
-
-                assert(ret.isTensor());
-                tensor_list.push_back(ret.toTensor());
-                idx++;
-            }
-            return tensor_list;
-        } else {
-            throw std::invalid_argument("recvIValue only supports tensor or tensor list. route=" + toString(route)
-                + " type=" + toString(global_type));
-        }
     }
 
     torch::jit::IValue SComm::bcastIValue(const torch::jit::IValue& ivalue, const RouteDP& route) {
@@ -434,14 +266,16 @@ namespace rannc {
 
         recordStart("distributeBatchTensor_" + toString(route));
 
+        size_t batch_size = getSplitBatchSize(split_delay);
+
         const auto& global_dim = global_type.getTensorDim();
-        if (batch_size_ < 1) {
-            batch_size_ = global_dim.front();
+        if (batch_size < 1) {
+            batch_size = global_dim.front();
         }
 
         // setup and run alltoall here
         std::unordered_map<int, std::vector<int64_t>> dest_dist =
-                rannc::calcDistBatchDims(batch_size_, global_dim, rannc::vectorToSet(route.dests), split_index_-split_delay);
+                rannc::calcDistBatchDims(batch_size, global_dim, rannc::vectorToSet(route.dests));
 
         at::Tensor recv_buf;
         void* send_ptr;
@@ -467,7 +301,7 @@ namespace rannc {
         }
 
         NCCLWrapper& ar = NCCLWrapper::get();
-        ar.redist(send_ptr, recv_ptr, route, batch_size_, global_type, split_index_-split_delay);
+        ar.redist(send_ptr, recv_ptr, route, batch_size, global_type);
 
         recordEnd("distributeBatchTensor_" + toString(route));
 
@@ -483,7 +317,7 @@ namespace rannc {
         if (global_type.getBaseType() == IRBaseType::TENSOR) {
             const auto& dim = global_type.getTensorDim();
             if (dim.empty()) {
-                return distributeLossTensor(val, global_type, route, is_bwd, batch_size_);
+                return distributeLossTensor(val, global_type, route, is_bwd, split_delay);
             }
             return distributeBatchTensor(val, global_type, route, split_delay);
         } else if (global_type.getBaseType() == IRBaseType::LIST) {
@@ -549,19 +383,9 @@ namespace rannc {
         throw std::invalid_argument("Unexpected type for distribution: " + toString(global_type));
     }
 
-    IRType SComm::reduceRouteTypes(const IRType& type, const RouteDP& route) {
-        std::stringstream ss;
-        ss << "SComm::reduceRouteTypes_" << toString(type) << "_" << toString(route);
-        const auto key = ss.str();
-        recordStart(key);
-        auto ret = reduceTypes(type, getRouteCommunicator(route));
-        recordEnd(key);
-        return ret;
-    }
-
     torch::jit::IValue SComm::distribute(const torch::jit::IValue& val, const RouteDP& route, bool is_bwd, int split_delay) {
         auto ir_type = route.ir_value.getType();
-        ir_type.setBatchSize(batch_size_);
+        ir_type.setBatchSize(getSplitBatchSize(split_delay));
         return distribute(val, route, is_bwd, ir_type, split_delay);
     }
 
@@ -574,10 +398,9 @@ namespace rannc {
 
     rannc::RedistArgs getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim,
                                     const std::unordered_set<int>& src_ranks,
-                                    const std::unordered_set<int>& dest_ranks,
-                                    int split_index) {
-        std::unordered_map<int, std::vector<int64_t>> src_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, src_ranks, split_index);
-        std::unordered_map<int, std::vector<int64_t>> dest_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, dest_ranks, split_index);
+                                    const std::unordered_set<int>& dest_ranks) {
+        std::unordered_map<int, std::vector<int64_t>> src_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, src_ranks);
+        std::unordered_map<int, std::vector<int64_t>> dest_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, dest_ranks);
 
 //        for (const auto& it: src_dist) {
 //            int rank = it.first;
@@ -625,7 +448,10 @@ namespace rannc {
     }
 
     torch::jit::IValue SComm::distributeLossTensor(const torch::jit::IValue& val, const IRType& global_type,
-                                            const RouteDP& route, bool weight, int64_t batch_size) {
+                                                   const RouteDP& route, bool weight, int split_delay) {
+
+        size_t batch_size = getSplitBatchSize(split_delay);
+
         assert(val.isTensor() || val.isNone());
         const auto& global_dim = global_type.getTensorDim();
 
@@ -697,19 +523,12 @@ namespace rannc {
         return ten;
     }
 
-    void SComm::startFwd(int64_t batch_size) {
-        start("FWD", batch_size);
-        is_bwd_ = false;
-    }
+    void SComm::setPipeline(int pipeline_num, int64_t global_batch_size, bool is_bwd) {
+        pipeline_num_ = pipeline_num;
+        global_batch_size_ = global_batch_size;
+        is_bwd_ = is_bwd;
 
-    void SComm::startBwd(int64_t batch_size) {
-        start("BWD", batch_size);
-        is_bwd_ = true;
-    }
-
-    void SComm::start(std::string prefix, int64_t batch_size) {
-        prefix_ = std::move(prefix);
-        batch_size_ = batch_size;
+        split_batch_sizes_ = getSplitBatchSizes(global_batch_size_, pipeline_num_);
     }
 
     void SComm::startSplit(int split_index) {
@@ -717,17 +536,21 @@ namespace rannc {
     }
 
     std::string SComm::getKey(const RouteDP& route) const {
+        const std::string prefix = is_bwd_ ? "BWD" : "FWD";
         std::stringstream ss;
-        ss << "[PREFIX=" << prefix_ << "]" << toString(route.location) << "[TAG=" << route.tag << "]";
+        ss << "[PREFIX=" << prefix << "]" << toString(route.location) << "[TAG=" << route.tag << "]";
         return ss.str();
+    }
+
+    size_t SComm::getSplitBatchSize(int split_delay) {
+        int delayed_split_index = split_index_ - split_delay;
+        assert(delayed_split_index >= 0);
+        assert(delayed_split_index < split_batch_sizes_.size());
+        return split_batch_sizes_.at(delayed_split_index);
     }
 
     MPI_Comm SComm::getRouteCommunicator(const RouteDP& route) {
         return getCommunicator(route.tag, getRanksInRoute(route));
-    }
-
-    MPI_Comm SComm::getRouteSourcesCommunicator(const RouteDP& route) {
-        return getCommunicator(route.source_tag, vectorToSet(route.sources));
     }
 
     MPI_Comm SComm::getCommunicator(int tag, const std::unordered_set<int>& ranks) {

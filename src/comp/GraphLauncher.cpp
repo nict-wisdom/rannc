@@ -142,7 +142,7 @@ namespace rannc {
     }
 
     IValueMap GraphLauncher::compute(const std::string& id, bool is_bwd,
-            int64_t batch_size, const IValueMap &inputs, const std::function<void(int64_t)> &set_bs,
+            int64_t batch_size, const IValueMap &inputs,
             std::vector<RouteDP> &in_routes, std::vector<RouteDP> &out_routes) {
 
         // Assume we already padded the global batch size according to the world size
@@ -153,6 +153,7 @@ namespace rannc {
         SComm& scomm = SComm::get();
 
         int actual_pipeline_num = pipeline_num_ > batch_size ? batch_size : pipeline_num_;
+        scomm.setPipeline(pipeline_num_, batch_size, is_bwd);
 
         // Routes from/to subgraphs
         std::unordered_map<std::string, std::unordered_map<IValueLocation, RouteDP, IValueLocationHash>> in_route_map;
@@ -187,8 +188,6 @@ namespace rannc {
             std::unordered_map<std::string, IValueMap> split_inputs;
 
             // *global* batch sizes of this split in the pipeline
-            int64_t split_bs = split_batch_sizes.at(i);
-            set_bs(split_bs);
             scomm.startSplit(i);
 
             for (const auto &r: in_routes) {
@@ -226,8 +225,6 @@ namespace rannc {
 
             std::unordered_map <std::string, IValueMap> split_driver_out;
 
-            int64_t split_bs = split_batch_sizes.at(i);
-            set_bs(split_bs);
             scomm.startSplit(i);
             const auto& inputs = toCUDAIfAvailable(graph_inputs.at(i), true);
             if (is_bwd) {
@@ -248,8 +245,6 @@ namespace rannc {
             std::unordered_map <std::string, IValueMap> &split_driver_out = graph_driver_out.at(i);
 
             // *global* batch sizes of this split in the pipeline
-            int64_t split_bs = split_batch_sizes.at(i);
-            set_bs(split_bs);
             scomm.startSplit(i);
 
             std::unordered_map <std::string, IValueMap> split_out;
@@ -353,12 +348,7 @@ namespace rannc {
         }
 
         SComm& scomm = SComm::get();
-        scomm.startFwd(global_batch_size);
-
-        std::function<void(int64_t)> set_bs = [&scomm](size_t batch_size) {
-                    return scomm.startFwd(batch_size);
-                };
-        auto outputs = compute(id, false, global_batch_size, pad_inputs, set_bs, deployment_.fwd_in_routes, deployment_.fwd_out_routes);
+        auto outputs = compute(id, false, global_batch_size, pad_inputs, deployment_.fwd_in_routes, deployment_.fwd_out_routes);
 
         const auto &output_names = deployment_.graph->getOutputNames();
         assert(output_names.size() == 1);
@@ -421,10 +411,7 @@ namespace rannc {
         param_storage_->prepareBackward(id);
 
         SComm& scomm = SComm::get();
-        std::function<void(int64_t)> set_bs = [&scomm](size_t batch_size) {
-            return scomm.startBwd(batch_size);
-        };
-        auto outputs = compute(id, true, global_batch_size, scaled_inputs, set_bs, deployment_.bwd_in_routes, deployment_.bwd_out_routes);
+        auto outputs = compute(id, true, global_batch_size, scaled_inputs, deployment_.bwd_in_routes, deployment_.bwd_out_routes);
 
         if (gather_inputs_) {
             outputs = alignBatch(outputs, input_batch_size, deployment_.graph, false);

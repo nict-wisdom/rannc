@@ -1473,4 +1473,42 @@ namespace rannc {
 
         return Partition{ir_graph->getName(), ir_graph, sg_map, connections, sg_order};
     }
+
+    std::ostream &operator<<(std::ostream &os, const Deployment &deployment) {
+        os << "id: " << deployment.id << std::endl;
+        os << " pipeline_num: " << deployment.pipeline_num
+           << " checkpointing: " << deployment.checkpointing << std::endl;
+
+        os << " graph: " << *deployment.graph;
+        os << " subgraphs: " << std::endl;
+        int idx = 0;
+        for (const auto& sg_name: deployment.fwd_graph_order) {
+            assert(contains(deployment.subgraphs, sg_name));
+            const auto graph = deployment.subgraphs.at(sg_name);
+            os << "  order: " << idx << " " << *graph;
+            os << "  allocation: " << join_as_str(deployment.allocation.at(sg_name)) << std::endl;
+            idx++;
+        }
+
+        for (const auto& r: deployment.fwd_in_routes) {
+            os << " fwd_in_routes: " << r << std::endl;
+        }
+        for (const auto& r: deployment.fwd_routes) {
+            os << " fwd_routes: " << r << std::endl;
+        }
+        for (const auto& r: deployment.fwd_out_routes) {
+            os << " fwd_out_routes: " << r << std::endl;
+        }
+        for (const auto& r: deployment.bwd_in_routes) {
+            os << " bwd_in_routes: " << r << std::endl;
+        }
+        for (const auto& r: deployment.bwd_routes) {
+            os << " bwd_routes: " << r << std::endl;
+        }
+        for (const auto& r: deployment.bwd_out_routes) {
+            os << " bwd_out_routes: " << r << std::endl;
+        }
+
+        return os;
+    }
 }

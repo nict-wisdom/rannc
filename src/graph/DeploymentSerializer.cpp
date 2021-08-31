@@ -6,14 +6,6 @@
 
 namespace rannc {
 
-    struct DeploymentState {
-        Deployment deployment;
-        int world_size;
-        long dev_mem;
-
-        MSGPACK_DEFINE(deployment, world_size, dev_mem);
-    };
-
     void save(const std::string& file, const Deployment& deployment,
               int world_size, long dev_mem) {
 
@@ -29,7 +21,7 @@ namespace rannc {
         out.close();
     }
 
-    Deployment load(const std::string& file, int world_size, long dev_mem) {
+    DeploymentState loadDeploymentState(const std::string& file) {
 
         std::ifstream input(file, std::ios::in | std::ios::binary);
         if (!input) {
@@ -37,16 +29,24 @@ namespace rannc {
         }
 
         std::vector<char> buffer(std::istreambuf_iterator<char>(input), {});
+        return deserialize<DeploymentState>(buffer);
+    }
 
-        DeploymentState state = deserialize<DeploymentState>(buffer);
+    Deployment loadDeployment(const std::string& file, int world_size, long dev_mem) {
+        DeploymentState state = loadDeploymentState(file);
 
-        if (state.world_size != world_size || state.dev_mem != dev_mem) {
-            std::stringstream ss;
-            ss << "Deployment state does not match: world_size=" << state.world_size
+            if (state.world_size != world_size || state.dev_mem != dev_mem) {
+                std::stringstream ss;
+                ss << "Deployment state does not match: world_size=" << state.world_size
                 << " dev_mem=" << state.dev_mem;
-            throw std::invalid_argument(ss.str());
-        }
+                throw std::invalid_argument(ss.str());
+            }
 
+        return state.deployment;
+    }
+
+    Deployment loadDeployment(const std::string& file) {
+        DeploymentState state = loadDeploymentState(file);
         return state.deployment;
     }
 }

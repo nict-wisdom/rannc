@@ -354,6 +354,8 @@ namespace rannc {
     }
 
     void ParamStorage::allReduceParamGradsZero(const std::string& graph_id, double loss_scale) {
+        logger->trace("allReduceParamGradsZero starting {}", graph_id);
+
         const auto& graph_grouped_params = grouped_params_[graph_id];
 
         assert(zeroEnabled(graph_id));
@@ -435,6 +437,7 @@ namespace rannc {
 
         syncStream();
         recordEnd(ss.str());
+        logger->trace("allReduceParamGradsZero finished {}", graph_id);
     }
 
     void ParamStorage::setGradToLocalParamSegment(const std::string& graph_id) {

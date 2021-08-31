@@ -272,7 +272,7 @@ namespace rannc {
             const auto dev_info = ::rannc::getCudaDeviceInfo(getCurrentCudaDeviceId());
             if (load_deployment_) {
                 logger->info("Loading deployment state from {}", deployment_file_);
-                deployment_ = load(deployment_file_, mpi::getSize(), dev_info.total_mem);
+                deployment_ = loadDeployment(deployment_file_, mpi::getSize(), dev_info.total_mem);
                 deployment_.id = id_;
 
                 std::unordered_map<std::string, GraphProfile> profiles;

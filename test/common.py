@@ -240,7 +240,11 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             if delay_grad_allreduce and run_update:
                 pyrannc.allreduce_grads(rmodel, r_opt)
 
-            torch.nn.utils.clip_grad_norm_(amp.master_params(opt), MAX_NORM)
+            if use_amp:
+                torch.nn.utils.clip_grad_norm_(amp.master_params(opt), MAX_NORM)
+            else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_NORM)
+
             rmodel.clip_grad_norm(MAX_NORM)
 
             if run_update:
@@ -274,7 +278,6 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     if pyrannc.get_rank() == 0:
         torch.save(model_state_dict, 'model.pt')
         torch.save(global_opt_state_dict, 'opt_state.pt')
-        rmodel.save_deployment(str("rannc_deployment.bin"))
 
     pyrannc.barrier()
 

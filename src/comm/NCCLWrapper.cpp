@@ -306,14 +306,14 @@ namespace rannc {
                           });
     }
 
-    std::string getBoolBufKey(const RouteDP& route, const std::string& action, int split_index) {
+    std::string getBoolBufKey(const RouteDP& route, const std::string& action) {
         std::stringstream ss;
-        ss << toString(route) << "_" << action << "_" << split_index;
+        ss << toString(route) << "_" << action;
         return ss.str();
     }
 
     void NCCLWrapper::redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
-                             int64_t batch_size, const IRType& global_type, int split_index) {
+                             int64_t batch_size, const IRType& global_type) {
 
         if (!contains(getRanksInRoute(route), mpi::getRank())) {
             return;
@@ -328,7 +328,7 @@ namespace rannc {
         const auto& elem_type = convert_bool ? IRTensorElemType::INT : global_type.getTensorElemType();
 
         const auto redist_args = getRedistArgs(mpi::getRank(), batch_size, global_dim,
-               vectorToSet(route.sources), vectorToSet(route.dests), split_index);
+               vectorToSet(route.sources), vectorToSet(route.dests));
 
         void* tmp_send_ptr = send_ptr;
         void* tmp_recv_ptr = recv_ptr;
@@ -341,7 +341,7 @@ namespace rannc {
                         .dtype(c10::ScalarType::Bool);
 
                 auto send_ten = torch::from_blob(send_ptr, {send_count_sum}, options);
-                auto send_buf_ten = buf_cache_.get(getBoolBufKey(route, "send", split_index),
+                auto send_buf_ten = buf_cache_.get(getBoolBufKey(route, "send"),
                                                    IRType::createTensorType(elem_type, {send_count_sum}, false));
                 send_buf_ten.zero_();
                 send_buf_ten.masked_fill_(send_ten, 1);
@@ -349,7 +349,7 @@ namespace rannc {
             }
 
             if (recv_ptr != nullptr) {
-                auto recv_buf_ten = buf_cache_.get(getBoolBufKey(route, "recv", split_index),
+                auto recv_buf_ten = buf_cache_.get(getBoolBufKey(route, "recv"),
                                                    IRType::createTensorType(elem_type, {recv_count_sum}, false));
                 tmp_recv_ptr = recv_buf_ten.data_ptr();
             }
@@ -369,7 +369,7 @@ namespace rannc {
 
         const auto elem_size = getTensorElemSize(elem_type);
         job_executor_.addCommJob([n_ranks, redist_args, my_local_rank, tmp_send_ptr, tmp_recv_ptr, datatype,
-                                  elem_size, ncomm, split_index, send_count_sum]() {
+                                  elem_size, ncomm, send_count_sum]() {
 
             auto stream = getStream();
             for (size_t i=0; i<n_ranks; i++) {

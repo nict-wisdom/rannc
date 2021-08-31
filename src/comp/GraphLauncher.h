@@ -47,7 +47,7 @@ namespace rannc {
 
     private:
         IValueMap compute(const std::string& id, bool is_bwd,
-                          int64_t batch_size, const IValueMap &inputs, const std::function<void(int64_t)> &set_bs,
+                          int64_t batch_size, const IValueMap &inputs,
                           std::vector<RouteDP> &in_routes, std::vector<RouteDP> &out_routes);
 
         IValueMap alignBatch(const IValueMap &input, int batch_size, const std::shared_ptr<IRGraph> &graph, bool zero_pad);

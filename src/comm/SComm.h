@@ -29,7 +29,7 @@ namespace rannc {
 
     RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim,
                              const std::unordered_set<int>& src_ranks,
-                             const std::unordered_set<int>& dest_ranks, int split_index);
+                             const std::unordered_set<int>& dest_ranks);
 
     void sendTensorRedist(const torch::jit::IValue &send_val, const RouteDP &route, const IRType &global_type,
                           int64_t batch_size, MPI_Comm comm);
@@ -86,17 +86,11 @@ namespace rannc {
     public:
         static SComm& get();
 
-        void startFwd(int64_t batch_size);
-        void startBwd(int64_t batch_size);
+        void setPipeline(int pipeline_num, int64_t global_batch_size, bool is_bwd);
+
         void startSplit(int split_index);
         std::string getKey(const RouteDP& route) const;
 
-        int64_t getBatchSize() const {
-            return batch_size_;
-        }
-
-        void sendIValue(const torch::jit::IValue& ivalue, const RouteDP& route);
-        torch::jit::IValue recvIValue(const RouteDP& route);
         torch::jit::IValue bcastIValue(const torch::jit::IValue& ivalue, const RouteDP& route);
         IValueMap bcastIValueMap(const IValueMap& ivalue_map, const RouteDP& route);
 
@@ -119,32 +113,22 @@ namespace rannc {
     private:
         SComm();
 
-        void start(std::string prefix, int64_t batch_size);
         MPI_Comm getRouteCommunicator(const RouteDP& route);
-        MPI_Comm getRouteSourcesCommunicator(const RouteDP& route);
-        IRType reduceRouteSourceBatchTypes(const IRType& type, const RouteDP& route);
-        IRType reduceRouteTypes(const IRType& type, const RouteDP& route);
-
-        IRType sendTypeBcast(IRType local_type, const RouteDP& route);
-        IRType recvTypeBcast(const RouteDP& route);
-        void sendTensorRedist(const torch::jit::IValue& send_val, const RouteDP& route, const IRType& global_type);
-        torch::jit::IValue recvTensorRedist(const RouteDP& route, const IRType& global_type);
-
         torch::jit::IValue doDistribute(const torch::jit::IValue& val, const IRType& global_type,
                                         const RouteDP& route, bool is_fwd, int split_delay);
-
         torch::jit::IValue distributeBatchTensor(const torch::jit::IValue& val, const IRType& global_type,
                 const RouteDP& route, int split_delay);
         torch::jit::IValue distributeLossTensor(const torch::jit::IValue& val, const IRType& global_type,
-                                                const RouteDP& route, bool weight, int64_t batch_size);
+                                                const RouteDP& route, bool weight, int split_delay);
         at::Tensor bcastTensor(const torch::jit::IValue& ivalue, const IRType& ir_type, const RouteDP& route,
                                MPI_Comm comm);
-
+        size_t getSplitBatchSize(int split_delay);
 
         BufferTensorCache buf_cache_;
 
-        int64_t batch_size_;
-        std::string prefix_;
+        int64_t global_batch_size_;
+        std::vector<int64_t> split_batch_sizes_;
+        int pipeline_num_;
         int split_index_;
         bool is_bwd_;
 

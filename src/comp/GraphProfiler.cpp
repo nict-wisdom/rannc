@@ -114,6 +114,14 @@ namespace rannc {
         return results;
     }
 
+    void GraphValueCache::put(const std::string& name, const torch::jit::IValue& value) {
+
+    }
+
+    torch::jit::IValue GraphValueCache::get(const std::string& name, size_t batch_size) {
+
+    }
+
     ProfilingResult GraphProfiler::compute(
             const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
             int iteration, IValueMap& values, int split_index, bool checkpointing) {
@@ -127,9 +135,15 @@ namespace rannc {
             avail_locs.insert(it.first);
         }
 
-        size_t  prev_done = 0;
-        size_t  prev_locs = 0;
-        size_t  infinite  = 0;
+        size_t prev_done = 0;
+        size_t prev_locs = 0;
+        size_t infinite = 0;
+
+//        spdlog::info("Before profiler graph loop: #ir_graphs={}", ir_graphs.size());
+//        for (const auto& it: ir_graphs) {
+//            spdlog::info("graph={}", toString(*it.second));
+//        }
+
         while (graphs_done.size() < ir_graphs.size()) {
             for (const auto &it: ir_graphs) {
                 const auto& id = it.first;
@@ -285,8 +299,8 @@ namespace rannc {
                 }   //  End if (graph_ready)
             }   //  End for (it_graphs)
 
-            //  Check the size of graphs_done and avail_locs.
-            //  Because if the above for block did not changed the sizes,
+            //  Check the sizes of graphs_done and avail_locs.
+            //  Because if the above for block did not change the sizes,
             //  it may be bug and causes infinite-loops.
             if ((graphs_done.size() == prev_done)
                     && (avail_locs.size() == prev_locs))
@@ -295,13 +309,13 @@ namespace rannc {
                     throw  std::runtime_error(
                         "The variable(s) was not updated in while loop. "
                         "It (may) causes infinite-loops. "
-                        "This may be BUG, please report to developper."
+                        "This may be BUG, please report to developer."
                     );
                 }
                 logger->debug(
                         "The variable(s) was not updated in while loop. "
                         "It (may) causes infinite-loops. "
-                        "This may be BUG, please report to developper."
+                        "This may be BUG, please report to developer."
                 );
                 logger->debug(
                         "graphs_done = {} (prev = {}), "

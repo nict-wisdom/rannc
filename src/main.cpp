@@ -346,6 +346,34 @@ PYBIND11_MODULE(_pyrannc, m) {
         save(deployment_file, deployment, cache.dev_num, cache.dev_mem);
     });
 
+
+    m.def("show_deployment", [](const std::string& path, size_t batch_size) {
+        spdlog::info("Loading deployment state from {}", path);
+        const DeploymentState state = loadDeploymentState(path);
+        const Deployment& deployment = state.deployment;
+        std::stringstream ss;
+        ss << deployment;
+
+        SComm& scomm = SComm::get();
+
+        std::vector<int64_t> split_batch_sizes = getSplitBatchSizes(batch_size, deployment.pipeline_num);
+        for (int i=0; i<split_batch_sizes.size(); i++) {
+            int64_t split_bs = split_batch_sizes.at(i);
+
+            ss << "split" << i << ": bs=" << split_bs << std::endl;
+            for (const auto sg_name: deployment.fwd_graph_order) {
+                const auto& g = deployment.subgraphs.at(sg_name);
+                auto alloc = setToVector(deployment.allocation.at(sg_name));
+                std::sort(alloc.begin(), alloc.end());
+                ss << " " << sg_name << " repl_num=" << alloc.size() << " " << join_as_str(alloc) << std::endl;
+
+            }
+
+        }
+
+        spdlog::info(ss.str());
+    });
+
 #ifdef VERSION_INFO
     m.attr("__version__") = VERSION_INFO;
 #else

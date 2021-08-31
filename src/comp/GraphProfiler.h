@@ -69,6 +69,21 @@ namespace rannc {
         std::unordered_map<size_t, ProfileItem> items_;
     };
 
+    class GraphValueCache {
+    public:
+        GraphValueCache(size_t batch_size): batch_size_(batch_size) {}
+
+        void put(const std::string& name, const torch::jit::IValue& value);
+        torch::jit::IValue get(const std::string& name, size_t batch_size);
+
+    private:
+        std::unordered_map<std::string, torch::jit::IValue> values_;
+        size_t batch_size_;
+
+        const std::shared_ptr<spdlog::logger> logger = getLogger("GraphValueCache");
+    };
+
+
     class GraphProfiler {
     public:
         GraphProfiler(std::shared_ptr<ParamStorage> param_storage,

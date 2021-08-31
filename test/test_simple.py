@@ -13,6 +13,7 @@ default_vals = {
 
 test_models = [
     {"model": models.SmallParamModel},
+    {"model": models.SharedInputModel},
     {"model": models.ForkJoinModel},
     {"model": models.SharedParamModel},
     {"model": models.OneOpModel},

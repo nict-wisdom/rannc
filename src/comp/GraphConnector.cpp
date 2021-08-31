@@ -88,16 +88,19 @@ namespace rannc {
 
             torch::jit::IValue send_value;
             if (contains(sg_values, r.location)) {
-                send_value = sg_values.at(r.location);
+                send_value = toCUDAIfAvailable(sg_values.at(r.location), true, false);
             }
 
             const auto event_key = getCommKey("send", r, split_index, toIRType(send_value));
             recordStart(event_key);
-            logger->trace("Sending output via route {} split={} delay={}", toString(r), split_index, send_delay);
+            int split_delay = send_delay - flush_offset;
+            logger->trace("Sending output via route {} split={} split_delay={} tgt_split={}", toString(r), split_index,
+                          split_delay, tgt_split);
             SComm &scomm = SComm::get();
-            auto recv_val = scomm.distribute(send_value, r, is_bwd, send_delay - flush_offset);
+            auto recv_val = scomm.distribute(send_value, r, is_bwd, split_delay);
             recordEnd(event_key);
-            logger->trace("Finished sending output via route {} split={} delay={}", toString(r), split_index, send_delay);
+            logger->trace("Finished sending output via route {} split={} split_delay={}, tgt_split={}",
+                          toString(r), split_index, split_delay, tgt_split);
 
             return recv_val;
         } else {
@@ -270,9 +273,9 @@ namespace rannc {
                     driver_out = f(sg_name, graph_inputs, split_index);
                 }
                 logger->trace("Finished driver split_index={}", split_index);
-                for (const auto& it: driver_out) {
-                    if (!contains(sg_values, it.first)) {
-                        sg_values[it.first] = it.second;
+                for (const auto& it_out: driver_out) {
+                    if (!contains(sg_values, it_out.first)) {
+                        sg_values[it_out.first] = toCPU(it_out.second, true, true);
                     }
                 }
                 graphs_done.insert(sg_name);

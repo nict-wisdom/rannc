@@ -540,3 +540,7 @@ def allreduce_grads(rmodel, optimizer, prescale=1.0):
 
 def run_dp_dry(path):
     _pyrannc.run_dp_dry(path)
+
+
+def show_deployment(path, batch_size):
+    _pyrannc.show_deployment(path, batch_size)
