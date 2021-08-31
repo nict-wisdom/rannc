@@ -259,7 +259,7 @@ namespace rannc {
 
                     torch::jit::IValue send_val;
                     if (contains(split_driver_out[sg_name], loc)) {
-                        send_val = split_driver_out[sg_name].at(loc);
+                        send_val = toCUDAIfAvailable(split_driver_out[sg_name].at(loc), true, false);
                     }
                     logger->trace("Sending output {} via route {} split={}", toString(toIRType(send_val)),
                                   toString(route), i);
