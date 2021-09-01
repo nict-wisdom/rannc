@@ -41,8 +41,9 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
 
-    print("use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={}".format(
-          use_amp, allreduce_amp_master_params, enable_zero, dist_params))
+    print("use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={} "
+          " gradient_accumulation_steps={}".format(
+          use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps))
 
     for k, v in default_vals.items():
         if k not in test_model:

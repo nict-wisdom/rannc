@@ -29,7 +29,7 @@ function get_port_unused_random {
 }
 
 NP=${NP:-4}
-BATCH_SIZE=${BATCH_SIZE:-64}
+BATCH_SIZE=${BATCH_SIZE:-32}
 PARTITION_NUM=${PARTITION_NUM:-1}
 RANNC_CONF_DIR=${RANNC_CONF_DIR:-${HOME}/.pyrannc}
 

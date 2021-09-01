@@ -403,7 +403,7 @@ namespace rannc {
                 if (contains(param_cache_, irp.getName())) {
                     graph_param_tensors[irp.getName()]  = param_cache_.at(irp.getName());
                 } else {
-                    logger->info("Gathering distributed param: {}", irp.getName());
+                    logger->info("Fetching param: {}", irp.getName());
                     const auto param_tensor = param_storage_->getParamTensor(graph_params_.at(irp.getName()));
                     graph_param_tensors[irp.getName()] = param_cache_[irp.getName()] = param_tensor;
                 }

@@ -125,13 +125,6 @@ class SharedInputModel(nn.Module):
         self.fc3 = nn.Linear(3, 3, bias=False)
         self.fc4 = nn.Linear(3, 3, bias=False)
 
-        with torch.no_grad():
-            w = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
-            self.fc1.weight.copy_(w)
-            self.fc2.weight.copy_(w)
-            self.fc3.weight.copy_(w)
-            self.fc4.weight.copy_(w)
-
     def forward(self, x):
         y1 = self.fc1(x)
         y2 = self.fc2(y1)
