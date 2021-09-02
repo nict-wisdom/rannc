@@ -14,31 +14,6 @@
 #include "EventRecorder.h"
 
 namespace {
-    std::string getFuncKey(const std::string& func, const std::string& id,
-                           int split, bool grad) {
-        std::stringstream ss_key;
-        ss_key << "GraphConnector::" << func << "_id=" << id
-               << "_split=" << split << "_grad=" << grad;
-        return ss_key.str();
-    }
-
-    std::string getCommKey(const std::string& direction, const rannc::RouteDP& r,
-                           int split) {
-        std::stringstream ss_key;
-        ss_key << "GraphConnector::" << direction
-               << "_val=" << r.location.value_name
-               << "_src=" << r.source_graph
-               << "_dest=" << r.dest_graph
-               << "_split=" << split;
-        return ss_key.str();
-    }
-
-    std::string getCommKey(const std::string& direction, const rannc::RouteDP& r,
-                           int split, const rannc::IRType& type) {
-        std::stringstream ss_key;
-        ss_key << getCommKey(direction, r, split) << "_type=" << toString(type);
-        return ss_key.str();
-    }
 
     int getDelay(const rannc::RouteDP& r,
                     const std::unordered_map<std::string, int>& graph_order) {
@@ -88,10 +63,13 @@ namespace rannc {
 
             torch::jit::IValue send_value;
             if (contains(sg_values, r.location)) {
+                const auto event_key = getFuncKey("GraphConnector", "driver_output_to_cuda", id_, tgt_split, false);
+                recordStart(event_key);
                 send_value = toCUDAIfAvailable(sg_values.at(r.location), true, false);
+                recordEnd(event_key);
             }
 
-            const auto event_key = getCommKey("send", r, split_index, toIRType(send_value));
+            const auto event_key = getCommKey("GraphConnector", "send", r, split_index, toIRType(send_value));
             recordStart(event_key);
             int split_delay = send_delay - flush_offset;
             logger->trace("Sending output via route {} split={} split_delay={} tgt_split={}", toString(r), split_index,
@@ -275,7 +253,10 @@ namespace rannc {
                 logger->trace("Finished driver split_index={}", split_index);
                 for (const auto& it_out: driver_out) {
                     if (!contains(sg_values, it_out.first)) {
+                        const auto event_key = getFuncKey("GraphConnector", "driver_output_to_cpu", id_, split_index, false);
+                        recordStart(event_key);
                         sg_values[it_out.first] = toCPU(it_out.second, true, true);
+                        recordEnd(event_key);
                     }
                 }
                 graphs_done.insert(sg_name);
@@ -313,7 +294,7 @@ namespace rannc {
             assert(contains(recv_routes, sg_name));
             for (const auto& r: recv_routes.at(sg_name)) {
                 assert(contains(r.dests, mpi::getRank()));
-                const auto event_key = getCommKey( "recv", r, split_index);
+                const auto event_key = getCommKey("GraphConnector",  "recv", r, split_index);
 
                 recordStart(event_key);
                 logger->trace("Receiving input via route {}", toString(r));
@@ -362,7 +343,7 @@ namespace rannc {
     std::unordered_map<std::string, IValueMap> GraphConnector::forward(const std::string &id,
             const std::unordered_map<std::string, IValueMap>& inputs, int split_index, bool grad_mode) {
 
-        const auto event_key = getFuncKey("forward", id, split_index, grad_mode);
+        const auto event_key = getFuncKey("GraphConnector", "forward", id, split_index, grad_mode);
         recordStart(event_key);
 
         logger->trace("GraphConnector::forward starting. id={} split={}", id, split_index);
@@ -382,7 +363,7 @@ namespace rannc {
                     }
                 }
 
-                const auto to_cpu_key = getFuncKey("input_to_cpu", id, split_index, false);
+                const auto to_cpu_key = getFuncKey("GraphConnector","input_to_cpu", id, split_index, false);
                 recordStart(to_cpu_key);
                 c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool();
                 {
@@ -395,7 +376,7 @@ namespace rannc {
 
                 // After computing the *last* split in pipeline, start moving inputs for the *first* split to gpu
                 if (split_index + 1 == pipeline_num_) { //
-                    const auto to_gpu_key = getFuncKey("input_to_gpu", id, 0, false);
+                    const auto to_gpu_key = getFuncKey("GraphConnector","input_to_gpu", id, 0, false);
                     recordStart(to_gpu_key);
                     c10::cuda::CUDAStreamGuard guard(stream);
 
@@ -472,7 +453,7 @@ namespace rannc {
         logger->trace("GraphConnector::backward starting. id={} split={}", id, split_index);
         time_counter_.start("GraphConnector::backward");
 
-        recordStart(getFuncKey("backward", id, split_index, false));
+        recordStart(getFuncKey("GraphConnector","backward", id, split_index, false));
 
         const auto func = [this](const std::string& id, const IValueMap& inputs, int split_index) {
             auto& driver = this->driver_;
@@ -497,7 +478,7 @@ namespace rannc {
                             inputs_[id][split_index-1].clear();
                         }
 
-                        const auto to_gpu_key = getFuncKey("input_to_gpu", id, split_index+1, false);
+                        const auto to_gpu_key = getFuncKey("GraphConnector","input_to_gpu", id, split_index+1, false);
                         recordStart(to_gpu_key);
                         c10::cuda::CUDAStreamGuard guard(stream);
 
@@ -569,7 +550,7 @@ namespace rannc {
                 max_bwd_delay_, func, aggr, getGradOutputNames, skip);
         logger->trace("GraphConnector::backward finished. id={} split={}", id, split_index);
 
-        recordEnd(getFuncKey("backward", id, split_index, false));
+        recordEnd(getFuncKey("GraphConnector","backward", id, split_index, false));
 
         return values;
     }

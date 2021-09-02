@@ -109,4 +109,38 @@ namespace rannc {
             erec.stop(key);
         }
     }
+
+    std::string getFuncKey(const std::string& prefix, const std::string& func, const std::string& id,
+                           int split, bool grad) {
+        std::stringstream ss_key;
+        ss_key << prefix << "::" << func << "_id=" << id
+        << "_split=" << split << "_grad=" << grad;
+        return ss_key.str();
+    }
+
+    std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r, int split) {
+        std::stringstream ss_key;
+        ss_key << prefix << "::" << direction
+        << "_val=" << r.location.value_name
+        << "_src=" << r.source_graph
+        << "_dest=" << r.dest_graph
+        << "_split=" << split;
+        return ss_key.str();
+    }
+
+    std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r,
+                           int split, const IRType& type) {
+        std::stringstream ss_key;
+        ss_key << getCommKey(prefix, direction, r, split) << "_type=" << toString(type);
+        return ss_key.str();
+    }
+
+    std::string getCopyKey(const std::string& prefix, const std::string& func, const std::string& name, const IRType& type) {
+                std::stringstream ss_key;
+        ss_key << prefix << "::copy"
+        << "_name=" << name
+        << "_type=" << toString(type)
+        << "_size=" << type.getSizeInByte();
+        return ss_key.str();
+    }
 }

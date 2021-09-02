@@ -10,6 +10,7 @@
 #include <utility>
 #include <Common.h>
 #include <queue>
+#include <comm/SCommCommon.h>
 
 namespace rannc {
 
@@ -55,6 +56,11 @@ namespace rannc {
 
     void recordStart(const std::string &key);
     void recordEnd(const std::string &key);
+
+    std::string getFuncKey(const std::string& prefix, const std::string& func, const std::string& id, int split, bool grad);
+    std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r, int split);
+    std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r, int split, const IRType& type);
+    std::string getCopyKey(const std::string& prefix, const std::string& func, const std::string& name, const IRType& type);
 }
 
 #endif //PYRANNC_EVENTRECORDER_H

@@ -21,16 +21,6 @@
 #include <cuda/CudaUtil.h>
 
 
-namespace {
-    std::string getFuncKey(const std::string& func, const std::string& id,
-                           int split, bool grad) {
-        std::stringstream ss_key;
-        ss_key << "TorchDriver::" << func << "_id=" << id
-               << "_split=" << split << "_grad=" << grad;
-        return ss_key.str();
-    }
-}
-
 namespace rannc {
 
     const torch::jit::IValue matchIValue(const IValueMap &ival_map, const IValueLocation& loc) {
@@ -333,7 +323,7 @@ namespace rannc {
         bool grad_mode = torch::autograd::GradMode::is_enabled();
         logger->trace("TorchDriver::forward starting. id={} split={} grad_mode={}", id, split_idx, grad_mode);
 
-        recordStart(getFuncKey("forward", id, split_idx, grad_mode));
+        recordStart(getFuncKey("TorchDriver", "forward", id, split_idx, grad_mode));
 
         assert(contains(ir_graphs_, id));
 
@@ -342,7 +332,7 @@ namespace rannc {
 
         displayValue("forward input", fwd_count_, split_idx, grad_mode, inputs);
 
-        recordStart(getFuncKey("forward_copy_in", id, split_idx, grad_mode));
+        recordStart(getFuncKey("TorchDriver", "forward_copy_in", id, split_idx, grad_mode));
 
         IValueMap graphIn;
         std::unordered_map<std::string, std::vector<std::string>>& clone_names = input_clone_names_[id];
@@ -378,7 +368,7 @@ namespace rannc {
             }
         }
 
-        recordEnd(getFuncKey("forward_copy_in", id, split_idx, grad_mode));
+        recordEnd(getFuncKey("TorchDriver", "forward_copy_in", id, split_idx, grad_mode));
 
         IValueMap &graphOut = last_outputs_[id];
         graphOut.clear();
@@ -389,7 +379,7 @@ namespace rannc {
         std::vector<torch::jit::IValue> stack;
         stack.emplace_back(non_param_inputs);
 
-        recordStart(getFuncKey("forward_copy_param", id, split_idx, grad_mode));
+        recordStart(getFuncKey("TorchDriver", "forward_copy_param", id, split_idx, grad_mode));
 
         auto& graph_clone_params = clone_params_[id];
         if (split_idx <= last_split_idx_) {
@@ -400,7 +390,7 @@ namespace rannc {
             stack.emplace_back(p);
         }
 
-        recordEnd(getFuncKey("forward_copy_param", id, split_idx, grad_mode));
+        recordEnd(getFuncKey("TorchDriver", "forward_copy_param", id, split_idx, grad_mode));
 
         logger->trace("TorchDriver::forward starting torch engine. id={}", id);
         functions_[id]->run(stack);
@@ -420,7 +410,7 @@ namespace rannc {
 
         displayValue("forward output", fwd_count_, split_idx, grad_mode, graphOut);
 
-        recordEnd(getFuncKey("forward", id, split_idx, grad_mode));
+        recordEnd(getFuncKey("TorchDriver", "forward", id, split_idx, grad_mode));
 
         fwd_count_++;
 
@@ -478,7 +468,7 @@ namespace rannc {
     IValueMap TorchDriver::backward(const std::string &id, const IValueMap &inputs, int split_idx) {
         const auto tc_key = "TorchDriver::backward_" + id;
 
-        recordStart(getFuncKey("backward", id, split_idx, false));
+        recordStart(getFuncKey("TorchDriver", "backward", id, split_idx, false));
 
         assert(contains(ir_graphs_, id));
 
@@ -551,13 +541,13 @@ namespace rannc {
             }
         }
 
-        recordStart(getFuncKey("backward_engine", id, split_idx, false));
+        recordStart(getFuncKey("TorchDriver", "backward_engine", id, split_idx, false));
         logger->trace("TorchDriver::backward starting torch engine. id={}", id);
         torch::autograd::Engine::get_default_engine().execute(edges, grad_vars, getKeepGraph(), false, true);
         logger->trace("TorchDriver::backward finished torch engine. id={}", id);
-        recordEnd(getFuncKey("backward_engine", id, split_idx, false));
+        recordEnd(getFuncKey("TorchDriver", "backward_engine", id, split_idx, false));
 
-        recordStart(getFuncKey("backward_sum_ingrad", id, split_idx, false));
+        recordStart(getFuncKey("TorchDriver", "backward_sum_ingrad", id, split_idx, false));
 
         for (const auto& in_name: ir_graphs_[id]->getInputNames()) {
             const auto& val = irGraph->getValue(in_name);
@@ -601,9 +591,9 @@ namespace rannc {
                 }
             }
         }
-        recordEnd(getFuncKey("backward_sum_ingrad", id, split_idx, false));
+        recordEnd(getFuncKey("TorchDriver", "backward_sum_ingrad", id, split_idx, false));
 
-        recordStart(getFuncKey("backward_sum_paramgrad", id, split_idx, false));
+        recordStart(getFuncKey("TorchDriver", "backward_sum_paramgrad", id, split_idx, false));
 
         size_t param_idx = 0;
         auto& graph_clone_params = clone_params_[id];
@@ -647,11 +637,11 @@ namespace rannc {
             }
         }
 
-        recordEnd(getFuncKey("backward_sum_paramgrad", id, split_idx, false));
+        recordEnd(getFuncKey("TorchDriver", "backward_sum_paramgrad", id, split_idx, false));
 
-        recordStart(getFuncKey("backward_sync", id, split_idx, false));
+        recordStart(getFuncKey("TorchDriver", "backward_sync", id, split_idx, false));
         syncStream();
-        recordEnd(getFuncKey("backward_sync", id, split_idx, false));
+        recordEnd(getFuncKey("TorchDriver", "backward_sync", id, split_idx, false));
 
         if (!getKeepGraph()) {
             graphOut.clear();
@@ -663,7 +653,7 @@ namespace rannc {
 
         logger->trace("TorchDriver::backward finished. id={} split={}", id, split_idx);
 
-        recordEnd(getFuncKey("backward", id, split_idx, false));
+        recordEnd(getFuncKey("TorchDriver", "backward", id, split_idx, false));
 
         bwd_count_++;
 

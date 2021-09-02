@@ -3,7 +3,9 @@
 //
 
 #include <comm/SComm.h>
+#include <cuda/CudaUtil.h>
 #include "GraphLauncher.h"
+#include "EventRecorder.h"
 
 namespace rannc {
 
@@ -207,7 +209,10 @@ namespace rannc {
                 logger->trace("Received input via route {} split={} {}", toString(r), i, toString(toIRType(in)));
 
                 if (!in.isNone()) {
+                    const auto event_key = getFuncKey("GraphLauncher", "input_to_cpu", id, i, false);
+                    recordStart(event_key);
                     split_inputs[r.dest_graph][r.location] = toCPU(in, true);
+                    recordEnd(event_key);
                 }
             }
 
@@ -226,7 +231,12 @@ namespace rannc {
             std::unordered_map <std::string, IValueMap> split_driver_out;
 
             scomm.startSplit(i);
+
+            const auto event_key = getFuncKey("GraphLauncher", "input_to_cuda", id, i, false);
+            recordStart(event_key);
             const auto connector_inputs = toCUDAIfAvailable(graph_inputs.at(i), true);
+            recordEnd(event_key);
+
             if (is_bwd) {
                 split_driver_out = driver_[id]->backward(id, connector_inputs, i);
             } else {
@@ -259,16 +269,26 @@ namespace rannc {
 
                     torch::jit::IValue send_val;
                     if (contains(split_driver_out[sg_name], loc)) {
+                        const auto event_key = getCopyKey("GraphLauncher", "output_to_cuda", route.ir_value.getName(), route.ir_value.getType());
+                        recordStart(event_key);
                         send_val = toCUDAIfAvailable(split_driver_out[sg_name].at(loc), true, false);
+                        recordEnd(event_key);
                     }
                     logger->trace("Sending output {} via route {} split={}", toString(toIRType(send_val)),
                                   toString(route), i);
+
+                    const auto event_key = getCommKey("GraphLauncher", "dist", route, i, route.ir_value.getType());
+                    recordStart(event_key);
                     const auto out = scomm.distribute(send_val, route, is_bwd);
+                    recordEnd(event_key);
                     logger->trace("Received output {} via route: {} split={}", toString(toIRType(out)),
                                   toString(route), i);
 
                     if (!out.isNone()) {
+                        const auto event_key = getFuncKey("GraphLauncher", "clone_output", id, i, false);
+                        recordStart(event_key);
                         split_out[sg_name][loc] = cloneTensorsInIValue(out);
+                        recordEnd(event_key);
                     }
                 }
             }
@@ -318,6 +338,8 @@ namespace rannc {
 
 //        spdlog::info("GraphLauncher::forward starting id={} rng_state={}", id,
 //                     toString(getRngState()));
+        const auto event_key = getFuncKey("GraphLauncher", "forward", id, 0, false);
+        recordStart(event_key);
 
         logger->trace("GraphLauncher::forward starting");
 
@@ -368,10 +390,15 @@ namespace rannc {
         time_counter_.stop("GraphLauncher::forward");
         logger->trace("GraphLauncher::forward finished");
 
+        recordEnd(event_key);
+
         return output_value;
     }
 
     IValueMap GraphLauncher::backward(const std::string &id, const IValueMap &inputs) {
+
+        const auto event_key = getFuncKey("GraphLauncher", "backward", id, 0, false);
+        recordStart(event_key);
 
         std::atomic_bool& graph_bwd_running = bwd_running_[id];
         bool expected_running = false;
@@ -430,6 +457,8 @@ namespace rannc {
         logger->trace("GraphLauncher::backward finished");
 
         graph_bwd_running.store(false);
+
+        recordEnd(event_key);
 
         return outputs;
     }
