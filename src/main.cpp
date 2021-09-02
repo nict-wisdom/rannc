@@ -354,21 +354,31 @@ PYBIND11_MODULE(_pyrannc, m) {
         std::stringstream ss;
         ss << deployment;
 
-        SComm& scomm = SComm::get();
+        int all_ranks = 0;
+        for (const auto& it: deployment.allocation) {
+            all_ranks += it.second.size();
+        }
 
         std::vector<int64_t> split_batch_sizes = getSplitBatchSizes(batch_size, deployment.pipeline_num);
         for (int i=0; i<split_batch_sizes.size(); i++) {
             int64_t split_bs = split_batch_sizes.at(i);
+            ss << "split" << i << ": bs=" << split_bs;
 
-            ss << "split" << i << ": bs=" << split_bs << std::endl;
-            for (const auto sg_name: deployment.fwd_graph_order) {
+            std::vector<std::string> local_splits_str;
+            for (int r=0; r<all_ranks; r++) {
+                const auto local_split_batch_sizes = getLocalSplitBatchSizes(split_batch_sizes, all_ranks, r);
+                std::stringstream split_ss;
+                split_ss << r << "=" << local_split_batch_sizes.at(i);
+                local_splits_str.push_back(split_ss.str());
+            }
+            ss << " local_splits=" << join_as_str(local_splits_str) << std::endl;
+
+            for (const auto& sg_name: deployment.fwd_graph_order) {
                 const auto& g = deployment.subgraphs.at(sg_name);
                 auto alloc = setToVector(deployment.allocation.at(sg_name));
                 std::sort(alloc.begin(), alloc.end());
                 ss << " " << sg_name << " repl_num=" << alloc.size() << " " << join_as_str(alloc) << std::endl;
-
             }
-
         }
 
         spdlog::info(ss.str());

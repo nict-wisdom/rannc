@@ -612,7 +612,6 @@ namespace rannc {
     bool noUnusedValue(const std::shared_ptr<IRGraph>& g, bool show_msg=false);
     std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g);
     size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g);
-
 }
 
 #endif //PT_RANNC_IR_H

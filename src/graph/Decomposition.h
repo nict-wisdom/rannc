@@ -466,7 +466,7 @@ namespace rannc {
     Partition createPartition(const BGraph& g);
     std::shared_ptr<IRGraph> scaleGraph(const std::shared_ptr<IRGraph>& graph, int num, int64_t batch_size);
     PartitionDP replicate(const PartitionDP &partition, const std::unordered_map<std::string, int>& repl_nums,
-                          int64_t batch_size);
+                          int pipeline_num, int64_t batch_size);
     Deployment createDeployment(const PartitionDP &partition,
                                 const std::unordered_map<std::string, std::unordered_set<int>> &allocation,
                                 int np);

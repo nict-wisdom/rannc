@@ -29,7 +29,7 @@ namespace rannc {
 
     RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim,
                              const std::unordered_set<int>& src_ranks,
-                             const std::unordered_set<int>& dest_ranks);
+                             const std::unordered_set<int>& dest_ranks, int split_index);
 
     void sendTensorRedist(const torch::jit::IValue &send_val, const RouteDP &route, const IRType &global_type,
                           int64_t batch_size, MPI_Comm comm);

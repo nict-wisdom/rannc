@@ -30,7 +30,8 @@ namespace rannc {
             config::Config &config = config::Config::get();
             enable_profiling_ = config.getVal<bool>(config::PROFILING);
             time_counter_.enable(enable_profiling_);
-            display_values_ = config.getVal<bool>(config::DISPLAY_COMM_VALUE);
+            display_comm_values_ = config.getVal<bool>(config::DISPLAY_COMM_VALUE);
+            display_act_values_ = config.getVal<bool>(config::DISPLAY_ACT_VALUE);
         }
 
         TorchDriver(const TorchDriver&) = delete;
@@ -125,7 +126,8 @@ namespace rannc {
 
         TimeCounter time_counter_;
         bool enable_profiling_;
-        bool display_values_;
+        bool display_comm_values_;
+        bool display_act_values_;
 
         // for debugging
         size_t fwd_count_ = 0;

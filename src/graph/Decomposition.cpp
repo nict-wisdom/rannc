@@ -926,7 +926,7 @@ namespace rannc {
     }
 
     PartitionDP replicate(const PartitionDP &partition, const std::unordered_map<std::string, int>& repl_nums,
-            int64_t batch_size) {
+                          int pipeline_num, int64_t batch_size) {
         const auto logger = getLogger(LOGGER_NAME);
 
         PartitionDP rep_partition = partition;
@@ -939,7 +939,7 @@ namespace rannc {
                 num = 1;
             }
 
-            auto replica = scaleGraph(g, g->getName(), num, 0, batch_size);
+            auto replica = scaleGraph(g, g->getName(), num*pipeline_num, 0, batch_size);
             replica->setReplicable(g->isReplicable());
             rep_partition.subgraphs[it.first] = replica;
         }

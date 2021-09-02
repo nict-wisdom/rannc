@@ -170,6 +170,81 @@ namespace rannc {
         return res;
     }
 
+    at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
+        spdlog::info("{} {} value={}", name, toString(toIRType(tensor)), tensorToString(tensor));
+        return tensor;
+    }
+
+    TORCH_LIBRARY(rannc, m) {
+        m.def("valueHook", displayValueHook);
+    }
+
+    std::shared_ptr<IRGraph> insertValueHook(const std::shared_ptr<IRGraph>& g, IValueMap &constants) {
+        std::vector<IRNode> new_nodes;
+        const std::unordered_map<std::string, IRValue> &vals = g->getValues();
+        std::unordered_map<std::string, IRValue> new_values;
+        std::unordered_map<std::string, std::string> hook_out_names;
+
+        for (const auto& in_name: g->getInputNames()) {
+            assert(contains(vals, in_name));
+            new_values[in_name] = vals.at(in_name);
+        }
+
+        for (const auto &n: g->getNodes()) {
+            std::vector<std::string> input_names;
+            for (const auto &in_name: n.getInputNames()) {
+                if (contains(hook_out_names, in_name)) {
+                    input_names.push_back(hook_out_names.at(in_name));
+                } else {
+                    input_names.push_back(in_name);
+                }
+            }
+
+            IRNode new_node(n.getName(), input_names, n.getOutputNames());
+            new_node.setBatch(n.isBatch());
+            new_node.setCriterion(n.isCriterion());
+            new_nodes.push_back(new_node);
+
+            for (const auto &out_name: n.getOutputNames()) {
+                assert(contains(vals, out_name));
+                const IRValue& out_val = vals.at(out_name);
+
+                new_values[out_name] = out_val;
+                if (out_val.isBatch()) {
+                    const std::string out_name_var = out_name + "_name";
+                    IRNode var_name_node("prim::Constant", {}, {out_name_var});
+                    new_nodes.push_back(var_name_node);
+
+                    IRValue var_name_val(out_name_var, IRType::createStringType());
+                    new_values[out_name_var] = var_name_val;
+
+                    const std::string hook_out_name = out_name + "_hook_out";
+                    IRNode hook("rannc::valueHook", {out_name, out_name_var}, {hook_out_name});
+                    hook.setBatch(n.isBatch());
+                    hook.setCriterion(n.isCriterion());
+                    new_nodes.push_back(hook);
+
+                    hook_out_names[out_name] = hook_out_name;
+                    new_values[hook_out_name] = IRValue(hook_out_name, out_val);
+
+                    constants[out_name_var] = torch::jit::IValue(out_name);
+                }
+            }
+        }
+
+        std::vector<std::string> output_names;
+        for (const auto& out_name: g->getOutputNames()) {
+            assert(contains(vals, out_name));
+            if (contains(hook_out_names, out_name)) {
+                output_names.push_back(hook_out_names.at(out_name));
+            } else {
+                output_names.push_back(out_name);
+            }
+        }
+
+        return std::make_shared<IRGraph>(g->getName(), new_nodes, new_values, g->getInputNames(), output_names);
+    }
+
     bool TorchDriver::keep_graph_ = false;
 
     void TorchDriver::createModule(const std::string &id,
@@ -188,12 +263,14 @@ namespace rannc {
         clone_input_ir_graphs_[id] = clone_results.first;
         input_clone_names_[id] = clone_results.second;
 
-//        std::stringstream ss;
-//        ss << *clone_results.first;
-//        spdlog::info("shared_in_graph: {}", ss.str());
+        IValueMap constants_mod = constants;
+
+        if (display_act_values_) {
+            clone_input_ir_graphs_[id] = insertValueHook(clone_input_ir_graphs_[id], constants_mod);
+        }
 
         ConvertGraph cg;
-        auto graph = cg.toTorch(clone_input_ir_graphs_[id], constants, functions);
+        auto graph = cg.toTorch(clone_input_ir_graphs_[id], constants_mod, functions);
 
         logger->trace("Finished to convert graph.");
         logger->debug("Subgraph {} deployed: {}", id, graph->toString());
@@ -228,7 +305,7 @@ namespace rannc {
     void TorchDriver::displayValue(const std::string& prefix, size_t count, int split_index,
             bool grad_mode, const IValueMap &vals) {
 
-        if (display_values_) {
+        if (display_comm_values_) {
             const auto tid = std::this_thread::get_id();
             if (vals.empty()) {
                 this->logger->info("@rank{} {} no data to display", mpi::getRank(), prefix);

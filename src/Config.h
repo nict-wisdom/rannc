@@ -24,6 +24,7 @@ namespace rannc {
         extern const char PIPELINE_NUM[];
         extern const char VALIDATE_COMM[];
         extern const char DISPLAY_COMM_VALUE[];
+        extern const char DISPLAY_ACT_VALUE[];
         extern const char CONSOLIDATE_GRADS[];
         extern const char PROFILING_ITER[];
         extern const char CHECKPOINTING[];

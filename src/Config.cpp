@@ -30,6 +30,7 @@ namespace rannc {
         const char PIPELINE_NUM[] = "pipeline_num";
         const char VALIDATE_COMM[] = "validate_comm";
         const char DISPLAY_COMM_VALUE[] = "display_comm_value";
+        const char DISPLAY_ACT_VALUE[] = "display_act_value";
         const char CONSOLIDATE_GRADS[] = "consolidate_grads";
         const char PROFILING_ITER[] = "profiling_iter";
         const char CHECKPOINTING[] = "checkpointing";
@@ -119,6 +120,7 @@ namespace rannc {
                     makeConfigItem(PIPELINE_NUM, 0),
                     makeConfigItem(VALIDATE_COMM, false),
                     makeConfigItem(DISPLAY_COMM_VALUE, false),
+                    makeConfigItem(DISPLAY_ACT_VALUE, false),
                     makeConfigItem(CONSOLIDATE_GRADS, true),
                     makeConfigItem(PROFILING_ITER, 1),
                     makeConfigItem(CHECKPOINTING, false),

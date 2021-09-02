@@ -55,7 +55,7 @@ namespace rannc {
             repl_nums[it.first] = sol.repl_nums.at(it.first);
         }
 
-        const auto repl = replicate(new_part, repl_nums, batch_size_);
+        const auto repl = replicate(new_part, repl_nums, sol.pipeline_num, batch_size_);
         logger->trace("Partitioning finished: id={}", ir_graph->getName());
 
         std::unordered_map<std::string, std::unordered_set<int>> alloc;

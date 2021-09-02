@@ -164,7 +164,8 @@ namespace rannc {
         for (const auto& it: partition.subgraphs) {
             repl_nums[it.first] = replica_num;
         }
-        PartitionDP partitionDp = replicate(partition, repl_nums, batch_size_);
+        int conf_n_pipeline = config::Config::get().getVal<int>(config::PIPELINE_NUM);
+        PartitionDP partitionDp = replicate(partition, repl_nums, conf_n_pipeline, batch_size_);
         logger->trace("FairWeightDecomposer::decompose created PartitionDP. id={}", partitionDp.id);
 
 //        logger->info("Created subgraphs: partitions={} replications={}", n_partition, replica_num);
@@ -181,7 +182,6 @@ namespace rannc {
 //            logger->info("{} fwd_time={} bwd_time={} mem={}", it.first, prof.fwd_time, prof.bwd_time, prof.max_allocated_mem);
 //        }
 
-        int conf_n_pipeline = config::Config::get().getVal<int>(config::PIPELINE_NUM);
 
         logger->info("Assigning {} subgraphs to {} device(s) ... (mem: {} per device) pipeline={}",
                      partitionDp.subgraphs.size(), mpi::getSize(), dev_mem_, conf_n_pipeline);

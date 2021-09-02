@@ -275,7 +275,8 @@ namespace rannc {
 
         // setup and run alltoall here
         std::unordered_map<int, std::vector<int64_t>> dest_dist =
-                rannc::calcDistBatchDims(batch_size, global_dim, rannc::vectorToSet(route.dests));
+                rannc::calcDistBatchDims(batch_size, global_dim, rannc::vectorToSet(route.dests),
+                split_index_-split_delay);
 
         at::Tensor recv_buf;
         void* send_ptr;
@@ -301,7 +302,7 @@ namespace rannc {
         }
 
         NCCLWrapper& ar = NCCLWrapper::get();
-        ar.redist(send_ptr, recv_ptr, route, batch_size, global_type);
+        ar.redist(send_ptr, recv_ptr, route, batch_size, global_type, split_index_-split_delay);
 
         recordEnd("distributeBatchTensor_" + toString(route));
 
@@ -398,9 +399,10 @@ namespace rannc {
 
     rannc::RedistArgs getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim,
                                     const std::unordered_set<int>& src_ranks,
-                                    const std::unordered_set<int>& dest_ranks) {
-        std::unordered_map<int, std::vector<int64_t>> src_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, src_ranks);
-        std::unordered_map<int, std::vector<int64_t>> dest_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, dest_ranks);
+                                    const std::unordered_set<int>& dest_ranks,
+                                    int split_index) {
+        std::unordered_map<int, std::vector<int64_t>> src_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, src_ranks, split_index);
+        std::unordered_map<int, std::vector<int64_t>> dest_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, dest_ranks, split_index);
 
 //        for (const auto& it: src_dist) {
 //            int rank = it.first;

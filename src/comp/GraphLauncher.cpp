@@ -226,11 +226,11 @@ namespace rannc {
             std::unordered_map <std::string, IValueMap> split_driver_out;
 
             scomm.startSplit(i);
-            const auto& inputs = toCUDAIfAvailable(graph_inputs.at(i), true);
+            const auto connector_inputs = toCUDAIfAvailable(graph_inputs.at(i), true);
             if (is_bwd) {
-                split_driver_out = driver_[id]->backward(id, inputs, i);
+                split_driver_out = driver_[id]->backward(id, connector_inputs, i);
             } else {
-                split_driver_out = driver_[id]->forward(id, inputs, i, torch::autograd::GradMode::is_enabled());
+                split_driver_out = driver_[id]->forward(id, connector_inputs, i, torch::autograd::GradMode::is_enabled());
             }
             graph_driver_out.push_back(split_driver_out);
         }
