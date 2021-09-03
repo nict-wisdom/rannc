@@ -357,37 +357,32 @@ namespace rannc {
             this->rng_states_[id][split_index] = getRngState();
 
             if (cp.at(id)) {
+
                 if (split_index == 0) {
                     for (int s=0; s<pipeline_num_; s++) {
                         inputs_[id][s].clear();
                     }
                 }
 
-                const auto to_cpu_key = getFuncKey("GraphConnector","input_to_cpu", id, split_index, false);
-                recordStart(to_cpu_key);
                 c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool();
                 {
+                    TraceEvent evt(getFuncKey("GraphConnector","input_to_cpu", id, split_index, false));
                     c10::cuda::CUDAStreamGuard guard(stream);
-                    inputs_[id][split_index] = toCPU(inputs, true, true);
-                    at::cuda::CUDAEvent& evt = copy_to_cpu_events_[id][split_index];
-                    evt.record(stream);
-                }
-                recordEnd(to_cpu_key);
 
-                // After computing the *last* split in pipeline, start moving inputs for the *first* split to gpu
+                    inputs_[id][split_index] = toCPU(inputs, true, true);
+                    copy_to_cpu_events_[id][split_index].record(stream);
+                }
+
+                // Before computing the *last* split in pipeline, start moving inputs for the *first* split to gpu
                 if (split_index + 1 == pipeline_num_) { //
-                    const auto to_gpu_key = getFuncKey("GraphConnector","input_to_gpu", id, 0, false);
-                    recordStart(to_gpu_key);
+                    TraceEvent evt(getFuncKey("GraphConnector","input_to_gpu", id, 0, false));
                     c10::cuda::CUDAStreamGuard guard(stream);
 
                     // Make sure that copy to cpu has finished
-                    at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][0];
-                    prev_evt.block(stream);
+                    copy_to_cpu_events_[id][0].block(stream);
 
                     inputs_[id][0] = toCUDAIfAvailable(inputs_[id][0], true, true);
-                    at::cuda::CUDAEvent& evt = copy_to_gpu_events_[id][0];
-                    evt.record(stream);
-                    recordEnd(to_gpu_key);
+                    copy_to_gpu_events_[id][0].record(stream);
                 }
 
                 torch::NoGradGuard no_grad;
@@ -426,6 +421,7 @@ namespace rannc {
             }
         };
 
+        // Records whether a split is skipped
         const auto skip = [this](const IValueMap& values, int split) {
             for (const auto& it: values) {
                 if (it.second.isTensor()) {
@@ -469,6 +465,8 @@ namespace rannc {
                     torch::autograd::AutoGradMode gm(true);
                     setRngState(this->rng_states_.at(id).at(split_index));
 
+                    spdlog::info("@backward cp_fwd starting: split_index={} pipeline_num_={}", split_index, pipeline_num_);
+
                     // Move inputs to cuda for the *next* split. This intends to overlap the copy and backward.
                     // Note that inputs for the first split has already been moved when finishing forward for the last split
                     if (split_index+1 < pipeline_num_) {
@@ -486,7 +484,29 @@ namespace rannc {
                         at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][split_index+1];
                         prev_evt.block(stream);
 
+                        std::vector<std::string> dev_str1;
+                        for (const auto& it: inputs_[id][split_index+1]) {
+                            std::stringstream ss;
+                            ss << toString(it.first) << "=" << toString(toIRType(it.second));
+                            if (it.second.isTensor()) {
+                                ss << "_dev=" << it.second.toTensor().device().str();
+                            }
+                            dev_str1.push_back(ss.str());
+                        }
+                        spdlog::info("@backward cp_fwd before_moving_to_cuda: split_index+1={} {}", split_index+1, join_as_str(dev_str1));
                         inputs_[id][split_index+1] = toCUDAIfAvailable(inputs_[id][split_index+1], true, true);
+
+                        std::vector<std::string> dev_str2;
+                        for (const auto& it: inputs_[id][split_index+1]) {
+                            std::stringstream ss;
+                            ss << toString(it.first) << "=" << toString(toIRType(it.second));
+                            if (it.second.isTensor()) {
+                                ss << "_dev=" << it.second.toTensor().device().str();
+                            }
+                            dev_str2.push_back(ss.str());
+                        }
+                        spdlog::info("@backward cp_fwd after_moving_to_cuda: split_index+1={} {}", split_index+1, join_as_str(dev_str2));
+
                         recordEnd(to_gpu_key);
 
                         at::cuda::CUDAEvent& evt = copy_to_gpu_events_[id][split_index + 1];
@@ -495,6 +515,18 @@ namespace rannc {
 
                     // We have to wait for inputs back to gpu
                     copy_to_gpu_events_[id][split_index].block(c10::cuda::getCurrentCUDAStream());
+
+                    std::vector<std::string> dev_str;
+                    for (const auto& it: inputs_[id][split_index]) {
+                        std::stringstream ss;
+                        ss << toString(it.first) << "=" << toString(toIRType(it.second));
+                        if (it.second.isTensor()) {
+                            ss << "_dev=" << it.second.toTensor().device().str();
+                        }
+                        dev_str.push_back(ss.str());
+                    }
+                    spdlog::info("@backward cp_fwd before_run_forward: split_index={} {}", split_index, join_as_str(dev_str));
+
                     const auto outputs = driver_.forward(id, inputs_[id][split_index], split_index);
 
                     // for debugging
@@ -540,6 +572,7 @@ namespace rannc {
             }
         };
 
+        // Check if a split is skipped at a forward pass
         const auto skip = [this](const IValueMap& values, int split) {
             assert(contains(this->skip_fwd_split_, split));
             return this->skip_fwd_split_.at(split);

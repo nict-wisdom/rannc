@@ -61,6 +61,17 @@ namespace rannc {
     std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r, int split);
     std::string getCommKey(const std::string& prefix, const std::string& direction, const rannc::RouteDP& r, int split, const IRType& type);
     std::string getCopyKey(const std::string& prefix, const std::string& func, const std::string& name, const IRType& type);
+
+    struct TraceEvent {
+        TraceEvent(std::string key) : key_(std::move(key)) {
+            recordStart(key_);
+        }
+
+        ~TraceEvent() {
+            recordEnd(key_);
+        }
+        std::string key_;
+    };
 }
 
 #endif //PYRANNC_EVENTRECORDER_H
