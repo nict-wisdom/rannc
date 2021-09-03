@@ -95,7 +95,8 @@ set(RANNC_SRCS
         src/comm/NCCLWrapper.cpp
         src/torch/IValueLocation.cpp
         src/torch/TorchDriver.cpp
-        src/torch/TorchUtil.cpp)
+        src/torch/TorchUtil.cpp
+        src/torch/CustomOps.cpp)
 
 option(NCCL_SUPPORTS_BFLOAT16 "Enable Bfloat16 support of NCCL." off)
 if(NCCL_SUPPORTS_BFLOAT16)

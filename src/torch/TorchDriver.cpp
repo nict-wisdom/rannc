@@ -1,24 +1,21 @@
 //
 // Created by Masahiro Tanaka on 2018-11-30.
 //
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <cuda_runtime_api.h>
 #include <torch/torch.h>
 #include <torch/csrc/autograd/engine.h>
-#include <torch/csrc/autograd/functions/basic_ops.h>
 
 #include <Common.h>
 #include "ConfiguredTorch.h"
 #include <graph/ConvertGraph.h>
-#include <torch/TorchEngine.h>
-#include <Config.h>
 #include <comp/EventRecorder.h>
+#include <torch/CustomOps.h>
+#include <cuda/CudaUtil.h>
 
 #include "TorchDriver.h"
 
-#include <cuda/CudaUtil.h>
 
 
 namespace rannc {
@@ -160,15 +157,6 @@ namespace rannc {
         return res;
     }
 
-    at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
-        spdlog::info("{} {} value={}", name, toString(toIRType(tensor)), tensorToString(tensor));
-        return tensor;
-    }
-
-    TORCH_LIBRARY(rannc, m) {
-        m.def("valueHook", displayValueHook);
-    }
-
     std::shared_ptr<IRGraph> insertValueHook(const std::shared_ptr<IRGraph>& g, IValueMap &constants) {
         std::vector<IRNode> new_nodes;
         const std::unordered_map<std::string, IRValue> &vals = g->getValues();
@@ -305,10 +293,11 @@ namespace rannc {
                     const std::function<at::Tensor(const at::Tensor &, const IValueLocation)> f =
                             [this, &prefix, &tid, count, split_index, grad_mode](const at::Tensor &t,
                                                                                  const IValueLocation &loc) {
-                                this->logger->info("@rank{} {} count={} tid={} split={} grad={}: {} {} v={}",
+                                this->logger->info("@rank{} {} count={} tid={} split={} grad={}: {} {} {} v={}",
                                                    mpi::getRank(), prefix,
                                                    count, toString(tid), split_index, grad_mode,
                                                    toString(loc), toString(toIRType(t)),
+                                                   t.device().str(),
                                                    tensorToString(t));
                                 return at::Tensor();
                             };

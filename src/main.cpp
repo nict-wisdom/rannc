@@ -377,7 +377,18 @@ PYBIND11_MODULE(_pyrannc, m) {
                 const auto& g = deployment.subgraphs.at(sg_name);
                 auto alloc = setToVector(deployment.allocation.at(sg_name));
                 std::sort(alloc.begin(), alloc.end());
-                ss << " " << sg_name << " repl_num=" << alloc.size() << " " << join_as_str(alloc) << std::endl;
+                ss << " " << sg_name << " repl_num=" << alloc.size() << " alloc=" << join_as_str(alloc);
+
+                std::vector<std::string> sg_splits_str;
+                for (int r: alloc) {
+                    std::unordered_map<int, std::vector<int64_t>> dest_dist =
+                            rannc::calcDistBatchDims(split_bs, {split_bs}, rannc::vectorToSet(alloc), i);
+                    const auto& dim = dest_dist.at(r);
+                    std::stringstream split_ss;
+                    split_ss << r << "=" << dim.front();
+                    sg_splits_str.push_back(split_ss.str());
+                }
+                ss << " bs=" << join_as_str(sg_splits_str) << std::endl;
             }
         }
 
