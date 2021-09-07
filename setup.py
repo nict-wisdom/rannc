@@ -69,7 +69,7 @@ class CMakeBuild(build_ext):
 setup(
     name='pyrannc',
     packages=find_packages(),
-    version='0.6.4.post2',
+    version='0.6.4.post3',
     author='Masahiro Tanaka',
     author_email='mtnk@nict.go.jp',
     description='Deep learning framework for data/model hybrid parallelism',

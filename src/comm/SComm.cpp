@@ -516,7 +516,6 @@ namespace rannc {
     void SComm::setPipeline(int pipeline_num, int64_t global_batch_size, bool is_bwd) {
         pipeline_num_ = pipeline_num;
         is_bwd_ = is_bwd;
-
         bs_calc_.setPipeline(pipeline_num, global_batch_size);
     }
 
@@ -529,6 +528,49 @@ namespace rannc {
         std::stringstream ss;
         ss << "[PREFIX=" << prefix << "]" << toString(route.location) << "[TAG=" << route.tag << "]";
         return ss.str();
+    }
+
+    bool SComm::isLastLocalSplit(const std::unordered_set<int>& ranks, int my_rank, int split_index) const {
+      int last_index = -1;
+      for (int i=0; i<pipeline_num_; i++) {
+        int64_t bs = bs_calc_.getLocalSplitBatchSize(ranks, my_rank, i);
+        if (bs > 0) {
+          last_index = i;
+        }
+      }
+      assert(last_index > 0);
+
+      return last_index == split_index;
+    }
+
+    int SComm::getFirstLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank) const {
+      for (int i=0; i<pipeline_num_; i++) {
+        int64_t bs = bs_calc_.getLocalSplitBatchSize(ranks, my_rank, i);
+        if (bs > 0) {
+          return i;
+        }
+      }
+      throw std::runtime_error("The batch size is zero for all values of split_index.");
+    }
+
+    int SComm::getNextLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank, int split_index) const {
+      for (int i=split_index+1; i<pipeline_num_; i++) {
+        int64_t bs = bs_calc_.getLocalSplitBatchSize(ranks, my_rank, i);
+        if (bs > 0) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    int SComm::getPrevLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank, int split_index) const {
+      for (int i=split_index-1; i > 0; i--) {
+        int64_t bs = bs_calc_.getLocalSplitBatchSize(ranks, my_rank, i);
+        if (bs > 0) {
+          return i;
+        }
+      }
+      return -1;
     }
 
     size_t SComm::getSplitBatchSize(int split_index) {

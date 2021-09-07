@@ -79,9 +79,13 @@ namespace rannc {
         static SComm& get();
 
         void setPipeline(int pipeline_num, int64_t global_batch_size, bool is_bwd);
-
         void startSplit(int split_index);
         std::string getKey(const RouteDP& route) const;
+
+        bool isLastLocalSplit(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
+        int getFirstLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank) const;
+        int getNextLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
+        int getPrevLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
 
         torch::jit::IValue bcastIValue(const torch::jit::IValue& ivalue, const RouteDP& route);
         IValueMap bcastIValueMap(const IValueMap& ivalue_map, const RouteDP& route);

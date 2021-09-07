@@ -81,6 +81,8 @@ namespace rannc {
         bool verify_recomp_;
 
         std::unordered_map<std::string, bool> checkpointing_;
+        std::unordered_map<std::string, std::unordered_set<int>> allocation_;
+
         // split index -> graph id -> values
         std::unordered_map<int, std::unordered_map<std::string, IValueMap>> split_values_;
         int pipeline_num_;

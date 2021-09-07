@@ -214,6 +214,8 @@ namespace rannc {
                                  param_tensors);
 
             checkpointing_[sg_name] = deployment.checkpointing;
+            assert(contains(deployment.allocation, sg_name));
+            allocation_[sg_name] = deployment.allocation.at(sg_name);
         }
 
         pipeline_num_ = deployment.pipeline_num;
@@ -366,23 +368,27 @@ namespace rannc {
 
                 c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool();
                 {
-                    TraceEvent evt(getFuncKey("GraphConnector","input_to_cpu", id, split_index, false));
+                    TraceEvent evt(getFuncKey("GraphConnector","input_to_cpu_async", id, split_index, false));
                     c10::cuda::CUDAStreamGuard guard(stream);
 
                     inputs_[id][split_index] = toCPU(inputs, true, true);
                     copy_to_cpu_events_[id][split_index].record(stream);
                 }
 
+                SComm& scomm = SComm::get();
+                assert(contains(allocation_, id));
+                const std::unordered_set<int>& sg_ranks = allocation_.at(id);
                 // Before computing the *last* split in pipeline, start moving inputs for the *first* split to gpu
-                if (split_index + 1 == pipeline_num_) { //
+                if (scomm.isLastLocalSplit(allocation_.at(id), mpi::getRank(), split_index)) { //
                     TraceEvent evt(getFuncKey("GraphConnector","input_to_gpu", id, 0, false));
                     c10::cuda::CUDAStreamGuard guard(stream);
+                    int first_split = scomm.getFirstLocalSplitIndex(sg_ranks, mpi::getRank());
 
                     // Make sure that copy to cpu has finished
-                    copy_to_cpu_events_[id][0].block(stream);
+                    copy_to_cpu_events_[id][first_split].block(stream);
 
-                    inputs_[id][0] = toCUDAIfAvailable(inputs_[id][0], true, true);
-                    copy_to_gpu_events_[id][0].record(stream);
+                    inputs_[id][0] = toCUDAIfAvailable(inputs_[id][first_split], true, true);
+                    copy_to_gpu_events_[id][first_split].record(stream);
                 }
 
                 torch::NoGradGuard no_grad;
@@ -465,63 +471,38 @@ namespace rannc {
                     torch::autograd::AutoGradMode gm(true);
                     setRngState(this->rng_states_.at(id).at(split_index));
 
+                    SComm& scomm = SComm::get();
+                    assert(contains(allocation_, id));
+                    const std::unordered_set<int>& sg_ranks = allocation_.at(id);
+
+                    // We don't need inputs for old splits
+                    int prev_split = scomm.getPrevLocalSplitIndex(sg_ranks, mpi::getRank(), split_index);
+                    if (prev_split >= 0) {
+                      inputs_[id][prev_split].clear();
+                    }
+
                     // Move inputs to cuda for the *next* split. This intends to overlap the copy and backward.
                     // Note that inputs for the first split has already been moved when finishing forward for the last split
-                    if (split_index+1 < pipeline_num_) {
-                        c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool();
-                        // We don't need inputs for old splits
-                        if (split_index > 0) {
-                            inputs_[id][split_index-1].clear();
-                        }
+                    if (!scomm.isLastLocalSplit(sg_ranks, mpi::getRank(), split_index)) {
+                        TraceEvent evt(getFuncKey("GraphConnector","input_to_gpu_async", id, split_index, false));
 
-                        const auto to_gpu_key = getFuncKey("GraphConnector","input_to_gpu", id, split_index+1, false);
-                        recordStart(to_gpu_key);
+                        c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool();
+
+                        int next_split = scomm.getNextLocalSplitIndex(sg_ranks, mpi::getRank(), split_index);
                         c10::cuda::CUDAStreamGuard guard(stream);
 
                         // Make sure that copy to cpu has finished
-                        at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][split_index+1];
+                        at::cuda::CUDAEvent& prev_evt = copy_to_cpu_events_[id][next_split];
                         prev_evt.block(stream);
 
-                        std::vector<std::string> dev_str1;
-                        for (const auto& it: inputs_[id][split_index+1]) {
-                            std::stringstream ss;
-                            ss << toString(it.first) << "=" << toString(toIRType(it.second));
-                            if (it.second.isTensor()) {
-                                ss << "_dev=" << it.second.toTensor().device().str();
-                            }
-                            dev_str1.push_back(ss.str());
-                        }
-                        inputs_[id][split_index+1] = toCUDAIfAvailable(inputs_[id][split_index+1], true, true);
+                        inputs_[id][next_split] = toCUDAIfAvailable(inputs_[id][next_split], true, true);
 
-                        std::vector<std::string> dev_str2;
-                        for (const auto& it: inputs_[id][split_index+1]) {
-                            std::stringstream ss;
-                            ss << toString(it.first) << "=" << toString(toIRType(it.second));
-                            if (it.second.isTensor()) {
-                                ss << "_dev=" << it.second.toTensor().device().str();
-                            }
-                            dev_str2.push_back(ss.str());
-                        }
-
-                        recordEnd(to_gpu_key);
-
-                        at::cuda::CUDAEvent& evt = copy_to_gpu_events_[id][split_index + 1];
-                        evt.record(stream);
+                        at::cuda::CUDAEvent& cuda_evt = copy_to_gpu_events_[id][split_index + 1];
+                        cuda_evt.record(stream);
                     }
 
                     // We have to wait for inputs back to gpu
                     copy_to_gpu_events_[id][split_index].block(c10::cuda::getCurrentCUDAStream());
-
-                    std::vector<std::string> dev_str;
-                    for (const auto& it: inputs_[id][split_index]) {
-                        std::stringstream ss;
-                        ss << toString(it.first) << "=" << toString(toIRType(it.second));
-                        if (it.second.isTensor()) {
-                            ss << "_dev=" << it.second.toTensor().device().str();
-                        }
-                        dev_str.push_back(ss.str());
-                    }
-
                     const auto outputs = driver_.forward(id, inputs_[id][split_index], split_index);
 
                     // for debugging

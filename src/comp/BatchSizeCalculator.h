@@ -26,6 +26,10 @@ namespace rannc {
                                                                         int split_index) const;
         double getDpRatio(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
 
+        bool isLastLocalSplit(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
+        int getFirstLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank) const;
+        int getNextLocalSplitIndex(const std::unordered_set<int>& ranks, int my_rank, int split_index) const;
+
     private:
         int pipeline_num_;
         int64_t global_batch_size_;
