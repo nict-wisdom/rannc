@@ -432,7 +432,7 @@ std::unordered_map<std::string, IValueMap> GraphConnector::forward(
         // Make sure that copy to cpu has finished
         copy_to_cpu_events_[id][first_split].block(stream);
 
-        inputs_[id][0] =
+        inputs_[id][first_split] =
             toCUDAIfAvailable(inputs_[id][first_split], true, true);
         copy_to_gpu_events_[id][first_split].record(stream);
       }

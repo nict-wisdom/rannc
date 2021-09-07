@@ -6,7 +6,6 @@
 #include <torch/torch.h>
 
 #include "Common.h"
-#include "graph/ir.h"
 #include "MPIUtil.h"
 
 namespace {
@@ -14,7 +13,6 @@ const int RANNC_TAG_UB = 30000;
 }
 
 namespace mpi {
-auto logger = spdlog::stdout_color_mt("mpi");
 
 int getRank() {
   int rank;
@@ -59,7 +57,7 @@ int getTagUB() {
   //// The above returns different values in different ranks.
 
   return RANNC_TAG_UB;
-};
+}
 
 void checkMPIResult(int code) {
   if (code == MPI_SUCCESS)
