@@ -13,17 +13,16 @@
 namespace py = pybind11;
 
 namespace rannc {
-    long getPythonObjId(py::object obj);
+long getPythonObjId(py::object obj);
 }
 
 namespace torch {
-    namespace jit {
-        IValue _toIValue(
-                py::handle obj,
-                const TypePtr& type,
-                c10::optional<int32_t> N = c10::nullopt);
-        IValue _toTypeInferredIValue(py::handle input);
-        Stack _toTraceableStack(const py::tuple& inputs);
-    }
-}
-#endif //PYRANNC_PYBINDUTIL_H
+namespace jit {
+IValue _toIValue(
+    py::handle obj, const TypePtr& type,
+    c10::optional<int32_t> N = c10::nullopt);
+IValue _toTypeInferredIValue(py::handle input);
+Stack _toTraceableStack(const py::tuple& inputs);
+} // namespace jit
+} // namespace torch
+#endif // PYRANNC_PYBINDUTIL_H

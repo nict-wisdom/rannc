@@ -8,8 +8,8 @@
 #include "spdlog/spdlog.h"
 
 namespace rannc {
-    void initLogger();
-    std::shared_ptr<spdlog::logger> getLogger(const std::string& name);
-}
+void initLogger();
+std::shared_ptr<spdlog::logger> getLogger(const std::string& name);
+} // namespace rannc
 
-#endif //PYRANNC_LOGGING_H
+#endif // PYRANNC_LOGGING_H

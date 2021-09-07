@@ -10,7 +10,7 @@
 #include "ir.h"
 
 namespace rannc {
-    std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph> &g);
+std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph>& g);
 }
 
-#endif //PYRANNC_GUESSVALUETYPES_H
+#endif // PYRANNC_GUESSVALUETYPES_H

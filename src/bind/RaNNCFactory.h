@@ -8,19 +8,18 @@
 #include <memory>
 
 namespace rannc {
-    class RaNNCProcess;
+class RaNNCProcess;
 
-    class RaNNCFactory {
-    public:
-        static std::shared_ptr<RaNNCProcess> get();
+class RaNNCFactory {
+ public:
+  static std::shared_ptr<RaNNCProcess> get();
 
-    private:
-        RaNNCFactory() = default;
-        ~RaNNCFactory() = default;
+ private:
+  RaNNCFactory() = default;
+  ~RaNNCFactory() = default;
 
-        static std::shared_ptr<RaNNCProcess> process_;
-    };
+  static std::shared_ptr<RaNNCProcess> process_;
 };
+}; // namespace rannc
 
-
-#endif //PYRANNC_RANNCFACTORY_H
+#endif // PYRANNC_RANNCFACTORY_H

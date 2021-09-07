@@ -7,12 +7,12 @@
 #include "bind/RaNNCProcess.h"
 
 namespace rannc {
-    std::shared_ptr<RaNNCProcess> RaNNCFactory::process_;
+std::shared_ptr<RaNNCProcess> RaNNCFactory::process_;
 
-    std::shared_ptr<RaNNCProcess> RaNNCFactory::get() {
-        if (!process_) {
-            process_ = std::make_shared<RaNNCProcess>();
-        }
-        return process_;
-    }
+std::shared_ptr<RaNNCProcess> RaNNCFactory::get() {
+  if (!process_) {
+    process_ = std::make_shared<RaNNCProcess>();
+  }
+  return process_;
 }
+} // namespace rannc

@@ -8,34 +8,34 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <Logging.h>
-#include "comp/TimeCounter.h"
 #include "comp/GraphLauncher.h"
+#include "comp/TimeCounter.h"
 #include "graph/Decomposition.h"
 
 namespace rannc {
-    class RaNNCModule;
+class RaNNCModule;
 
-    class RaNNCProcess {
-    public:
-        RaNNCProcess() = default;
+class RaNNCProcess {
+ public:
+  RaNNCProcess() = default;
 
-        void start();
+  void start();
 
-        void registerModule(const std::string& id, RaNNCModule* module);
-        void unregisterModule(const std::string& id);
-        std::unordered_map<std::string, RaNNCModule*> getModules();
+  void registerModule(const std::string& id, RaNNCModule* module);
+  void unregisterModule(const std::string& id);
+  std::unordered_map<std::string, RaNNCModule*> getModules();
 
-        void clear();
+  void clear();
 
-        const std::shared_ptr<ParamStorage> &getParamStorage() const {
-            return param_storage_;
-        }
+  const std::shared_ptr<ParamStorage>& getParamStorage() const {
+    return param_storage_;
+  }
 
-    private:
-        std::unordered_map<std::string, RaNNCModule*> modules_;
-        std::shared_ptr<ParamStorage> param_storage_;
-        const std::shared_ptr<spdlog::logger> logger = getLogger("RaNNCProcess");
-    };
-}
+ private:
+  std::unordered_map<std::string, RaNNCModule*> modules_;
+  std::shared_ptr<ParamStorage> param_storage_;
+  const std::shared_ptr<spdlog::logger> logger = getLogger("RaNNCProcess");
+};
+} // namespace rannc
 
-#endif //PT_RANNC_CALLRANNC_H
+#endif // PT_RANNC_CALLRANNC_H

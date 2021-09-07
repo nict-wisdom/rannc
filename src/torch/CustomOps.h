@@ -8,8 +8,7 @@
 #include <torch/torch.h>
 
 namespace rannc {
-    at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name);
+at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name);
 }
 
-
-#endif //PYRANNC_CUSTOMOPS_H
+#endif // PYRANNC_CUSTOMOPS_H

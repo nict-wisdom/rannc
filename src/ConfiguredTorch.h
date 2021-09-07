@@ -6,16 +6,14 @@
 
 namespace rannc {
 
-inline at::Tensor& getMutableGradRef(at::Tensor &t)
-{
-    return t.mutable_grad();
+inline at::Tensor& getMutableGradRef(at::Tensor& t) {
+  return t.mutable_grad();
 }
 
-inline at::Tensor& getMutableGradRef(at::Tensor &&t)
-{
-    return t.mutable_grad();
+inline at::Tensor& getMutableGradRef(at::Tensor&& t) {
+  return t.mutable_grad();
 }
 
-}   //  End of namespace rannc.
+} //  End of namespace rannc.
 
 #endif

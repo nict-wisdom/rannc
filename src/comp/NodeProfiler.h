@@ -12,19 +12,20 @@
 
 namespace rannc {
 
-    class NodeProfiler {
-    public:
-        NodeProfiler(std::shared_ptr<GraphProfiler> sg_prof) :
-                sg_prof_(std::move(sg_prof)) {}
+class NodeProfiler {
+ public:
+  NodeProfiler(std::shared_ptr<GraphProfiler> sg_prof)
+      : sg_prof_(std::move(sg_prof)) {}
 
-        ProfilingResult profile(const std::shared_ptr<IRGraph>& ir_graph, int iteration);
+  ProfilingResult profile(
+      const std::shared_ptr<IRGraph>& ir_graph, int iteration);
 
-    private:
-        std::shared_ptr<GraphProfiler> sg_prof_;
+ private:
+  std::shared_ptr<GraphProfiler> sg_prof_;
 
-        const std::shared_ptr<spdlog::logger> logger = getLogger("NodeProfiler");
-    };
+  const std::shared_ptr<spdlog::logger> logger = getLogger("NodeProfiler");
+};
 
-}
+} // namespace rannc
 
-#endif //PYRANNC_NODEPROFILER_H
+#endif // PYRANNC_NODEPROFILER_H

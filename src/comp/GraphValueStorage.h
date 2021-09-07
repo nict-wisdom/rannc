@@ -11,19 +11,19 @@
 
 namespace rannc {
 
-    class GraphValueStorage {
-    public:
-        void deploy(const std::shared_ptr<torch::jit::Graph>& graph);
-        const torch::jit::IValue& getValue(const IValueLocation& loc) const;
+class GraphValueStorage {
+ public:
+  void deploy(const std::shared_ptr<torch::jit::Graph>& graph);
+  const torch::jit::IValue& getValue(const IValueLocation& loc) const;
 
-        const IValueMap &getValues() const {
-            return values_;
-        }
+  const IValueMap& getValues() const {
+    return values_;
+  }
 
-    private:
-        IValueMap values_;
-        const std::shared_ptr<spdlog::logger> logger = getLogger("GraphValueStorage");
-    };
-}
+ private:
+  IValueMap values_;
+  const std::shared_ptr<spdlog::logger> logger = getLogger("GraphValueStorage");
+};
+} // namespace rannc
 
-#endif //PYRANNC_GRAPHVALUESTORAGE_H
+#endif // PYRANNC_GRAPHVALUESTORAGE_H

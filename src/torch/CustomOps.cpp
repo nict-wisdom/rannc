@@ -11,14 +11,14 @@
 
 namespace rannc {
 
-    at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
-        spdlog::info("{} {} {} value={}", name, toString(toIRType(tensor)),
-                     tensor.device().str(),
-                     tensorToString(tensor));
-        return tensor;
-    }
-
-    TORCH_LIBRARY(rannc, m) {
-        m.def("valueHook", displayValueHook);
-    }
+at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
+  spdlog::info(
+      "{} {} {} value={}", name, toString(toIRType(tensor)),
+      tensor.device().str(), tensorToString(tensor));
+  return tensor;
 }
+
+TORCH_LIBRARY(rannc, m) {
+  m.def("valueHook", displayValueHook);
+}
+} // namespace rannc

@@ -10,80 +10,86 @@
 
 namespace rannc {
 
-    size_t calcInputSize(const std::shared_ptr<IRGraph>& g);
-    size_t calcOutputSize(const std::shared_ptr<IRGraph>& g);
-    long calcCommTime(long cut_size);
-    long calcInputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
-    long calcOutputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
-    long calcAllReduceTime(long cut_size);
+size_t calcInputSize(const std::shared_ptr<IRGraph>& g);
+size_t calcOutputSize(const std::shared_ptr<IRGraph>& g);
+long calcCommTime(long cut_size);
+long calcInputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
+long calcOutputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
+long calcAllReduceTime(long cut_size);
 
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, bool use_amp_master_params,
-                        bool enable_zero, int zero_dist_num);
-    size_t calcGraphMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, size_t batch_size, int replica_num,
-                        int pipeline_num, bool use_amp_master_params, bool enable_zero);
-    bool fitToMem(const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity, bool use_amp_master_params,
-                  bool enable_zero, int zero_dist_num);
+size_t calcGraphMem(
+    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
+    bool use_amp_master_params, bool enable_zero, int zero_dist_num);
+size_t calcGraphMem(
+    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
+    size_t batch_size, int replica_num, int pipeline_num,
+    bool use_amp_master_params, bool enable_zero);
+bool fitToMem(
+    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
+    bool use_amp_master_params, bool enable_zero, int zero_dist_num);
 
-    struct MLProfileKey {
-        std::string id;
-        size_t batch_size;
-        bool checkpointing;
+struct MLProfileKey {
+  std::string id;
+  size_t batch_size;
+  bool checkpointing;
 
-        bool operator==(const MLProfileKey &rhs) const {
-            return id == rhs.id &&
-                   batch_size == rhs.batch_size &&
-                    checkpointing == rhs.checkpointing;
-        }
+  bool operator==(const MLProfileKey& rhs) const {
+    return id == rhs.id && batch_size == rhs.batch_size &&
+        checkpointing == rhs.checkpointing;
+  }
 
-        bool operator!=(const MLProfileKey &rhs) const {
-            return !(rhs == *this);
-        }
+  bool operator!=(const MLProfileKey& rhs) const {
+    return !(rhs == *this);
+  }
 
-        MSGPACK_DEFINE(id, batch_size, checkpointing);
-    };
+  MSGPACK_DEFINE(id, batch_size, checkpointing);
+};
 
-    struct MLProfileKeyHash {
-        std::size_t operator()(const MLProfileKey &key) const {
-            std::stringstream ss;
-            ss << key.id << "_" << key.batch_size << "_cp=" << key.checkpointing;
-            return std::hash<std::string>()(ss.str());
-        };
-    };
+struct MLProfileKeyHash {
+  std::size_t operator()(const MLProfileKey& key) const {
+    std::stringstream ss;
+    ss << key.id << "_" << key.batch_size << "_cp=" << key.checkpointing;
+    return std::hash<std::string>()(ss.str());
+  };
+};
 
-    using MLProfileCache = std::unordered_map<MLProfileKey, GraphProfile, MLProfileKeyHash>;
+using MLProfileCache =
+    std::unordered_map<MLProfileKey, GraphProfile, MLProfileKeyHash>;
 
-    class ProfilerUtil {
-    public:
-        ProfilerUtil(std::shared_ptr<GraphProfiler> profiler):
-            profiler_(std::move(profiler)) {};
-        GraphProfile profile(const std::shared_ptr <IRGraph> &g, size_t batch_size, size_t replica_num,
-                             bool checkpointing=false);
+class ProfilerUtil {
+ public:
+  ProfilerUtil(std::shared_ptr<GraphProfiler> profiler)
+      : profiler_(std::move(profiler)){};
+  GraphProfile profile(
+      const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
+      bool checkpointing = false);
 
-        const MLProfileCache &getProfileCache() const {
-            return profile_cache_;
-        }
+  const MLProfileCache& getProfileCache() const {
+    return profile_cache_;
+  }
 
-        void setProfileCache(const MLProfileCache &profileCache) {
-            profile_cache_ = profileCache;
-        }
+  void setProfileCache(const MLProfileCache& profileCache) {
+    profile_cache_ = profileCache;
+  }
 
-        static const long ERROR_VAL = LONG_MAX / 1024;
+  static const long ERROR_VAL = LONG_MAX / 1024;
 
-    private:
-        MLProfileCache profile_cache_;
-        std::unordered_map<bool, std::unordered_map<std::string, size_t>> max_batch_size_cache_;
-        std::shared_ptr<GraphProfiler> profiler_;
-    };
+ private:
+  MLProfileCache profile_cache_;
+  std::unordered_map<bool, std::unordered_map<std::string, size_t>>
+      max_batch_size_cache_;
+  std::shared_ptr<GraphProfiler> profiler_;
+};
 
-    GraphProfile accProfileValues(ProfilerUtil& prof_util, size_t batch_size,
-                                  const std::vector<std::shared_ptr<IRGraph>>& graphs,
-                                  size_t from, size_t to, size_t dev_num,
-                                  bool checkpointing);
+GraphProfile accProfileValues(
+    ProfilerUtil& prof_util, size_t batch_size,
+    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
+    size_t dev_num, bool checkpointing);
 
-    std::string displayGraphProfiles(const std::vector<std::shared_ptr<IRGraph>>& graphs,
-                                     size_t batch_size, int pipeline_num,
-                                     bool use_amp_master_params, bool enable_zero,
-                                     const std::unordered_map<std::string, int>& repl_nums,
-                                     const std::unordered_map<std::string, GraphProfile>& profiles);
-}
-#endif //PYRANNC_PROFILERUTIL_H
+std::string displayGraphProfiles(
+    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t batch_size,
+    int pipeline_num, bool use_amp_master_params, bool enable_zero,
+    const std::unordered_map<std::string, int>& repl_nums,
+    const std::unordered_map<std::string, GraphProfile>& profiles);
+} // namespace rannc
+#endif // PYRANNC_PROFILERUTIL_H
