@@ -347,28 +347,30 @@ PYBIND11_MODULE(_pyrannc, m) {
     });
 
 
-    m.def("show_deployment", [](const std::string& path, size_t batch_size) {
+    m.def("show_deployment", [](const std::string& path, int64_t batch_size) {
         spdlog::info("Loading deployment state from {}", path);
         const DeploymentState state = loadDeploymentState(path);
         const Deployment& deployment = state.deployment;
         std::stringstream ss;
         ss << deployment;
 
-        int all_ranks = 0;
+        std::unordered_set<int> all_ranks;
         for (const auto& it: deployment.allocation) {
-            all_ranks += it.second.size();
+            for (int r: it.second) {
+                all_ranks.insert(r);
+            }
         }
 
-        std::vector<int64_t> split_batch_sizes = getSplitBatchSizes(batch_size, deployment.pipeline_num);
-        for (int i=0; i<split_batch_sizes.size(); i++) {
-            int64_t split_bs = split_batch_sizes.at(i);
+        BatchSizeCalculator bs_calc(deployment.pipeline_num, batch_size);
+
+        for (int i=0; i<deployment.pipeline_num; i++) {
+            int64_t split_bs = bs_calc.getGlobalSplitBatchSize(i);
             ss << "split" << i << ": bs=" << split_bs;
 
             std::vector<std::string> local_splits_str;
-            for (int r=0; r<all_ranks; r++) {
-                const auto local_split_batch_sizes = getLocalSplitBatchSizes(split_batch_sizes, all_ranks, r);
+            for (int r=0; r<all_ranks.size(); r++) {
                 std::stringstream split_ss;
-                split_ss << r << "=" << local_split_batch_sizes.at(i);
+                split_ss << r << "=" << bs_calc.getLocalSplitBatchSize(all_ranks, r, i);
                 local_splits_str.push_back(split_ss.str());
             }
             ss << " local_splits=" << join_as_str(local_splits_str) << std::endl;
@@ -381,11 +383,8 @@ PYBIND11_MODULE(_pyrannc, m) {
 
                 std::vector<std::string> sg_splits_str;
                 for (int r: alloc) {
-                    std::unordered_map<int, std::vector<int64_t>> dest_dist =
-                            rannc::calcDistBatchDims(split_bs, {split_bs}, rannc::vectorToSet(alloc), i);
-                    const auto& dim = dest_dist.at(r);
                     std::stringstream split_ss;
-                    split_ss << r << "=" << dim.front();
+                    split_ss << r << "=" << bs_calc.getLocalSplitBatchSize(vectorToSet(alloc), r, i);
                     sg_splits_str.push_back(split_ss.str());
                 }
                 ss << " bs=" << join_as_str(sg_splits_str) << std::endl;

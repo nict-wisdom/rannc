@@ -465,8 +465,6 @@ namespace rannc {
                     torch::autograd::AutoGradMode gm(true);
                     setRngState(this->rng_states_.at(id).at(split_index));
 
-                    spdlog::info("@backward cp_fwd starting: split_index={} pipeline_num_={}", split_index, pipeline_num_);
-
                     // Move inputs to cuda for the *next* split. This intends to overlap the copy and backward.
                     // Note that inputs for the first split has already been moved when finishing forward for the last split
                     if (split_index+1 < pipeline_num_) {
@@ -493,7 +491,6 @@ namespace rannc {
                             }
                             dev_str1.push_back(ss.str());
                         }
-                        spdlog::info("@backward cp_fwd before_moving_to_cuda: split_index+1={} {}", split_index+1, join_as_str(dev_str1));
                         inputs_[id][split_index+1] = toCUDAIfAvailable(inputs_[id][split_index+1], true, true);
 
                         std::vector<std::string> dev_str2;
@@ -505,7 +502,6 @@ namespace rannc {
                             }
                             dev_str2.push_back(ss.str());
                         }
-                        spdlog::info("@backward cp_fwd after_moving_to_cuda: split_index+1={} {}", split_index+1, join_as_str(dev_str2));
 
                         recordEnd(to_gpu_key);
 
@@ -525,7 +521,6 @@ namespace rannc {
                         }
                         dev_str.push_back(ss.str());
                     }
-                    spdlog::info("@backward cp_fwd before_run_forward: split_index={} {}", split_index, join_as_str(dev_str));
 
                     const auto outputs = driver_.forward(id, inputs_[id][split_index], split_index);
 

@@ -14,6 +14,7 @@
 #include "ConfiguredTorch.h"
 #include "TorchUtil.h"
 #include "graph/ir.h"
+#include "comp/BatchSizeCalculator.h"
 
 #include <c10/cuda/CUDACachingAllocator.h>
 
@@ -740,8 +741,10 @@ namespace rannc {
             for (int i=0; i < replica_num; i++) {
                 dummy_ranks.insert(i);
             }
-            std::unordered_map<int, std::vector<int64_t>> dist_dim = calcDistBatchDims(
-                    total_batch_size, {(int64_t) total_batch_size}, dummy_ranks);
+
+            BatchSizeCalculator bs_calc(1, total_batch_size);
+            std::unordered_map<int, std::vector<int64_t>> dist_dim =
+                    bs_calc.calcDistBatchDims({(int64_t) total_batch_size}, dummy_ranks, 0);
             assert(contains(dist_dim, 0));
             const auto& dim = dist_dim.at(0);
             assert(!dim.empty());
@@ -823,7 +826,9 @@ namespace rannc {
         for (int i=0; i<num; i++) {
             dummy_ranks.push_back(i);
         }
-        const auto dist_dims = calcDistBatchDims(batch_size, dim, vectorToSet(dummy_ranks));
+
+        BatchSizeCalculator bs_calc(1, batch_size);
+        const auto dist_dims = bs_calc.calcDistBatchDims(dim, vectorToSet(dummy_ranks), 0);
 
         int offset = 0;
         int i;
@@ -834,34 +839,6 @@ namespace rannc {
         }
         int size = dist_dims.at(i).front();
         return tensor.slice(0, offset, offset+size);
-    }
-
-    torch::jit::IValue sliceDistBatchTensorsInIValue(const torch::jit::IValue &ivalue, int index, int64_t batch_size,
-            int num) {
-        std::function<at::Tensor(const at::Tensor&)> f =
-                [index, num, batch_size](const at::Tensor& t) {
-                    return sliceDistBatchTensor(t, index, batch_size, num);
-                };
-        return transformTensorsInIValue(ivalue, f);
-    }
-
-    torch::jit::IValue weightDistLossTensorsInIValue(const torch::jit::IValue &ivalue, int index, int64_t batch_size,
-                                                     int num) {
-        std::function<at::Tensor(const at::Tensor&)> f =
-                [index, num, batch_size](const at::Tensor& t) {
-                    std::vector<int> dummy_ranks;
-                    dummy_ranks.reserve(num);
-                    for (int i=0; i<num; i++) {
-                        dummy_ranks.push_back(i);
-                    }
-
-                    auto loss = getDpRatio(batch_size, dummy_ranks, index) * t;
-//                    spdlog::info("weightDistLossTensorsInIValue v={} v'={} ratio={} (rank={} #ranks={})", tensorToString(t),
-//                            tensorToString(loss), getDpRatio(batch_size, dummy_ranks, index),
-//                            index, num);
-                    return loss;
-                };
-        return transformTensorsInIValue(ivalue, f);
     }
 
     torch::jit::IValue sliceOrWeightTensorsInIValue(const torch::jit::IValue &ivalue,
@@ -985,21 +962,15 @@ namespace rannc {
         torch::NoGradGuard no_grad;
 
         assert(!tensors.empty());
-        const auto dist_bs = getSplitBatchSizes(batch_size, tensors.size());
 
-        double ratio = (double) dist_bs.front() / batch_size;
+        BatchSizeCalculator bs_calc(tensors.size(), batch_size);
+        double ratio = (double) bs_calc.getGlobalSplitBatchSize(0) / batch_size;
         at::Tensor ret = ratio * tensors.front();
         for (size_t i=1; i<tensors.size(); i++) {
-            ratio = (double) dist_bs.at(i) / batch_size;
+            ratio = (double) bs_calc.getGlobalSplitBatchSize(i) / batch_size;
             ret = ret + ratio * tensors.at(i);
         }
         return ret;
-    }
-
-    torch::jit::IValue sumDistLossTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues, int batch_size) {
-        return aggregateTensorsInIValues(ivalues, [batch_size](const std::vector<at::Tensor>& tensors) {
-            return sumDistLossTensors(tensors, batch_size);
-        });
     }
 
     torch::jit::IValue concatOrSumTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues, size_t batch_size) {

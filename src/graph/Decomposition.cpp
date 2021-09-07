@@ -11,6 +11,7 @@
 #include <Config.h>
 
 #include "Decomposition.h"
+#include "comp/BatchSizeCalculator.h"
 
 namespace {
     const std::string LOGGER_NAME = "Decomposition";
@@ -820,7 +821,8 @@ namespace rannc {
 
     std::unordered_map<int, IRType> getDistTensorType(const IRType& type, const std::unordered_set<int>& ranks,
                                                       int64_t batch_size) {
-        const auto dp_dim = calcDistBatchDims(batch_size, type.getTensorDim(), ranks);
+        BatchSizeCalculator bs_calc(1, batch_size);
+        const auto dp_dim = bs_calc.calcDistBatchDims(type.getTensorDim(), ranks, 0);
 
         std::unordered_map<int, IRType> ret;
         for (int r: ranks) {

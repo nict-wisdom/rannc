@@ -254,13 +254,6 @@ namespace rannc {
     template <>
     void copyToVector(std::vector<bool>& dest, const bool* src, int size);
 
-    double getDpRatio(size_t total_batch_size, const std::unordered_set<int>& ranks, int myrank, int split_index=0);
-    double getDpRatio(size_t total_batch_size, const std::vector<int>& ranks, int myrank, int split_index=0);
-
-    IRType reduceBatchTypes(IRType type, MPI_Comm comm);
-    IRType reduceLossTypes(IRType type, MPI_Comm comm);
-    IRType reduceTypes(IRType type, MPI_Comm comm);
-
     void redist(void* sendbuf, const RedistArgs& redist_args, MPI_Datatype datatype, MPI_Comm communicator,
                 void* recvbuf, bool use_cuda);
 }

@@ -15,6 +15,7 @@
 #include <graph/ir.h>
 
 #include "torch/TorchUtil.h"
+#include "comp/BatchSizeCalculator.h"
 
 
 namespace rannc {
@@ -27,13 +28,6 @@ namespace rannc {
     using GroupMap = std::unordered_map<int, unique_group_ptr>;
     using CommMap = std::unordered_map<int, unique_comm_ptr>;
 
-    RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim,
-                             const std::unordered_set<int>& src_ranks,
-                             const std::unordered_set<int>& dest_ranks, int split_index);
-
-    void sendTensorRedist(const torch::jit::IValue &send_val, const RouteDP &route, const IRType &global_type,
-                          int64_t batch_size, MPI_Comm comm);
-
     class TagMap {
     public:
         static TagMap& get() {
@@ -41,9 +35,7 @@ namespace rannc {
             return instance;
         }
 
-        int getParamTag(long param_id);
         int getRankSetTag(const std::unordered_set<int>& ranks);
-        int getValueTag(const IValueLocation& loc);
         int getRouteTag(const RouteDP& route);
         int getRouteSourceTag(const RouteDP& route);
 
@@ -122,12 +114,17 @@ namespace rannc {
                                                 const RouteDP& route, bool weight, int split_delay);
         at::Tensor bcastTensor(const torch::jit::IValue& ivalue, const IRType& ir_type, const RouteDP& route,
                                MPI_Comm comm);
-        size_t getSplitBatchSize(int split_delay);
+
+        size_t getSplitBatchSize(int split_index);
+        size_t getCurrentSplitBatchSize(int split_delay);
+
+        RedistArgs getRedistArgs(int my_rank, int64_t batch_size, const std::vector<int64_t>& dim,
+                                 const std::unordered_set<int>& src_ranks,
+                                 const std::unordered_set<int>& dest_ranks, int split_index);
 
         BufferTensorCache buf_cache_;
+        BatchSizeCalculator bs_calc_;
 
-        int64_t global_batch_size_;
-        std::vector<int64_t> split_batch_sizes_;
         int pipeline_num_;
         int split_index_;
         bool is_bwd_;

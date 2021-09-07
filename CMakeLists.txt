@@ -62,6 +62,7 @@ set(RANNC_SRCS
         src/comm/MPIUtil.cpp
         src/comm/ObjectComm.cpp
         src/comp/Backward.cpp
+        src/comp/BatchSizeCalculator.cpp
         src/comp/FunctionStorage.cpp
         src/comp/GraphConnector.cpp
         src/comp/GraphLauncher.cpp

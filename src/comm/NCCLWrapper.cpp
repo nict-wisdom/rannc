@@ -313,7 +313,7 @@ namespace rannc {
     }
 
     void NCCLWrapper::redist(void* send_ptr, void* recv_ptr, const RouteDP& route,
-                             int64_t batch_size, const IRType& global_type, int split_index) {
+                             const IRType& global_type, const RedistArgs& redist_args) {
 
         if (!contains(getRanksInRoute(route), mpi::getRank())) {
             return;
@@ -326,8 +326,6 @@ namespace rannc {
         // Special case for bool
         bool convert_bool = global_type.getTensorElemType() == IRTensorElemType::BOOL;
         const auto& elem_type = convert_bool ? IRTensorElemType::INT : global_type.getTensorElemType();
-
-        const auto redist_args = getRedistArgs(mpi::getRank(), batch_size, global_dim, vectorToSet(route.sources), vectorToSet(route.dests), split_index);
 
         void* tmp_send_ptr = send_ptr;
         void* tmp_recv_ptr = recv_ptr;

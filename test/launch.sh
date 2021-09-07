@@ -43,6 +43,9 @@ echo "CONF_DIR=${RANNC_CONF_DIR}"
 ENVS="-x RANNC_SHOW_CONFIG_ITEMS=true"
 ENVS+=" -x RANNC_PARTITION_NUM=${PARTITION_NUM}"
 ENVS+=" -x RANNC_CONF_DIR=${RANNC_CONF_DIR}"
+ENVS+=" ${MPI_ENV_OPTS}"
+
+set -x
 
 mpirun --tag-output -np ${NP} ${MPI_OPTS} \
   -x PYTEST \

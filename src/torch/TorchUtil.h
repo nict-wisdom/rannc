@@ -98,8 +98,6 @@ namespace rannc {
     at::Tensor toFloatIfHalf(const at::Tensor &tensor);
     torch::jit::IValue toFloatTensorsInIValue(const torch::jit::IValue &ivalue);
     at::Tensor sliceDistBatchTensor(const at::Tensor& tensor, int index, int64_t batch_size, int num);
-    torch::jit::IValue sliceDistBatchTensorsInIValue(const torch::jit::IValue &ivalue, int index, int64_t batch_size, int num);
-    torch::jit::IValue weightDistLossTensorsInIValue(const torch::jit::IValue &ivalue, int index, int64_t batch_size, int num);
     torch::jit::IValue sliceOrWeightTensorsInIValue(const torch::jit::IValue &ivalue,
                                                     const std::vector<int64_t>& batch_sizes, int index);
     torch::jit::IValue cloneTensorsInIValue(const torch::jit::IValue &ivalue);
@@ -109,7 +107,6 @@ namespace rannc {
 
     torch::jit::IValue aggregateTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues,
                                                  const std::function<at::Tensor(const std::vector<at::Tensor>&)>& f);    torch::jit::IValue concatTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues);
-    torch::jit::IValue sumDistLossTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues, int batch_size);
     torch::jit::IValue sumTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues);
     torch::jit::IValue concatOrSumTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues, size_t batch_size);
     torch::jit::IValue concatOrSumTensorsInIValues(const std::vector<torch::jit::IValue> &ivalues);

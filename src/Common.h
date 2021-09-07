@@ -263,17 +263,6 @@ namespace rannc {
 
     std::vector<std::unordered_set<int>> combination(const std::vector<int>& group, int size);
 
-    std::unordered_map<int, int64_t> getSplitBatchSizes(int64_t batch_size, const std::unordered_set<int>& ranks,
-                                                        int split_index=0);
-    std::vector<int64_t> getSplitBatchSizes(int64_t batch_size, int split_num);
-    std::vector<int64_t> getLocalSplitBatchSizes(const std::vector<int64_t>& split_batch_sizes,
-                                                 int world_size, int rank);
-        std::vector<int64_t> getGlobalDim(int64_t batch_size, const std::vector<int64_t> &local_dim,
-                                      const std::unordered_set<int> &ranks, int my_rank);
-    std::unordered_map<int, std::vector<int64_t>> calcDistBatchDims(int64_t batch_size,
-                    const std::vector<int64_t> &dim, const std::unordered_set<int> &ranks,
-                    int split_index=0);
-
     struct IntSetHash {
         std::size_t operator()(const std::unordered_set<int> &iset) const {
             auto ivec = setToVector(iset);

@@ -164,7 +164,6 @@ namespace {
 }
 
 namespace rannc {
-    rannc::TimeCounter scomm_time_counter(false);
 
     unique_group_ptr unique_group(MPI_Group *ptr) {
         return unique_group_ptr(ptr, [](MPI_Group* ptr) {
@@ -179,22 +178,11 @@ namespace rannc {
         });
     }
 
-    int TagMap::getParamTag(long param_id) {
-        if (!contains(param_map_, param_id)) {
-            param_map_[param_id] = generate(param_id);
-        }
-        return param_map_[param_id];
-    }
-
     int TagMap::getRankSetTag(const std::unordered_set<int>& ranks) {
         if (!contains(param_comm_map_, ranks)) {
             param_comm_map_[ranks] = generate(ranks);
         }
         return param_comm_map_[ranks];
-    }
-
-    int TagMap::getValueTag(const IValueLocation& loc) {
-        return getStrTag(toString(loc));
     }
 
     int TagMap::getRouteTag(const RouteDP& route) {
@@ -266,7 +254,7 @@ namespace rannc {
 
         recordStart("distributeBatchTensor_" + toString(route));
 
-        size_t batch_size = getSplitBatchSize(split_delay);
+        size_t batch_size = getCurrentSplitBatchSize(split_delay);
 
         const auto& global_dim = global_type.getTensorDim();
         if (batch_size < 1) {
@@ -274,9 +262,8 @@ namespace rannc {
         }
 
         // setup and run alltoall here
-        std::unordered_map<int, std::vector<int64_t>> dest_dist =
-                rannc::calcDistBatchDims(batch_size, global_dim, rannc::vectorToSet(route.dests),
-                split_index_-split_delay);
+        std::unordered_map<int, std::vector<int64_t>> dest_dist = bs_calc_.calcDistBatchDims(
+                global_dim, vectorToSet(route.dests), split_index_-split_delay);
 
         at::Tensor recv_buf;
         void* send_ptr;
@@ -301,8 +288,9 @@ namespace rannc {
             }
         }
 
+        const RedistArgs redist_args = getRedistArgs(mpi::getRank(), batch_size, global_dim, vectorToSet(route.sources), vectorToSet(route.dests), split_index_-split_delay);
         NCCLWrapper& ar = NCCLWrapper::get();
-        ar.redist(send_ptr, recv_ptr, route, batch_size, global_type, split_index_-split_delay);
+        ar.redist(send_ptr, recv_ptr, route, global_type, redist_args);
 
         recordEnd("distributeBatchTensor_" + toString(route));
 
@@ -318,6 +306,7 @@ namespace rannc {
         if (global_type.getBaseType() == IRBaseType::TENSOR) {
             const auto& dim = global_type.getTensorDim();
             if (dim.empty()) {
+                assert(split_delay == 0);
                 return distributeLossTensor(val, global_type, route, is_bwd, split_delay);
             }
             return distributeBatchTensor(val, global_type, route, split_delay);
@@ -386,7 +375,7 @@ namespace rannc {
 
     torch::jit::IValue SComm::distribute(const torch::jit::IValue& val, const RouteDP& route, bool is_bwd, int split_delay) {
         auto ir_type = route.ir_value.getType();
-        ir_type.setBatchSize(getSplitBatchSize(split_delay));
+        ir_type.setBatchSize(getCurrentSplitBatchSize(split_delay));
         return distribute(val, route, is_bwd, ir_type, split_delay);
     }
 
@@ -397,12 +386,13 @@ namespace rannc {
         return doDistribute(val, global_type, route, is_bwd, split_delay);
     }
 
-    rannc::RedistArgs getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim,
+    RedistArgs SComm::getRedistArgs(int my_rank, int64_t total_batch_size, const std::vector<int64_t>& global_dim,
                                     const std::unordered_set<int>& src_ranks,
                                     const std::unordered_set<int>& dest_ranks,
                                     int split_index) {
-        std::unordered_map<int, std::vector<int64_t>> src_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, src_ranks, split_index);
-        std::unordered_map<int, std::vector<int64_t>> dest_dist = rannc::calcDistBatchDims(total_batch_size, global_dim, dest_ranks, split_index);
+
+        std::unordered_map<int, std::vector<int64_t>> src_dist = bs_calc_.calcDistBatchDims(global_dim, src_ranks, split_index);
+        std::unordered_map<int, std::vector<int64_t>> dest_dist = bs_calc_.calcDistBatchDims(global_dim, dest_ranks, split_index);
 
 //        for (const auto& it: src_dist) {
 //            int rank = it.first;
@@ -413,17 +403,17 @@ namespace rannc {
 //            std::cout << "dest_dist: rank=" << rank << " dim=" << rannc::join_as_str(it.second) << std::endl;
 //        }
 
-        auto vec_src_ranks = rannc::setToVector(src_ranks);
+        auto vec_src_ranks = setToVector(src_ranks);
         std::sort(vec_src_ranks.begin(), vec_src_ranks.end());
-        auto vec_dest_ranks = rannc::setToVector(dest_ranks);
+        auto vec_dest_ranks = setToVector(dest_ranks);
         std::sort(vec_dest_ranks.begin(), vec_dest_ranks.end());
 
         bool send = false;
-        if (rannc::contains(src_ranks, my_rank)) {
+        if (contains(src_ranks, my_rank)) {
             send = true;
         }
         bool recv = false;
-        if (rannc::contains(dest_ranks, my_rank)) {
+        if (contains(dest_ranks, my_rank)) {
             recv = true;
         }
 
@@ -452,8 +442,6 @@ namespace rannc {
     torch::jit::IValue SComm::distributeLossTensor(const torch::jit::IValue& val, const IRType& global_type,
                                                    const RouteDP& route, bool weight, int split_delay) {
 
-        size_t batch_size = getSplitBatchSize(split_delay);
-
         assert(val.isTensor() || val.isNone());
         const auto& global_dim = global_type.getTensorDim();
 
@@ -469,7 +457,7 @@ namespace rannc {
             src = val.toTensor();
             if (!weight) {
                 if (contains(route.sources, mpi::getRank())) {
-                    src_ratio = getDpRatio(batch_size, route.sources, mpi::getRank(), split_index_);
+                    src_ratio = bs_calc_.getDpRatio(vectorToSet(route.sources), mpi::getRank(), split_index_ - split_delay);
                 }
                 src = src_ratio * src;
             }
@@ -494,7 +482,7 @@ namespace rannc {
 
         double ratio = 1.0;
         if (weight) {
-            ratio *= getDpRatio(batch_size, route.dests, mpi::getRank(), split_index_);
+            ratio *= bs_calc_.getDpRatio(vectorToSet(route.dests), mpi::getRank(), split_index_ - split_delay);
         }
 
         return ratio * src;
@@ -527,10 +515,9 @@ namespace rannc {
 
     void SComm::setPipeline(int pipeline_num, int64_t global_batch_size, bool is_bwd) {
         pipeline_num_ = pipeline_num;
-        global_batch_size_ = global_batch_size;
         is_bwd_ = is_bwd;
 
-        split_batch_sizes_ = getSplitBatchSizes(global_batch_size_, pipeline_num_);
+        bs_calc_.setPipeline(pipeline_num, global_batch_size);
     }
 
     void SComm::startSplit(int split_index) {
@@ -544,11 +531,14 @@ namespace rannc {
         return ss.str();
     }
 
-    size_t SComm::getSplitBatchSize(int split_delay) {
+    size_t SComm::getSplitBatchSize(int split_index) {
+        return bs_calc_.getGlobalSplitBatchSize(split_index);
+    }
+
+    size_t SComm::getCurrentSplitBatchSize(int split_delay) {
         int delayed_split_index = split_index_ - split_delay;
         assert(delayed_split_index >= 0);
-        assert(delayed_split_index < split_batch_sizes_.size());
-        return split_batch_sizes_.at(delayed_split_index);
+        return getSplitBatchSize(delayed_split_index);
     }
 
     MPI_Comm SComm::getRouteCommunicator(const RouteDP& route) {
