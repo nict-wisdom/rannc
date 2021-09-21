@@ -933,6 +933,10 @@ torch::jit::IValue cloneTensorsInIValue(
 
 torch::jit::IValue cloneTensorsInIValue(const torch::jit::IValue& ivalue) {
   std::function<at::Tensor(const at::Tensor&)> f = [](const at::Tensor& t) {
+    if (!t.defined()) {
+      return t;
+    }
+
     at::Tensor t_copy = torch::empty_like(t);
     {
       torch::NoGradGuard no_grad;
