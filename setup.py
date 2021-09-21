@@ -1,13 +1,13 @@
-import os
-import re
-import sys
-import platform
-import subprocess
 import distutils
+import os
+import platform
+import re
+import subprocess
+from distutils.version import LooseVersion
 
+import sys
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
-from distutils.version import LooseVersion
 
 
 class CMakeExtension(Extension):
@@ -69,7 +69,7 @@ class CMakeBuild(build_ext):
 setup(
     name='pyrannc',
     packages=find_packages(),
-    version='0.6.4.post3',
+    version='0.6.4.post4',
     author='Masahiro Tanaka',
     author_email='mtnk@nict.go.jp',
     description='Deep learning framework for data/model hybrid parallelism',
