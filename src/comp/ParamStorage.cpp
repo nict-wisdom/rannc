@@ -766,7 +766,7 @@ void ParamStorage::deploy(
   }
 
   std::unordered_map<long, std::string> id_to_name;
-  for (const auto& it : getParamIDs(graph_id, false)) {
+  for (const auto& it : getParamIDs(graph_id, true)) {
     id_to_name[it.second] = it.first;
   }
 

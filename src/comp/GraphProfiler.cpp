@@ -555,8 +555,10 @@ ProfilingResult GraphProfiler::init() {
 
   for (const auto& v : getParamValues(base_graph_)) {
     if (!contains(ret.value_types, v.getName())) {
-      ret.value_types[v.getName()] =
-          param_storage_->getParamType(base_graph_->getName(), v.getName());
+      assert(contains(graph_params_, v.getName()));
+      long pid = graph_params_.at(v.getName());
+      const auto param_tensor = param_storage_->getParamTensor(pid);
+      ret.value_types[v.getName()] = toIRType(param_tensor);
     }
   }
 
