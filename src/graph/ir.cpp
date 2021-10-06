@@ -812,13 +812,13 @@ std::vector<IRNode> detectUnusedNodes(const std::shared_ptr<IRGraph>& g) {
   }
 
   for (const auto& n : g->getNodes()) {
-    bool unused = false;
+    bool used = false;
     for (const auto& out : n.getOutputNames()) {
-      if (!contains(ref_val_names, out)) {
-        unused = true;
+      if (contains(ref_val_names, out)) {
+        used = true;
       }
     }
-    if (unused) {
+    if (!used) {
       unused_nodes.push_back(n);
     }
   }
