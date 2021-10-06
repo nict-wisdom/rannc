@@ -836,12 +836,15 @@ std::vector<IRNode> detectUnusedNodes(
 }
 
 std::unordered_set<std::string> getRequiredValues(
-    const std::shared_ptr<IRGraph>& g) {
+    const std::shared_ptr<IRGraph>& g, const std::vector<std::string>& unused_outputs) {
   std::unordered_set<std::string> ref_val_names;
 
   // graph outputs and node inputs are required
   for (const auto& g_out : g->getOutputNames()) {
     ref_val_names.insert(g_out);
+  }
+  for (const auto& u_out : unused_outputs) {
+    ref_val_names.insert(u_out);
   }
   for (const auto& n : g->getNodes()) {
     for (const auto& in : n.getInputNames()) {
@@ -874,7 +877,7 @@ std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g) {
     unused_nodes = detectUnusedNodes(new_g, unused_outputs);
   }
 
-  const auto required_vals = getRequiredValues(new_g);
+  const auto required_vals = getRequiredValues(new_g, unused_outputs);
 
   std::unordered_map<std::string, IRValue> new_vals;
   for (const auto& it : new_g->getValues()) {
