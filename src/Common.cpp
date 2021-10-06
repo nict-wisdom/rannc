@@ -140,6 +140,8 @@ bool passedForBackward(const IRType& type) {
       return false;
     case IRBaseType::NONE:
       return false;
+    case IRBaseType::FUNCTION:
+      return false;
   }
 }
 
