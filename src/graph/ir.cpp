@@ -836,7 +836,8 @@ std::vector<IRNode> detectUnusedNodes(
 }
 
 std::unordered_set<std::string> getRequiredValues(
-    const std::shared_ptr<IRGraph>& g, const std::vector<std::string>& unused_outputs) {
+    const std::shared_ptr<IRGraph>& g,
+    const std::vector<std::string>& unused_outputs) {
   std::unordered_set<std::string> ref_val_names;
 
   // graph outputs and node inputs are required
