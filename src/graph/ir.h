@@ -641,7 +641,9 @@ size_t getOptMemSize(
 size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph);
 bool verifyNoDuplicatedOutputs(const std::shared_ptr<IRGraph>& g);
 bool verifyNodeInputs(const std::shared_ptr<IRGraph>& g, bool show_msg = false);
-std::vector<IRNode> detectUnusedNodes(const std::shared_ptr<IRGraph>& g);
+std::vector<IRNode> detectUnusedNodes(
+    const std::shared_ptr<IRGraph>& g,
+    std::vector<std::string>& unused_outputs);
 std::unordered_set<std::string> findUnusedValue(
     const std::shared_ptr<IRGraph>& g);
 bool noUnusedValue(const std::shared_ptr<IRGraph>& g, bool show_msg = false);
