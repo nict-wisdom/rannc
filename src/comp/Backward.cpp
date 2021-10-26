@@ -132,4 +132,9 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
   std::cerr << "Failed to compute backward. exiting." << std::endl;
   std::exit(-5);
 }
+
+variable_list OffloadTensorBackward::apply(variable_list&& grads) {
+  return grads;
+}
+
 } // namespace rannc
