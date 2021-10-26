@@ -233,6 +233,28 @@ std::shared_ptr<IRGraph> insertValueHook(
       g->getName(), new_nodes, new_values, g->getInputNames(), output_names);
 }
 
+std::shared_ptr<IRGraph> insertOffloadingHooks(
+    const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
+  for (const auto& n : g->getNodes()) {
+    std::vector<std::string> input_names;
+
+    bool has_param_input = false;
+    for (const auto& in_name : n.getInputNames()) {
+      const auto& in_val = g->getValue(in_name);
+      spdlog::info("{} input {}", n.getName(), toString(in_val));
+
+      if (in_val.isParam()) {
+        has_param_input = true;
+      }
+    }
+
+    if (has_param_input) {
+      spdlog::info("{} has param input", n.getName());
+    }
+  }
+  return g;
+}
+
 bool TorchDriver::keep_graph_ = false;
 
 void TorchDriver::createModule(
@@ -255,6 +277,17 @@ void TorchDriver::createModule(
   if (display_act_values_) {
     clone_input_ir_graphs_[id] =
         insertValueHook(clone_input_ir_graphs_[id], constants_mod);
+  }
+
+  config::Config& conf = config::Config::get();
+  if (conf.getVal<bool>(config::OFFLOAD_PARAMS)) {
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+
+    for (auto& it : param_tensors_[id]) {
+      param_map.registerParam(it.first, it.second);
+    }
+
+    insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
   }
 
   ConvertGraph cg;
@@ -285,15 +318,6 @@ void TorchDriver::createModule(
   logger->trace("TorchDriver::createModule creating function.");
   functions_[id] =
       std::make_shared<torch::jit::GraphFunction>("forward", graph, nullptr);
-
-  config::Config& conf = config::Config::get();
-  if (conf.getVal<bool>(config::OFFLOAD_PARAMS)) {
-    OffloadedParamMap& param_map = OffloadedParamMap::get();
-
-    for (auto& it : param_tensors_[id]) {
-      param_map.registerParam(it.first, it.second);
-    }
-  }
 
   syncStream();
   time_counter_.stop("TorchDriver::createModule");
