@@ -9,9 +9,9 @@
 
 #include <Common.h>
 #include <comp/EventRecorder.h>
+#include <comp/OffloadedParamMap.h>
 #include <cuda/CudaUtil.h>
 #include <graph/ConvertGraph.h>
-#include <torch/CustomOps.h>
 #include "ConfiguredTorch.h"
 
 #include "TorchDriver.h"
@@ -285,6 +285,15 @@ void TorchDriver::createModule(
   logger->trace("TorchDriver::createModule creating function.");
   functions_[id] =
       std::make_shared<torch::jit::GraphFunction>("forward", graph, nullptr);
+
+  config::Config& conf = config::Config::get();
+  if (conf.getVal<bool>(config::OFFLOAD_PARAMS)) {
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+
+    for (auto& it : param_tensors_[id]) {
+      param_map.registerParam(it.first, it.second);
+    }
+  }
 
   syncStream();
   time_counter_.stop("TorchDriver::createModule");
