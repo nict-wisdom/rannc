@@ -5,6 +5,8 @@
 #ifndef PYRANNC_OFFLOADEDPARAMMAP_H
 #define PYRANNC_OFFLOADEDPARAMMAP_H
 
+#include <torch/torch.h>
+
 namespace rannc {
 
 class OffloadedParamMap {
@@ -19,9 +21,14 @@ class OffloadedParamMap {
     return instance;
   }
 
+  void registerParam(const std::string& name, const at::Tensor& param);
+  at::Tensor getParam(const std::string& name);
+
  private:
-  OffloadedParamMap();
+  OffloadedParamMap(){};
   ~OffloadedParamMap() = default;
+
+  std::unordered_map<std::string, at::Tensor> param_map_;
 };
 } // namespace rannc
 
