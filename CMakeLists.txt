@@ -77,6 +77,7 @@ set(RANNC_SRCS
         src/comp/TimeCounter.cpp
         src/comp/EventRecorder.cpp
         src/comp/Validator.cpp
+        src/comp/OffloadedParamMap.cpp
         src/cuda/CudaUtil.cpp
         src/graph/ConvertGraph.cpp
         src/graph/Decomposition.cpp
