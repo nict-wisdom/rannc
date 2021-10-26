@@ -9,6 +9,11 @@
 
 namespace rannc {
 at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name);
-}
+
+at::Tensor offloadingPreHook(const at::Tensor& tensor, const std::string& name);
+at::Tensor offloadingPostHook(
+    const at::Tensor& tensor, const std::string& name);
+
+} // namespace rannc
 
 #endif // PYRANNC_CUSTOMOPS_H
