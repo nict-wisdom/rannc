@@ -65,6 +65,7 @@ extern const char SYNC_ALLREDUCE[];
 extern const char DUMP_DP_NODE_PROFILES[];
 extern const char DUMP_DP_CACHE[];
 extern const char PARTITIONING_DRY_RUN_NP[];
+extern const char OFFLOAD_PARAMS[];
 extern const char
     CONF_DIR[]; // this is special because Config itself sets this item
 
