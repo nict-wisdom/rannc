@@ -205,7 +205,8 @@ std::shared_ptr<IRGraph> insertValueHook(
 
         const std::string hook_out_name = out_name + "_hook_out";
         IRNode hook(
-            "rannc::valueHook", {out_name, out_name_var}, {hook_out_name});
+            "rannc::displayValueHook", {out_name, out_name_var},
+            {hook_out_name});
         hook.setBatch(n.isBatch());
         hook.setCriterion(n.isCriterion());
         new_nodes.push_back(hook);

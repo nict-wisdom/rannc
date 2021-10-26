@@ -19,6 +19,6 @@ at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
 }
 
 TORCH_LIBRARY(rannc, m) {
-  m.def("valueHook", displayValueHook);
+  m.def("displayValueHook", displayValueHook);
 }
 } // namespace rannc
