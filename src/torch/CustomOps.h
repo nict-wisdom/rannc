@@ -8,6 +8,23 @@
 #include <torch/torch.h>
 
 namespace rannc {
+
+// Inherit from Function
+class OffloadingPostHookFunction
+    : public torch::autograd::Function<OffloadingPostHookFunction> {
+ public:
+  static torch::Tensor forward(
+      torch::autograd::AutogradContext* ctx, torch::Tensor input) {
+    return input;
+  }
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs) {
+    return grad_outputs;
+  }
+};
+
 at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name);
 
 at::Tensor offloadingPreHook(const at::Tensor& tensor, const std::string& name);
