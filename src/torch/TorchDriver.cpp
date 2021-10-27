@@ -165,7 +165,8 @@ std::vector<at::Tensor> TorchDriver::getParamInputTensors(
 
 std::shared_ptr<IRGraph> insertOutValueHook(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants,
-    const std::function<bool(
+    const std::string& op_name,
+    const std::function<std::string(
         const IRValue& out, const IRNode& node,
         const std::shared_ptr<IRGraph>& g)>& f) {
   std::vector<IRNode> new_nodes;
@@ -198,8 +199,9 @@ std::shared_ptr<IRGraph> insertOutValueHook(
       const IRValue& out_val = vals.at(out_name);
 
       new_values[out_name] = out_val;
-      if (f(out_val, n, g)) {
-        const std::string out_name_var = out_name + "_name";
+      const std::string hook_input_name = f(out_val, n, g);
+      if (!hook_input_name.empty()) {
+        const std::string out_name_var = hook_input_name + "_name";
         IRNode var_name_node("prim::Constant", {}, {out_name_var});
         new_nodes.push_back(var_name_node);
 
@@ -207,9 +209,7 @@ std::shared_ptr<IRGraph> insertOutValueHook(
         new_values[out_name_var] = var_name_val;
 
         const std::string hook_out_name = out_name + "_hook_out";
-        IRNode hook(
-            "rannc::displayValueHook", {out_name, out_name_var},
-            {hook_out_name});
+        IRNode hook(op_name, {out_name, out_name_var}, {hook_out_name});
         hook.setBatch(n.isBatch());
         hook.setCriterion(n.isCriterion());
         new_nodes.push_back(hook);
@@ -217,7 +217,7 @@ std::shared_ptr<IRGraph> insertOutValueHook(
         hook_out_names[out_name] = hook_out_name;
         new_values[hook_out_name] = IRValue(hook_out_name, out_val);
 
-        constants[out_name_var] = torch::jit::IValue(out_name);
+        constants[out_name_var] = torch::jit::IValue(hook_input_name);
       }
     }
   }
@@ -239,33 +239,37 @@ std::shared_ptr<IRGraph> insertOutValueHook(
 std::shared_ptr<IRGraph> insertValueHook(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
   return insertOutValueHook(
-      g, constants,
+      g, constants, "rannc::displayValueHook",
       [](const IRValue& out, const IRNode& node,
-         const std::shared_ptr<IRGraph>& g) { return out.isBatch(); });
+         const std::shared_ptr<IRGraph>& g) {
+        return out.getName() + "_name";
+      });
 }
 
 std::shared_ptr<IRGraph> insertOffloadingHooks(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
   std::unordered_map<std::string, std::vector<at::Tensor>> input_names;
 
-  for (const auto& n : g->getNodes()) {
-    std::vector<std::string> input_names;
-
-    bool has_param_input = false;
-    for (const auto& in_name : n.getInputNames()) {
-      const auto& in_val = g->getValue(in_name);
-      spdlog::info("{} input {}", n.getName(), toString(in_val));
-
-      if (in_val.isParam()) {
-        has_param_input = true;
-      }
-    }
-
-    if (has_param_input) {
-      spdlog::info("{} has param input", n.getName());
-    }
-  }
-  return g;
+  return insertOutValueHook(
+      g, constants, "rannc::offloadingPostHook",
+      [](const IRValue& out, const IRNode& node,
+         const std::shared_ptr<IRGraph>& g) {
+        bool takes_one_param = false;
+        std::string input_param_name;
+        for (const auto& in_name : node.getInputNames()) {
+          const auto& in_val = g->getValue(in_name);
+          if (in_val.isParam()) {
+            if (takes_one_param) {
+              return std::string("");
+            } else {
+              takes_one_param = true;
+              input_param_name = in_val.getName();
+              spdlog::info("in lambda: input_param_name={}", input_param_name);
+            }
+          }
+        }
+        return input_param_name;
+      });
 }
 
 bool TorchDriver::keep_graph_ = false;
@@ -300,7 +304,8 @@ void TorchDriver::createModule(
       param_map.registerParam(it.first, it.second);
     }
 
-    insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
+    clone_input_ir_graphs_[id] =
+        insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
   }
 
   ConvertGraph cg;
