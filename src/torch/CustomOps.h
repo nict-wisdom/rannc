@@ -5,6 +5,7 @@
 #ifndef PYRANNC_CUSTOMOPS_H
 #define PYRANNC_CUSTOMOPS_H
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 namespace rannc {
@@ -14,7 +15,12 @@ class OffloadingPostHookFunction
     : public torch::autograd::Function<OffloadingPostHookFunction> {
  public:
   static torch::Tensor forward(
-      torch::autograd::AutogradContext* ctx, torch::Tensor input) {
+      torch::autograd::AutogradContext* ctx, torch::Tensor input,
+      torch::Tensor param) {
+    ctx->save_for_backward({param});
+
+    spdlog::info("@OffloadingPostHookFunction::forward");
+
     return input;
   }
 

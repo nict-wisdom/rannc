@@ -33,13 +33,9 @@ at::Tensor offloadingPostHook(
     const at::Tensor& tensor, const std::string& name) {
   OffloadedParamMap& param_map = OffloadedParamMap::get();
 
+  spdlog::info("@offloadingPostHook name={}", name);
   at::Tensor param = param_map.getParam(name);
-  toCPUInPlace(param);
-
-  auto func = std::make_shared<OffloadTensorBackward>(param, true);
-  func->add_input_metadata(tensor);
-  torch::autograd::Edge e(func, 0);
-  torch::autograd::impl::set_gradient_edge(tensor, e);
+  at::Tensor out = OffloadingPostHookFunction::apply(tensor, param);
 
   return tensor;
 }
