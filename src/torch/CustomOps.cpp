@@ -4,6 +4,7 @@
 
 #include "CustomOps.h"
 
+#include <comp/Backward.h>
 #include <torch/torch.h>
 
 #include "comp/OffloadedParamMap.h"
@@ -34,6 +35,12 @@ at::Tensor offloadingPostHook(
 
   at::Tensor param = param_map.getParam(name);
   toCPUInPlace(param);
+
+  auto func = std::make_shared<OffloadTensorBackward>(param, true);
+  func->add_input_metadata(tensor);
+  torch::autograd::Edge e(func, 0);
+  torch::autograd::impl::set_gradient_edge(tensor, e);
+
   return tensor;
 }
 
