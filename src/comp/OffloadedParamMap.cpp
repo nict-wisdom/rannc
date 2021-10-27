@@ -14,6 +14,7 @@ void OffloadedParamMap::registerParam(
 
 at::Tensor OffloadedParamMap::getParam(const std::string& name) {
   assert(contains(param_map_, name));
+  return param_map_.at(name);
 }
 
 } // namespace rannc
