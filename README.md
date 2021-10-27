@@ -28,6 +28,5 @@ loss.backward()                # Run a backward pass
 optimizer.step()               # Update parameters
 ```
 
-You only need to insert the line highlighted above.
 RaNNC profiles computation times and memory usage of the components in the network and
 determines the partitioning of the network so that each partitioned fragment fits the GPU memory and the training throughput is optimized.
