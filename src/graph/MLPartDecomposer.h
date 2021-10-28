@@ -16,14 +16,16 @@ class MLPartDecomposer {
       std::shared_ptr<GraphProfiler> sg_prof, int worker_num,
       int64_t batch_size,
       std::unordered_map<std::string, GraphProfile> node_profiles,
-      size_t dev_mem, bool use_amp_master_params, bool enable_zero)
+      size_t dev_mem, bool use_amp_master_params, bool enable_zero,
+      bool offload_params)
       : sg_prof_(std::move(sg_prof)),
         worker_num_(worker_num),
         batch_size_(batch_size),
         dev_mem_(dev_mem),
         node_profiles_(std::move(node_profiles)),
         use_amp_master_params_(use_amp_master_params),
-        enable_zero_(enable_zero) {}
+        enable_zero_(enable_zero),
+        offload_params_(offload_params) {}
 
   Deployment decompose(const std::shared_ptr<IRGraph>& irGraph);
 
@@ -35,6 +37,7 @@ class MLPartDecomposer {
   std::unordered_map<std::string, GraphProfile> node_profiles_;
   bool use_amp_master_params_;
   bool enable_zero_;
+  bool offload_params_;
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("Decomposer");
 };

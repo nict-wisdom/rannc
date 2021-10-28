@@ -1,6 +1,7 @@
 import pytest
 
 from . import common, models
+
 # from . import native_models
 
 default_vals = {
@@ -13,14 +14,14 @@ default_vals = {
 
 test_models = [
     {"model": models.SmallParamModel},
-    {"model": models.SharedInputModel},
-    {"model": models.ForkJoinModel},
-    {"model": models.SharedParamModel},
-    {"model": models.OneOpModel},
-    {"model": models.TensorMulModel},
-    {"model": models.EmbeddingModel, "get_dataset": models.EmbeddingModel.get_dataset},
-    {"model": models.FunctionModel, "get_dataset": models.FunctionModel.get_dataset},
-    {"model": models.LossOutModel, "loss_out": True},
+    # {"model": models.SharedInputModel},
+    # {"model": models.ForkJoinModel},
+    # {"model": models.SharedParamModel},
+    # {"model": models.OneOpModel},
+    # {"model": models.TensorMulModel},
+    # {"model": models.EmbeddingModel, "get_dataset": models.EmbeddingModel.get_dataset},
+    # {"model": models.FunctionModel, "get_dataset": models.FunctionModel.get_dataset},
+    # {"model": models.LossOutModel, "loss_out": True},
     # {"model": models.BasicModel},
     # {"model": native_models.NativeCallModel01}, # compiles module
     # {"model": models.LayerNormModel, "preprocess": models.norm_to_float} # DP only
@@ -28,11 +29,11 @@ test_models = [
 
 
 @pytest.mark.parametrize("test_model", test_models)
-@pytest.mark.parametrize("gradient_accumulation_steps", [1, 2, 4])
-@pytest.mark.parametrize("use_amp", [False, True])
-@pytest.mark.parametrize("allreduce_amp_master_params", [False, True])
-@pytest.mark.parametrize("enable_zero", [False, True])
-@pytest.mark.parametrize("dist_params", [False, True])
+@pytest.mark.parametrize("gradient_accumulation_steps", [1])
+@pytest.mark.parametrize("use_amp", [False])
+@pytest.mark.parametrize("allreduce_amp_master_params", [False])
+@pytest.mark.parametrize("enable_zero", [False])
+@pytest.mark.parametrize("dist_params", [False])
 def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
                use_amp, allreduce_amp_master_params,
                enable_zero, dist_params):

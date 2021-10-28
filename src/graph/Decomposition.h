@@ -167,6 +167,7 @@ struct Deployment {
   std::vector<std::string> bwd_graph_order;
   int pipeline_num;
   bool checkpointing;
+  bool offload_params;
 
   friend std::ostream& operator<<(
       std::ostream& os, const Deployment& deployment);
@@ -174,7 +175,8 @@ struct Deployment {
   MSGPACK_DEFINE(
       id, graph, subgraphs, allocation, fwd_routes, fwd_in_routes,
       fwd_out_routes, fwd_graph_order, bwd_routes, bwd_in_routes,
-      bwd_out_routes, bwd_graph_order, pipeline_num, checkpointing);
+      bwd_out_routes, bwd_graph_order, pipeline_num, checkpointing,
+      offload_params);
 };
 
 void verifyDeployment(const Deployment& deployment);

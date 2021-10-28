@@ -25,11 +25,12 @@ class GraphConnector {
   GraphConnector(
       std::string id, std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
-      const FunctionStorage& functions)
+      const FunctionStorage& functions, bool offload_params)
       : id_(std::move(id)),
         param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
-        functions_(functions) {
+        functions_(functions),
+        driver_(offload_params) {
     enable_profiling_ = config::Config::get().getVal<bool>(config::PROFILING);
     time_counter_.enable(enable_profiling_);
 

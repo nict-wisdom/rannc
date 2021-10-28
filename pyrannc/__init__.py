@@ -1,7 +1,6 @@
 import copy
 import inspect
 import logging
-import types
 from collections import OrderedDict
 
 import torch
@@ -10,16 +9,15 @@ import torch.onnx.utils
 import torch.random
 
 from . import _pyrannc
-
+from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, set_dist_param_dtype, \
+    DistributeModelParams
 from .opt import patch_optimizer
-from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, set_dist_param_dtype, DistributeModelParams
 
 # Run backward to set python engine as the default engine
 x = torch.randn(2, 2, requires_grad=True)
 tgt = torch.randn(2, 2)
-y = x*2
+y = x * 2
 y.backward(tgt)
-
 
 # for better reproducibility
 # https://pytorch.org/docs/stable/notes/randomness.html
@@ -123,6 +121,7 @@ def _create_interpreter_name_lookup_fn(frames_up=1):
             if isinstance(v, torch.Tensor) and var is v:
                 return k if k != 'self' else ''
         return ''
+
     return _get_interpreter_name_for_var
 
 
@@ -200,7 +199,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
     """
 
     def __init__(self, model, optimizer=None, gather_inputs=True, load_deployment=None, enable_apex_amp=False,
-                 allreduce_amp_master_params=False, enable_zero=False, check_unused_values=True):
+                 allreduce_amp_master_params=False, enable_zero=False, check_unused_values=True, offload_params=False):
         r"""
         :param model: Model to distribute.
         :param optimizer: Optimizer that should work with RaNNC.
@@ -229,8 +228,10 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         self.allreduce_amp_master_params = allreduce_amp_master_params
         self.enable_apex_amp = enable_apex_amp
         self.enable_zero = enable_zero
+        self.offload_params = offload_params
 
-        super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_params, enable_zero, check_unused_values)
+        super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_params, enable_zero,
+                                          check_unused_values, offload_params)
 
     def __call__(self, *args, **kwargs):
         if len(kwargs) > 0:
@@ -282,6 +283,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             def setup_amp(grad):
                 self._setup_amp_params()
                 return grad
+
             out.register_hook(setup_amp)
 
         return out
@@ -469,6 +471,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             raise AttributeError("This model has no attribute '{}'".format(attr))
 
         model_attr = getattr(self.model, attr)
+
         def wrapper_func(*args, **kwargs):
             return model_attr(*args, **kwargs)
 
@@ -493,7 +496,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if synced_param_cpu is not None:
                 if _pyrannc.get_rank() == 0 or sync_all_ranks:
                     with torch.no_grad():
-                        if (hasattr(param, "distributed") and param.distributed) and param.size() != synced_param_cpu.size():
+                        if (hasattr(param,
+                                    "distributed") and param.distributed) and param.size() != synced_param_cpu.size():
                             # This param is a dummy. It was originally distributed across all ranks  and then removed
                             # on this rank because the subgraph on this rank does not need this parameter.
                             param.data = synced_param_cpu

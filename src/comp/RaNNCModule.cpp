@@ -94,13 +94,14 @@ void syncDebugName(std::shared_ptr<torch::jit::Graph>& graph) {
 
 RaNNCModule::RaNNCModule(
     bool use_amp_master_params, bool allreduce_amp_master_param,
-    bool enable_zero, bool check_unused_values)
+    bool enable_zero, bool check_unused_values, bool offload_params)
     : id_(generateName("mod_")),
       master_(RaNNCFactory::get()),
       use_amp_master_params_(use_amp_master_params),
       allreduce_amp_master_param_(allreduce_amp_master_param),
       enable_zero_(enable_zero),
-      check_unused_values_(check_unused_values) {
+      check_unused_values_(check_unused_values),
+      offload_params_(offload_params) {
   ObjectComm& ocomm = ObjectComm::get();
   id_ = ocomm.bcast(id_);
 
@@ -231,7 +232,7 @@ std::vector<long> RaNNCModule::init(
     std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
         param_storage_, ir_graph_, non_param_inputs, graph_params,
         value_storage->getValues(), function_storage, batch_size,
-        mpi::getSize(), min_pipeline);
+        mpi::getSize(), min_pipeline, offload_params_);
 
     sg_prof->setCacheParamValues(true);
 
@@ -318,7 +319,8 @@ std::vector<long> RaNNCModule::init(
 
       MetaDecomposer decomposer(
           sg_prof, np, batch_size, prof_results.node_profiles,
-          dev_info.total_mem, use_amp_master_params_, enable_zero_);
+          dev_info.total_mem, use_amp_master_params_, enable_zero_,
+          offload_params_);
       const auto decomp_name = conf.getVal<std::string>(config::DECOMPOSER);
       deployment_ = decomposer.decompose(decomp_name, ir_graph_);
 
@@ -403,7 +405,7 @@ std::vector<long> RaNNCModule::init(
 
   driver_ = std::make_shared<GraphLauncher>(
       param_storage_, value_storage, function_storage, deployment_.pipeline_num,
-      gather_inputs);
+      gather_inputs, offload_params_);
   logger->debug("Calling driver->deployGraph");
   driver_->deployGraph(deployment_);
   logger->debug("Finished calling driver->deployGraph");

@@ -23,7 +23,7 @@ class FunctionStorage;
 
 class TorchDriver {
  public:
-  TorchDriver() {
+  TorchDriver(bool offload_params) : offload_params_(offload_params) {
     config::Config& config = config::Config::get();
     enable_profiling_ = config.getVal<bool>(config::PROFILING);
     time_counter_.enable(enable_profiling_);
@@ -139,6 +139,7 @@ class TorchDriver {
   bool enable_profiling_;
   bool display_comm_values_;
   bool display_act_values_;
+  bool offload_params_;
 
   // for debugging
   size_t fwd_count_ = 0;

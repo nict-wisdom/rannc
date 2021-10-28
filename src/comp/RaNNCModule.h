@@ -27,7 +27,7 @@ class RaNNCModule {
  public:
   RaNNCModule(
       bool use_amp_master_params, bool allreduce_amp_master_param,
-      bool enable_zero, bool check_unused_values);
+      bool enable_zero, bool check_unused_values, bool offload_params);
   ~RaNNCModule();
 
   /**
@@ -94,6 +94,7 @@ class RaNNCModule {
   bool check_unused_values_;
   bool allreduce_amp_master_param_;
   bool enable_zero_;
+  bool offload_params_;
 
   bool destroyed_ = false;
 

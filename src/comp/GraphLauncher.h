@@ -27,7 +27,7 @@ class GraphLauncher {
       std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
       const FunctionStorage& function_storage, int pipeline_num,
-      bool gather_inputs)
+      bool gather_inputs, bool offload_params)
       : param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
         function_storage_(function_storage),

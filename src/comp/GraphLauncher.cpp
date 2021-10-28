@@ -108,7 +108,8 @@ void GraphLauncher::deployGraph(const Deployment& deployment) {
   deployment_ = deployment;
 
   driver_[deployment.id] = std::make_shared<GraphConnector>(
-      deployment.id, param_storage_, value_storage_, this->function_storage_);
+      deployment.id, param_storage_, value_storage_, this->function_storage_,
+      deployment.offload_params);
   driver_[deployment.id]->deployGraph(deployment);
 
   TagMap& tag_map = TagMap::get();

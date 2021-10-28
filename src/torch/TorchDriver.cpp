@@ -391,8 +391,7 @@ void TorchDriver::createModule(
         insertValueHook(clone_input_ir_graphs_[id], constants_mod);
   }
 
-  config::Config& conf = config::Config::get();
-  if (conf.getVal<bool>(config::OFFLOAD_PARAMS)) {
+  if (offload_params_) {
     OffloadedParamMap& param_map = OffloadedParamMap::get();
 
     for (auto& it : param_tensors_[id]) {

@@ -222,7 +222,7 @@ PYBIND11_MODULE(_pyrannc, m) {
   });
 
   py::class_<RaNNCModule, std::shared_ptr<RaNNCModule>>(m, "RaNNCModule")
-      .def(py::init<bool, bool, bool, bool>())
+      .def(py::init<bool, bool, bool, bool, bool>())
       .def(
           "init",
           [](RaNNCModule& self, const py::function& fwdFunc,

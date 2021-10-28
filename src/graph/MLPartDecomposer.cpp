@@ -92,6 +92,7 @@ Deployment MLPartDecomposer::decompose(
   Deployment deployment = createDeployment(repl, alloc, worker_num_);
   deployment.pipeline_num = sol.pipeline_num;
   deployment.checkpointing = sol.checkpointing;
+  deployment.offload_params = offload_params_;
   logger->trace("MLPartDecomposer::decompose finished");
 
   return deployment;

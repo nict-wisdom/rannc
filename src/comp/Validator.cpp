@@ -74,7 +74,8 @@ std::unordered_map<std::string, at::Tensor> graphParamTensors(
 IValueMap compute(
     const IValueMap& inputs, const std::shared_ptr<IRGraph>& graph,
     const std::unordered_map<std::string, torch::jit::IValue>& params,
-    const IValueMap& const_vals, const FunctionStorage& functions) {
+    const IValueMap& const_vals, const FunctionStorage& functions,
+    bool offload_params) {
   std::unordered_map<std::string, at::Tensor> graph_params =
       graphParamTensors(graph, params);
 
@@ -88,7 +89,7 @@ IValueMap compute(
         it.second.to(torch::Device(torch::kCUDA), false, true).detach();
   }
 
-  TorchDriver driver;
+  TorchDriver driver(offload_params);
   driver.createModule(
       graph->getName(), graph, const_vals, functions, params_gpu);
 
@@ -183,8 +184,9 @@ bool Validator::validate(
       }
     }
 
-    sg_output_vals[sg_name] =
-        compute(sg_inputs, sg, param_inputs, const_vals_no_do, functions);
+    sg_output_vals[sg_name] = compute(
+        sg_inputs, sg, param_inputs, const_vals_no_do, functions,
+        deployment.offload_params);
 
     for (const auto& r : deployment.fwd_out_routes) {
       if (r.source_graph == sg_name) {
