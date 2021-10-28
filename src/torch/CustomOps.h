@@ -12,17 +12,22 @@
 
 namespace rannc {
 
-class OffloadingPreHookFunction
-    : public torch::autograd::Function<OffloadingPreHookFunction> {
+class OffloadingHookFunction
+    : public torch::autograd::Function<OffloadingHookFunction> {
  public:
   static torch::Tensor forward(
       torch::autograd::AutogradContext* ctx, torch::Tensor input,
-      const std::string& param_name) {
+      const std::string& param_name, bool to_cuda) {
     ctx->saved_data["param_name"] = param_name;
+    ctx->saved_data["to_cuda"] = to_cuda;
     OffloadedParamMap& param_map = OffloadedParamMap::get();
     at::Tensor param = param_map.getParam(param_name);
 
-    toCUDAInPlace(param);
+    if (to_cuda) {
+      toCUDAInPlace(param);
+    } else {
+      toCPUInPlace(param);
+    }
 
     return input;
   }
@@ -34,8 +39,18 @@ class OffloadingPreHookFunction
     assert(iv_param_name.isString());
     OffloadedParamMap& param_map = OffloadedParamMap::get();
     at::Tensor param = param_map.getParam(iv_param_name.toStringRef());
-    toCPUInPlace(param);
 
+    const torch::jit::IValue iv_to_cuda = ctx->saved_data["to_cuda"];
+    assert(iv_to_cuda.isBool());
+    bool to_cuda = iv_to_cuda.toBool();
+
+    if (to_cuda) {
+      toCPUInPlace(param);
+    } else {
+      toCUDAInPlace(param);
+    }
+
+    grad_outputs.push_back(torch::autograd::Variable());
     grad_outputs.push_back(torch::autograd::Variable());
     return grad_outputs;
   }

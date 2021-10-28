@@ -22,12 +22,12 @@ at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
 
 at::Tensor offloadingPreHook(
     const at::Tensor& tensor, const std::string& name) {
-  return OffloadingPreHookFunction::apply(tensor, name);
+  return OffloadingHookFunction::apply(tensor, name, true);
 }
 
 at::Tensor offloadingPostHook(
     const at::Tensor& tensor, const std::string& name) {
-  return OffloadingPostHookFunction::apply(tensor, name);
+  return OffloadingHookFunction::apply(tensor, name, false);
 }
 
 TORCH_LIBRARY(rannc, m) {
