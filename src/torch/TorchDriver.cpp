@@ -399,8 +399,8 @@ void TorchDriver::createModule(
       param_map.registerParam(it.first, it.second);
     }
 
-    //    clone_input_ir_graphs_[id] =
-    //        insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
+    clone_input_ir_graphs_[id] =
+        insertOffloadingPostHooks(clone_input_ir_graphs_[id], constants_mod);
     clone_input_ir_graphs_[id] =
         insertOffloadingPreHooks(clone_input_ir_graphs_[id], constants_mod);
   }

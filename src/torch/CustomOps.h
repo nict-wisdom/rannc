@@ -5,21 +5,24 @@
 #ifndef PYRANNC_CUSTOMOPS_H
 #define PYRANNC_CUSTOMOPS_H
 
+#include <comp/OffloadedParamMap.h>
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
+#include "TorchUtil.h"
 
 namespace rannc {
 
-// Inherit from Function
-class OffloadingPostHookFunction
-    : public torch::autograd::Function<OffloadingPostHookFunction> {
+class OffloadingPreHookFunction
+    : public torch::autograd::Function<OffloadingPreHookFunction> {
  public:
   static torch::Tensor forward(
       torch::autograd::AutogradContext* ctx, torch::Tensor input,
-      torch::Tensor param) {
-    ctx->save_for_backward({param});
+      const std::string& param_name) {
+    ctx->saved_data["param_name"] = param_name;
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+    at::Tensor param = param_map.getParam(param_name);
 
-    spdlog::info("@OffloadingPostHookFunction::forward");
+    toCUDAInPlace(param);
 
     return input;
   }
@@ -27,6 +30,43 @@ class OffloadingPostHookFunction
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs) {
+    const torch::jit::IValue iv_param_name = ctx->saved_data["param_name"];
+    assert(iv_param_name.isString());
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+    at::Tensor param = param_map.getParam(iv_param_name.toStringRef());
+    toCPUInPlace(param);
+
+    grad_outputs.push_back(torch::autograd::Variable());
+    return grad_outputs;
+  }
+};
+
+class OffloadingPostHookFunction
+    : public torch::autograd::Function<OffloadingPostHookFunction> {
+ public:
+  static torch::Tensor forward(
+      torch::autograd::AutogradContext* ctx, torch::Tensor input,
+      const std::string& param_name) {
+    ctx->saved_data["param_name"] = param_name;
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+    at::Tensor param = param_map.getParam(param_name);
+
+    toCPUInPlace(param);
+
+    return input;
+  }
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs) {
+    const torch::jit::IValue iv_param_name = ctx->saved_data["param_name"];
+    assert(iv_param_name.isString());
+    OffloadedParamMap& param_map = OffloadedParamMap::get();
+    at::Tensor param = param_map.getParam(iv_param_name.toStringRef());
+
+    toCUDAInPlace(param);
+
+    grad_outputs.push_back(torch::autograd::Variable());
     return grad_outputs;
   }
 };

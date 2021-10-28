@@ -22,22 +22,12 @@ at::Tensor displayValueHook(const at::Tensor& tensor, const std::string& name) {
 
 at::Tensor offloadingPreHook(
     const at::Tensor& tensor, const std::string& name) {
-  OffloadedParamMap& param_map = OffloadedParamMap::get();
-
-  at::Tensor param = param_map.getParam(name);
-  toCUDAInPlace(param);
-  return tensor;
+  return OffloadingPreHookFunction::apply(tensor, name);
 }
 
 at::Tensor offloadingPostHook(
     const at::Tensor& tensor, const std::string& name) {
-  OffloadedParamMap& param_map = OffloadedParamMap::get();
-
-  spdlog::info("@offloadingPostHook name={}", name);
-  at::Tensor param = param_map.getParam(name);
-  at::Tensor out = OffloadingPostHookFunction::apply(tensor, param);
-
-  return tensor;
+  return OffloadingPostHookFunction::apply(tensor, name);
 }
 
 TORCH_LIBRARY(rannc, m) {
