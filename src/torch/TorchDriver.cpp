@@ -359,7 +359,6 @@ std::shared_ptr<IRGraph> insertOffloadingPostHooks(
             } else {
               takes_one_param = true;
               input_param_name = in_val.getName();
-              spdlog::info("in lambda: input_param_name={}", input_param_name);
             }
           }
         }

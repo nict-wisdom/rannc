@@ -8,7 +8,7 @@ import torch.cuda
 import torch.onnx.utils
 import torch.random
 
-from . import _pyrannc
+from . import _pyrannc, utils
 from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, set_dist_param_dtype, \
     DistributeModelParams
 from .opt import patch_optimizer
@@ -125,12 +125,6 @@ def _create_interpreter_name_lookup_fn(frames_up=1):
     return _get_interpreter_name_for_var
 
 
-def _to_in_place(tensors, device):
-    for p in tensors:
-        with torch.no_grad():
-            p.data = p.to(device, dtype=p.dtype)
-
-
 def _stash_state_dict_hooks(model):
     hooks = {}
     for name, module in model._modules.items():
@@ -166,11 +160,11 @@ def _set_hooks_for_tracing(model, device):
         for n, p in _model.named_parameters(recurse=False):
             if not p.is_cuda:
                 cpu_params[_model].append(p)
-                _to_in_place([p], device)
+                utils._to_in_place([p], device)
         for n, b in _model.named_buffers(recurse=False):
             if not b.is_cuda:
                 cpu_params[_model].append(b)
-                _to_in_place([b], device)
+                utils._to_in_place([b], device)
         _pyrannc.set_tracing_state(True)
         return input
 
@@ -178,7 +172,7 @@ def _set_hooks_for_tracing(model, device):
     def _hook_for_tracing(_model, input, output):
         _pyrannc.set_tracing_state(False)
         for p in cpu_params[_model]:
-            _to_in_place([p], torch.device("cpu"))
+            utils._to_in_place([p], torch.device("cpu"))
         _pyrannc.set_tracing_state(True)
 
     handles = []
@@ -267,8 +261,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 for b, b_clone in zip(self.model.buffers(), buffers_clone):
                     b.copy_(b_clone)
 
-            _to_in_place([p for p in self.model.parameters() if id(p) in self.used_param_ids], self.device)
-            _to_in_place([b for b in self.model.buffers() if id(b) in self.used_param_ids], self.device)
+            utils._to_in_place([p for p in self.model.parameters() if id(p) in self.used_param_ids], self.device)
+            utils._to_in_place([b for b in self.model.buffers() if id(b) in self.used_param_ids], self.device)
 
             # Remove parameters from optimizer
             if self.optimizer and self.model.training:

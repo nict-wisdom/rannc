@@ -1,10 +1,9 @@
-import pickle
 import types
 
 import torch
 
 import pyrannc
-from . import _pyrannc, comm_utils, tensor_coll
+from . import _pyrannc, comm_utils, tensor_coll, utils
 from .amp import register_amp_params, unset_master_grads
 
 
@@ -295,3 +294,13 @@ def patch_optimizer(model, optimizer):
 
         optimizer.zero_grad = types.MethodType(new_zero_grad, optimizer)
 
+    # replace step
+    if model.offload_params:
+        old_step = optimizer.step
+
+        def new_step(opt, **kwargs):
+            utils._to_in_place([p for p in model.parameters() if id(p) in model.used_param_ids], model.device)
+            old_step(**kwargs)
+            utils._to_in_place([p for p in model.parameters() if id(p) in model.used_param_ids], torch.device("cpu"))
+
+        optimizer.step = types.MethodType(new_step, optimizer)
