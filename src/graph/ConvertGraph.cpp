@@ -5,20 +5,11 @@
 
 #include <torch/csrc/jit/ir/constants.h>
 #include <torch/csrc/jit/ir/ir.h>
-#include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/passes/dead_code_elimination.h>
-#include <torch/csrc/jit/passes/lower_grad_of.h>
-#include <torch/csrc/jit/passes/lower_tuples.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/python/python_tracer.h>
-#include <torch/csrc/jit/runtime/autodiff.h>
-#include <torch/csrc/jit/runtime/interpreter.h>
 #include <torch/csrc/jit/serialization/import.h>
-#include <torch/jit.h>
 #include <torch/torch.h>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 
 #include <comp/FunctionStorage.h>
 #include "Common.h"

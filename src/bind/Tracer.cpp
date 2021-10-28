@@ -2,8 +2,10 @@
 // Created by Masahiro Tanaka on 2019-02-25.
 //
 
+#undef USE_DISTRIBUTED
+#undef USE_RPC
+
 #include <torch/csrc/jit/passes/fixup_trace_scope_blocks.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/python/python_tracer.h>
 
 #include <torch/TorchUtil.h>

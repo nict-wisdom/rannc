@@ -4,8 +4,6 @@
 
 #include "RaNNCModule.h"
 
-#include <torch/csrc/jit/python/python_ivalue.h>
-
 #include <bind/PybindUtil.h>
 #include <bind/RaNNCFactory.h>
 #include <bind/RaNNCProcess.h>

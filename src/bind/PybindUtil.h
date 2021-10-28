@@ -6,6 +6,10 @@
 #define PYRANNC_PYBINDUTIL_H
 
 #include <pybind11/pybind11.h>
+#include <torch/torch.h>
+
+#undef USE_DISTRIBUTED
+#undef USE_RPC
 
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/python/python_ivalue.h>
@@ -18,9 +22,6 @@ long getPythonObjId(py::object obj);
 
 namespace torch {
 namespace jit {
-IValue _toIValue(
-    py::handle obj, const TypePtr& type,
-    c10::optional<int32_t> N = c10::nullopt);
 IValue _toTypeInferredIValue(py::handle input);
 Stack _toTraceableStack(const py::tuple& inputs);
 } // namespace jit

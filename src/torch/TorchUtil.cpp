@@ -20,6 +20,10 @@
 
 #include <ATen/CPUGeneratorImpl.h>
 #include <ATen/CUDAGeneratorImpl.h>
+
+#undef USE_DISTRIBUTED
+#undef USE_RPC
+
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/torch.h>
 
