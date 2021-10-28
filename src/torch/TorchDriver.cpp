@@ -163,6 +163,78 @@ std::vector<at::Tensor> TorchDriver::getParamInputTensors(
   return res;
 }
 
+std::shared_ptr<IRGraph> insertInValueHook(
+    const std::shared_ptr<IRGraph>& g, IValueMap& constants,
+    const std::string& op_name,
+    const std::function<std::string(
+        const IRValue& out, const IRNode& node,
+        const std::shared_ptr<IRGraph>& g)>& f) {
+  std::vector<IRNode> new_nodes;
+  const std::unordered_map<std::string, IRValue>& vals = g->getValues();
+  std::unordered_map<std::string, IRValue> new_values;
+  std::unordered_map<std::string, std::string> hook_out_names;
+
+  for (const auto& in_name : g->getInputNames()) {
+    assert(contains(vals, in_name));
+    new_values[in_name] = vals.at(in_name);
+  }
+
+  for (const auto& n : g->getNodes()) {
+    std::vector<std::string> input_names;
+
+    bool inserted = false;
+    for (const auto& in_name : n.getInputNames()) {
+      assert(contains(vals, in_name));
+      const IRValue& in_val = vals.at(in_name);
+
+      if (!inserted && !in_val.isParam()) {
+        const std::string hook_input_name = f(in_val, n, g);
+        if (!hook_input_name.empty()) {
+          const std::string out_name_var = hook_input_name + "_name";
+          IRNode var_name_node("prim::Constant", {}, {out_name_var});
+          new_nodes.push_back(var_name_node);
+
+          IRValue var_name_val(out_name_var, IRType::createStringType());
+          new_values[out_name_var] = var_name_val;
+
+          const std::string hook_out_name = in_name + "_hook_out";
+          IRNode hook(op_name, {in_name, out_name_var}, {hook_out_name});
+          hook.setBatch(n.isBatch());
+          hook.setCriterion(n.isCriterion());
+          new_nodes.push_back(hook);
+
+          hook_out_names[in_name] = hook_out_name;
+          new_values[hook_out_name] = IRValue(hook_out_name, in_val);
+
+          constants[out_name_var] = torch::jit::IValue(hook_input_name);
+
+          inserted = true;
+        }
+      }
+
+      if (contains(hook_out_names, in_name)) {
+        input_names.push_back(hook_out_names.at(in_name));
+      } else {
+        input_names.push_back(in_name);
+      }
+    }
+
+    IRNode new_node(n.getName(), input_names, n.getOutputNames());
+    new_node.setBatch(n.isBatch());
+    new_node.setCriterion(n.isCriterion());
+    new_nodes.push_back(new_node);
+
+    for (const auto& out_name : n.getOutputNames()) {
+      assert(contains(vals, out_name));
+      new_values[out_name] = vals.at(out_name);
+    }
+  }
+
+  return std::make_shared<IRGraph>(
+      g->getName(), new_nodes, new_values, g->getInputNames(),
+      g->getOutputNames());
+}
+
 std::shared_ptr<IRGraph> insertOutValueHook(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants,
     const std::string& op_name,
@@ -236,6 +308,31 @@ std::shared_ptr<IRGraph> insertOutValueHook(
       g->getName(), new_nodes, new_values, g->getInputNames(), output_names);
 }
 
+std::shared_ptr<IRGraph> insertOffloadingPreHooks(
+    const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
+  std::unordered_map<std::string, std::vector<at::Tensor>> input_names;
+
+  return insertInValueHook(
+      g, constants, "rannc::offloadingPreHook",
+      [](const IRValue& in, const IRNode& node,
+         const std::shared_ptr<IRGraph>& g) {
+        bool takes_one_param = false;
+        std::string input_param_name;
+        for (const auto& in_name : node.getInputNames()) {
+          const auto& in_val = g->getValue(in_name);
+          if (in_val.isParam()) {
+            if (takes_one_param) {
+              return std::string("");
+            } else {
+              takes_one_param = true;
+              input_param_name = in_val.getName();
+            }
+          }
+        }
+        return input_param_name;
+      });
+}
+
 std::shared_ptr<IRGraph> insertValueHook(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
   return insertOutValueHook(
@@ -246,10 +343,8 @@ std::shared_ptr<IRGraph> insertValueHook(
       });
 }
 
-std::shared_ptr<IRGraph> insertOffloadingHooks(
+std::shared_ptr<IRGraph> insertOffloadingPostHooks(
     const std::shared_ptr<IRGraph>& g, IValueMap& constants) {
-  std::unordered_map<std::string, std::vector<at::Tensor>> input_names;
-
   return insertOutValueHook(
       g, constants, "rannc::offloadingPostHook",
       [](const IRValue& out, const IRNode& node,
@@ -304,8 +399,10 @@ void TorchDriver::createModule(
       param_map.registerParam(it.first, it.second);
     }
 
+    //    clone_input_ir_graphs_[id] =
+    //        insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
     clone_input_ir_graphs_[id] =
-        insertOffloadingHooks(clone_input_ir_graphs_[id], constants_mod);
+        insertOffloadingPreHooks(clone_input_ir_graphs_[id], constants_mod);
   }
 
   ConvertGraph cg;
