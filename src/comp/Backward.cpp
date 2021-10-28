@@ -133,15 +133,4 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
   std::exit(-5);
 }
 
-variable_list OffloadTensorBackward::apply(variable_list&& grads) {
-
-  if (to_cuda_) {
-    toCUDAInPlace(target_param_);
-  } else {
-    toCPUInPlace(target_param_);
-  }
-
-  return grads;
-}
-
 } // namespace rannc

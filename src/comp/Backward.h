@@ -52,24 +52,6 @@ struct RaNNCTensorBackward : public torch::autograd::TraceableFunction {
   static bool delay_grad_allreduce_;
 };
 
-struct OffloadTensorBackward : public torch::autograd::TraceableFunction {
- public:
-  OffloadTensorBackward(at::Tensor target_param, bool to_cuda)
-      : target_param_(std::move(target_param)), to_cuda_(to_cuda) {}
-
-  variable_list apply(variable_list&& grads) override;
-
-  std::string name() const override {
-    return "OffloadTensorBackward";
-  }
-
-  void release_variables() override {}
-
- private:
-  at::Tensor target_param_;
-  bool to_cuda_;
-};
-
 } // namespace rannc
 
 #endif // PYRANNC_BACKWARD_H
