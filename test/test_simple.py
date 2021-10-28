@@ -34,17 +34,17 @@ test_models = [
 @pytest.mark.parametrize("allreduce_amp_master_params", [False])
 @pytest.mark.parametrize("enable_zero", [False])
 @pytest.mark.parametrize("dist_params", [False])
+@pytest.mark.parametrize("offload_params", [False])
 def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
                use_amp, allreduce_amp_master_params,
-               enable_zero, dist_params):
-
+               enable_zero, dist_params, offload_params):
     if enable_zero and (not allreduce_amp_master_params):
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
 
     print("use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={} "
-          " gradient_accumulation_steps={}".format(
-          use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps))
+          " gradient_accumulation_steps={} offload_params={}".format(
+        use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps, offload_params))
 
     for k, v in default_vals.items():
         if k not in test_model:

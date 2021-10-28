@@ -179,7 +179,7 @@ std::vector<long> RaNNCModule::init(
       trace(args, fwdFunc, py_params, py_buffers, var_lookup_fn, 2);
   syncDebugName(graph);
 
-  std::unordered_map<std::string, long> graph_params =
+  const std::unordered_map<std::string, long> graph_params =
       matchParamNames(graph, input_ivals.size(), py_params, py_buffers);
   bool distributed = false;
   for (const auto& it : graph_params) {
