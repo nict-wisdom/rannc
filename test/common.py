@@ -1,11 +1,11 @@
 import copy
-import inspect
 
 import numpy as np
 import torch
 import torch.cuda.random
 import torch.distributed as dist
 import torch.optim as optim
+
 try:
     from apex import amp
 except ImportError:
@@ -129,7 +129,7 @@ def convert_dtype(t, dtype):
 def do_run(model_cls, batch_size_per_proc, num_iter,
            trace, fwd, aggregate, bwd, dtype, preprocess, gradient_accumulation_steps,
            use_amp, allreduce_amp_master_params,
-           enable_zero, dist_params, rtol, atol, get_dataset,
+           enable_zero, dist_params, offload_params, rtol, atol, get_dataset,
            **kwargs):
     print("Starting test using {}".format(model_cls.__name__))
 
@@ -173,8 +173,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         if use_amp:
             rmodel = rmodel.to(device)
             rmodel, r_opt = amp.initialize(rmodel, r_opt, opt_level="O2",
-                                            max_loss_scale=LOSS_SCALE,
-                                            min_loss_scale=1)
+                                           max_loss_scale=LOSS_SCALE,
+                                           min_loss_scale=1)
         if preprocess:
             preprocess(rmodel)
 
@@ -182,12 +182,16 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     if "check_unused_values" in kwargs:
         module_args["check_unused_values"] = kwargs["check_unused_values"]
 
+    if "offload_params" in kwargs:
+        module_args["offload_params"] = kwargs["offload_params"]
+
     gather_inputs = True
     if "gather_inputs" in kwargs:
         gather_inputs = module_args["gather_inputs"] = kwargs["gather_inputs"]
 
     rmodel = pyrannc.RaNNCModule(rmodel, r_opt, enable_apex_amp=use_amp, enable_zero=enable_zero,
-                                 allreduce_amp_master_params=allreduce_amp_master_params, **module_args)
+                                 allreduce_amp_master_params=allreduce_amp_master_params,
+                                 offload_params=offload_params, **module_args)
 
     if dist_params:
         compare_dist_params(model, rmodel, rtol, atol)
@@ -337,7 +341,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
 def run(model_base, batch_size_per_proc, num_iter,
         dtype=torch.float, loss_out=False, preprocess=False, gradient_accumulation_steps=1,
         use_amp=False, allreduce_amp_master_params=False, enable_zero=False,
-        dist_params=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
+        dist_params=False, offload_params=False, rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE,
         get_dataset=None, **kwargs):
 
     if loss_out:
@@ -352,7 +356,7 @@ def run(model_base, batch_size_per_proc, num_iter,
                aggregate_out_loss,
                bwd_loss_output,
                dtype, preprocess, gradient_accumulation_steps,
-               use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               use_amp, allreduce_amp_master_params, enable_zero, dist_params, offload_params,
                rtol, atol, get_dataset, **kwargs)
 
     else:
@@ -362,6 +366,5 @@ def run(model_base, batch_size_per_proc, num_iter,
                lambda out: out,
                bwd_with_criterion,
                dtype, preprocess, gradient_accumulation_steps,
-               use_amp, allreduce_amp_master_params, enable_zero, dist_params,
+               use_amp, allreduce_amp_master_params, enable_zero, dist_params, offload_params,
                rtol, atol, get_dataset, **kwargs)
-
