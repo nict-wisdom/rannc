@@ -10,7 +10,7 @@ ENV BOOST_VERSION 1.74.0
 ENV OPENUCX_VERSION 1.9.0
 ENV OPENMPI_VERSION 4.0.5
 ENV CONDA_VERSION 4.9.2
-ENV PYTORCH_VERSION 1.9.0
+ENV PYTORCH_VERSION 1.10.0
 
 SHELL ["/bin/bash", "-c"]
 
@@ -64,7 +64,7 @@ RUN . /opt/conda/etc/profile.d/conda.sh \
     && conda create -y -n rannc python=${PYTHON_VERSION} \
     && conda activate rannc \
     && if [[ $CUDA_VERSION =~ ^11. ]]; then \
-          export CUDA_TOOLKIT_VERSION="11.1"; \
+          export CUDA_TOOLKIT_VERSION="11.3"; \
        else \
           export CUDA_TOOLKIT_VERSION="10.2"; \
        fi \
