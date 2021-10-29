@@ -4,7 +4,6 @@ import torch
 
 import pyrannc
 from . import _pyrannc, comm_utils, tensor_coll, utils
-from .amp import register_amp_params, unset_master_grads
 
 
 def replace_ids_in_param_group(param_group, order_local_to_global):
@@ -98,6 +97,7 @@ def merge_param_groups(target_groups, sub_groups):
 
 def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_zero=False, to_cpu=True, root=0):
     if use_amp_master_param:
+        from .amp import register_amp_params
         register_amp_params(optimizer)
 
     state_dict = optimizer.state_dict(from_global=False)
@@ -289,6 +289,7 @@ def patch_optimizer(model, optimizer):
     if model.enable_zero:
         def new_zero_grad(opt, **kwargs):
             if model.use_amp_master_params:
+                from .amp import unset_master_grads
                 unset_master_grads(opt)
             model.zero_grad(**kwargs)
 

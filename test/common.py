@@ -8,10 +8,10 @@ import torch.optim as optim
 
 try:
     from apex import amp
+    import pyrannc.amp
 except ImportError:
     print("Failed to import apex. Tests with FP16 will fail.")
 import pyrannc
-import pyrannc.amp
 
 
 RELATIVE_TOLERANCE = 1e-2
