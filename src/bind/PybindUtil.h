@@ -23,7 +23,15 @@ long getPythonObjId(py::object obj);
 namespace torch {
 namespace jit {
 IValue _toTypeInferredIValue(py::handle input);
-Stack _toTraceableStack(const py::tuple& inputs);
+
+inline Stack _toTraceableStack(const py::tuple& inputs) {
+  auto info = toTypeInferredIValue(inputs);
+  TORCH_CHECK(
+      isTraceableType(info.type()), "Type '", info.type()->repr_str(),
+      "' cannot be traced. Only Tensors and (possibly nested) Lists, Dicts, and"
+      " Tuples of Tensors can be traced");
+  return info.toTuple()->elements();
+}
 } // namespace jit
 } // namespace torch
 #endif // PYRANNC_PYBINDUTIL_H
