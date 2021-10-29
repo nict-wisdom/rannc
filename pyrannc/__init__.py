@@ -530,6 +530,8 @@ def allreduce_grads(rmodel, optimizer, prescale=1.0):
     else:
         with torch.no_grad():
             for p in rmodel.parameters():
+                if p.grad is None:
+                    continue
                 p.grad.mul_(prescale)
         rmodel.allreduce_grads()
 
