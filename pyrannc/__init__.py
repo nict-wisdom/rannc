@@ -199,7 +199,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         :param optimizer: Optimizer that should work with RaNNC.
         :param gather_inputs: Set ``False`` if model uses inputs given on rank 0.
         :param enable_apex_amp: Set ``True`` if ``model`` is processed by `Apex AMP <https://nvidia.github.io/apex/amp.html>`_.
-        :param allreduce_amp_master_param: Set ``True`` to allreduce gradients of master parameters of Apex AMP.
+        :param allreduce_amp_master_params: Set ``True`` to allreduce gradients of master parameters of Apex AMP.
         :param check_unused_values: If ``True``, RaNNC throws an exception when it finds unused values in a computation graph.
         """
 
