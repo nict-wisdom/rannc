@@ -12,7 +12,7 @@ RUN cd ${DOCKER_BUILD_DIR} \
     && conda activate rannc \
     && git clone https://github.com/NVIDIA/apex \
     && cd apex \
-    && git checkout e2083df5eb96643c61613b9df48dd4eea6b07690 \
+    && git checkout f3a960f80244cf9e80558ab30f7f7e8cbf03c0a0 \
     && export CUDA_HOME="$(dirname $(which nvcc))/../" \
     && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
