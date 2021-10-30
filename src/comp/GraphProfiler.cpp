@@ -412,7 +412,7 @@ std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
       if (contains(param_cache_, irp.getName())) {
         graph_param_tensors[irp.getName()] = param_cache_.at(irp.getName());
       } else {
-        logger->info("Fetching param: {}", irp.getName());
+        logger->debug("Fetching param: {}", irp.getName());
         const auto param_tensor =
             param_storage_->getParamTensor(graph_params_.at(irp.getName()));
         graph_param_tensors[irp.getName()] = param_cache_[irp.getName()] =
