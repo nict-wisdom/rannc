@@ -1,7 +1,7 @@
 Tutorial
 ======================================
 
-RaNNC partitions a PyTorch and computes it using multiple GPUs.
+RaNNC can automatically partition a model written for PyTorch and train it using multiple GPUs.
 Follow the steps below to learn the basic usage of RaNNC.
 
 Steps to use RaNNC
@@ -29,12 +29,13 @@ Insert ``import`` in your script.
 
 Wrap your model by using ``pyrannc.RaNNCModule`` with your optimizer.
 You can use the wrapped model in almost the same manner as the original model (see below).
-Note that the original model must be on a CUDA device.
+
+Note that the original model does not need to be on a CUDA device.
+Thus you can declare a very large model that does not fit to the memory of a GPU.
 
 .. code-block:: python
 
   model = Net()
-  model.to(torch.device("cuda"))
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, optimizer)
 
@@ -43,7 +44,6 @@ If you do not use an optimizer, pass only the model.
 .. code-block:: python
 
   model = pyrannc.RaNNCModule(model)
-
 
 
 3. Run forward/backward passes
@@ -62,10 +62,11 @@ RaNNCModule has several more limitations regarding a wrapped model and inputs/ou
 See :doc:`limitations` for details.
 The optimizer can update model parameters simply by calling ``step()``.
 
-The script below shows the above usage with a very simple model.
+The script below (``examples/tutorial.py``) shows the above usage with a very simple model.
 
 .. code-block:: python
 
+  import sys
   import torch
   import torch.nn as nn
   import torch.optim as optim
@@ -84,9 +85,9 @@ The script below shows the above usage with a very simple model.
           return x
 
 
-  batch_size = 64
-  hidden = 512
-  layers = 10
+  batch_size = int(sys.argv[1])
+  hidden = int(sys.argv[2])
+  layers = int(sys.argv[3])
 
   model = Net(hidden, layers)
   if pyrannc.get_rank() == 0:
@@ -95,12 +96,12 @@ The script below shows the above usage with a very simple model.
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, opt)
 
-  x = torch.randn(64, hidden, requires_grad=True).to(torch.device("cuda"))
+  x = torch.randn(batch_size, hidden, requires_grad=True).to(torch.device("cuda"))
   out = model(x)
   target = torch.randn_like(out)
   out.backward(target)
   opt.step()
-  print("Finished.")
+  print("Finished on rank{}".format(pyrannc.get_rank()))
 
 
 4. Launch
@@ -111,7 +112,8 @@ You can launch the above example script by
 
 .. code-block:: bash
 
-  mpirun -np 2 python tutorial.py
+  # The arguments are: [batch_size] [hidden] [layers]
+  mpirun -np 2 python tutorial.py 64 512 10
 
 
 (Ensure MPI is properly configured in your environment before you try RaNNC. You may need more options for MPI like
@@ -125,7 +127,7 @@ The following shows the output in our compute node that has eight NVIDIA A100's 
 
 .. code-block:: bash
 
-  $ mpirun -np 2 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py
+  $ mpirun -np 2 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial.py 64 512 10
   [RaNNCProcess] [info] RaNNC started on rank 1 (gpunode001)
   [RaNNCProcess] [info] RaNNC started on rank 0 (gpunode001)
   [RaNNCProcess] [info] CUDA device assignments:
@@ -150,9 +152,10 @@ The following shows the output in our compute node that has eight NVIDIA A100's 
   Finished on rank0
   Finished on rank1
 
-Since this model is small, RaNNC determines to train it using only data parallelism.
+Since this model is very small, RaNNC determines to train it using only data parallelism.
 You can see the partitioning result in the following part.
-The computational graph that is equivalent to the model was named ``MERGE_0_9`` and assigned to ranks 0 and 1.
+The computational graph that is equivalent to the model was named ``MERGE_0_9`` and assigned to ranks 0 and 1
+(replicated for data parallelism).
 
 .. code-block:: bash
 
@@ -167,24 +170,16 @@ The computational graph that is equivalent to the model was named ``MERGE_0_9`` 
 If the number of parameters of a model is extremely large, you cannot train the model only with data parallelism.
 RaNNC automatically partitions such models for *model parallelism*.
 
-To see how RaNNC partitions such a large model, increase the numbers for ``hidden_size`` and ``layers``.
-
-.. code-block:: python
-
-  hidden = 5000
-  layers = 100
-
-Given the following sizes, the model has more than 2.5 billion parameters.
+To see how RaNNC partitions such a large model, set ``hidden`` and ``layers`` to 5000 and 100 respectively.
+Given the configuration, the model has more than 2.5 billion parameters.
 This does not fit the memory of the GPU (40GB) (The model requires 10GB for parameters, 10GB for gradients, 20GB for
 optimizer states, and more for activations).
 
-Let's use all the GPUs on the node (eight GPUs).
-
-This takes a long time ().
+Let's use all the GPUs on the node (eight GPUs) for this configuration.
 
 .. code-block:: bash
 
-  $ mpirun -np 8 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py
+  $ mpirun -np 8 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py 64 5000 100
   [RaNNCProcess] [info] RaNNC started on rank 0 (gpunode001)
   [RaNNCProcess] [info] RaNNC started on rank 1 (gpunode001)
   ...
@@ -201,5 +196,4 @@ This takes a long time ().
 The model was partitioned into two computational graphs (``MERGE_0_4`` and ``MERGE_5_9``) and they were assigned to rank[6,4,0,2] and ranks[7,5,1,3] respectively.
 In this configuration, RaNNC used the hybrid model/data parallelism.
 
-
-For more practical usages, scripts in ``test/`` and `examples <https://github.com/nict-wisdom/rannc-examples/>`_ will be helpful.
+For more practical usages, ``test/test_simple.py`` and `examples <https://github.com/nict-wisdom/rannc-examples/>`_ will be helpful.
