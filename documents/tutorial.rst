@@ -53,7 +53,7 @@ If you do not use an optimizer, pass only the model.
 
 .. code-block:: python
 
-  x = torch.randn(64, 3, requires_grad=True).to(torch.device("cuda"))
+  x = torch.randn(batch_size, hidden_size, requires_grad=True).to(torch.device("cuda"))
   out = model(x)
   out.backward(torch.randn_like(out))
 
@@ -62,7 +62,7 @@ RaNNCModule has several more limitations regarding a wrapped model and inputs/ou
 See :doc:`limitations` for details.
 The optimizer can update model parameters simply by calling ``step()``.
 
-The program below shows the above usage with a very simple model.
+The script below shows the above usage with a very simple model.
 
 .. code-block:: python
 
@@ -74,29 +74,33 @@ The program below shows the above usage with a very simple model.
 
 
   class Net(nn.Module):
-      def __init__(self):
+      def __init__(self, hidden, layers):
           super(Net, self).__init__()
-          self.fc1 = nn.Linear(3, 2, bias=False)
-          self.fc2 = nn.Linear(2, 3, bias=False)
+          self.layers = nn.ModuleList([nn.Linear(hidden, hidden) for i in range(layers)])
 
       def forward(self, x):
-          x = self.fc1(x)
-          x = self.fc2(x)
+          for l in self.layers:
+              x = l(x)
           return x
 
 
-  model = Net()
+  batch_size = 64
+  hidden = 512
+  layers = 10
+
+  model = Net(hidden, layers)
+  if pyrannc.get_rank() == 0:
+      print("#Parameters={}".format(sum(p.numel() for p in model.parameters())))
   model.to(torch.device("cuda"))
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, opt)
 
-  x = torch.randn(64, 3, requires_grad=True).to(torch.device("cuda"))
+  x = torch.randn(64, hidden, requires_grad=True).to(torch.device("cuda"))
   out = model(x)
-
   target = torch.randn_like(out)
   out.backward(target)
-
   opt.step()
+  print("Finished.")
 
 
 4. Launch
@@ -107,47 +111,95 @@ You can launch the above example script by
 
 .. code-block:: bash
 
-  mpirun -np 2 python tutorial_usage.py
+  mpirun -np 2 python tutorial.py
+
+
+(Ensure MPI is properly configured in your environment before you try RaNNC. You may need more options for MPI like
+``--mca pml ucx --mca btl ^vader,tcp,openib ...``)
 
 ``-np`` indicates the number of ranks (processes).
 RaNNC allocates one CUDA device for each rank.
 In the above example, there must be two available CUDA devices.
 
-The following output shows that RaNNC uses only data parallelism to train this model.
+The following shows the output in our compute node that has eight NVIDIA A100's (40GB memory).
 
 .. code-block:: bash
 
-  ...
-  [DPStaging] [info] Estimated profiles of subgraphs (#partition(s))=1: batch_size=128 ranks=2 pipeline_num=2
-  [DPStaging] [info]   graph=MERGE_0_1 repl=2 cp=true fwd_time=99 bwd_time=356 ar_time=0 in_size=1536 out_size=1536 mem=4752 (fwd+bwd=4656 opt=96)
-  [Decomposer] [info]  Assigned subgraph MERGE_0_1 to rank[1,0]
-  ...
+  $ mpirun -np 2 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py
+  [RaNNCProcess] [info] RaNNC started on rank 1 (gpunode001)
+  [RaNNCProcess] [info] RaNNC started on rank 0 (gpunode001)
+  [RaNNCProcess] [info] CUDA device assignments:
+  [RaNNCProcess] [info]  Worker 0: device0@gpunode001
+  [RaNNCProcess] [info]  Worker 1: device1@gpunode001
+  #Parameters=2626560
+  [RaNNCModule] [info] Tracing model ...
+  [RaNNCModule] [info] Converting torch model to IR ...
+  [RaNNCModule] [info] Running profiler ...
+  [RaNNCModule] [info] Profiling finished
+  [RaNNCModule] [info] Assuming batch size: 128
+  [Decomposer] [info] Decomposer: ml_part
+  [Decomposer] [info] Available device memory: 38255689728
+  [Decomposer] [info] Starting model partitioning ... (this may take a very long time)
+  [DPStaging] [info] Estimated profiles of subgraphs: batch_size=128 np=2 pipeline=1 use_amp=0 zero=0
+    graph=MERGE_0_9 repl=2 fwd_time=4722 bwd_time=24237 ar_time=978 in_size=131072 out_size=131072 fp32param_size=10506240 fp16param_size=0 total_mem=54759424 (fwd+bwd=33353728 opt=21012480 comm=393216)
+  [Decomposer] [info]  Assigned subgraph MERGE_0_9 to rank[1,0]
+  [RaNNCModule] [info] Routes verification passed.
+  [ParamStorage] [info] Synchronizing parameters ...
+  [RaNNCModule] [info] RaNNCModule is ready. (rank0)
+  [RaNNCModule] [info] RaNNCModule is ready. (rank1)
+  Finished on rank0
+  Finished on rank1
 
-RaNNC automatically partitions a given model if the model is too large to be stored on one CUDA device's memory.
-The model in this example is so small that data parallelism works well.
-
-.. note::
-
-  Each process launched by MPI is expected to load different (mini-)batches. RaNNC automatically gathers the batches from all ranks and computes them as a single batch. ``torch.utils.data.distributed.DistributedSampler`` is useful for this purpose.
-
-
-To see how the partitioning works, you can force RaNNC to partition a model using model parallelism.
-The environment variable ``RANNC_PARTITION_NUM`` forces the number of partitions for model parallelism (See also :doc:`config`).
+Since this model is small, RaNNC determines to train it using only data parallelism.
+You can see the partitioning result in the following part.
+The computational graph that is equivalent to the model was named ``MERGE_0_9`` and assigned to ranks 0 and 1.
 
 .. code-block:: bash
 
-  mpirun -np 2 -x RANNC_PARTITION_NUM=2 python tutorial_usage.py
+  [DPStaging] [info] Estimated profiles of subgraphs: batch_size=128 np=2 pipeline=1 use_amp=0 zero=0
+    graph=MERGE_0_9 repl=2 fwd_time=4722 bwd_time=24237 ar_time=978 in_size=131072 out_size=131072 fp32param_size=10506240 fp16param_size=0 total_mem=54759424 (fwd+bwd=33353728 opt=21012480 comm=393216)
+  [Decomposer] [info]  Assigned subgraph MERGE_0_9 to rank[1,0]
 
-The output shows that RaNNC produced two partitions and allocated GPUs to them.
+
+5. Model partitioning
+---------------------
+
+If the number of parameters of a model is extremely large, you cannot train the model only with data parallelism.
+RaNNC automatically partitions such models for *model parallelism*.
+
+To see how RaNNC partitions such a large model, increase the numbers for ``hidden_size`` and ``layers``.
+
+.. code-block:: python
+
+  hidden = 5000
+  layers = 100
+
+Given the following sizes, the model has more than 2.5 billion parameters.
+This does not fit the memory of the GPU (40GB) (The model requires 10GB for parameters, 10GB for gradients, 20GB for
+optimizer states, and more for activations).
+
+Let's use all the GPUs on the node (eight GPUs).
+
+This takes a long time ().
 
 .. code-block:: bash
 
+  $ mpirun -np 8 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py
+  [RaNNCProcess] [info] RaNNC started on rank 0 (gpunode001)
+  [RaNNCProcess] [info] RaNNC started on rank 1 (gpunode001)
   ...
-  [DPStaging] [info] Estimated profiles of subgraphs (#partition(s))=2: batch_size=128 ranks=2 pipeline_num=2
-  [DPStaging] [info]   graph=ML_mod_jy9757acx1eve7nm_p0 repl=1 cp=true fwd_time=83 bwd_time=295 ar_time=0 in_size=1536 out_size=1024 mem=3656 (fwd+bwd=3608 opt=48)
-  [DPStaging] [info]   graph=ML_mod_jy9757acx1eve7nm_p1 repl=1 cp=true fwd_time=83 bwd_time=296 ar_time=0 in_size=1024 out_size=1536 mem=5192 (fwd+bwd=5144 opt=48)
-  [Decomposer] [info]  Assigned subgraph ML_mod_jy9757acx1eve7nm_p1 to rank[1]
-  [Decomposer] [info]  Assigned subgraph ML_mod_jy9757acx1eve7nm_p0 to rank[0]
+  #Parameters=2500500000
+  ..
+  [Decomposer] [info] Starting model partitioning ... (this may take a very long time)
+  [DPStaging] [info] Estimated profiles of subgraphs: batch_size=512 np=8 pipeline=1 use_amp=0 zero=0
+  graph=MERGE_0_4 repl=4 fwd_time=27516 bwd_time=126756 ar_time=437809 in_size=2560000 out_size=2560000 fp32param_size=4700940000 fp16param_size=0 total_mem=23707792544 (fwd+bwd=14298232544 opt=9401880000 comm=7680000)
+  graph=MERGE_5_9 repl=4 fwd_time=31228 bwd_time=153762 ar_time=493699 in_size=2560000 out_size=2560000 fp32param_size=5301060000 fp16param_size=0 total_mem=26732209376 (fwd+bwd=16122409376 opt=10602120000 comm=7680000)
+  [Decomposer] [info]  Assigned subgraph MERGE_5_9 to rank[7,5,1,3]
+  [Decomposer] [info]  Assigned subgraph MERGE_0_4 to rank[6,4,0,2]
   ...
+
+The model was partitioned into two computational graphs (``MERGE_0_4`` and ``MERGE_5_9``) and they were assigned to rank[6,4,0,2] and ranks[7,5,1,3] respectively.
+In this configuration, RaNNC used the hybrid model/data parallelism.
+
 
 For more practical usages, scripts in ``test/`` and `examples <https://github.com/nict-wisdom/rannc-examples/>`_ will be helpful.
