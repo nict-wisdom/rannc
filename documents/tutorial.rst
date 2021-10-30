@@ -1,8 +1,11 @@
 Tutorial
-======================================
+========
 
-RaNNC can automatically partition a model written for PyTorch and train it using multiple GPUs.
-Follow the steps below to learn the basic usage of RaNNC.
+The greatest feature of RaNNC is that it can automatically partition a model written for PyTorch and train it using
+multiple GPUs (model parallelism).
+Unlike other frameworks for model parallelism, users do not need to modify the model for partitioning.
+
+In this tutorial, you will learn how to use RaNNC to train very large models that cannot be trained using data parallelism only.
 
 Steps to use RaNNC
 ~~~~~~~~~~~~~~~~~~
@@ -10,8 +13,9 @@ Steps to use RaNNC
 0. Set up environment
 -------------------------
 
-Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available.
+Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available in your environment.
 The libraries must be included in ``LD_LIBRARY_PATH`` at runtime.
+Then install ``pyrannc`` following the command shown in :doc:`installation` page.
 
 
 1. Import RaNNC
@@ -92,7 +96,7 @@ The script below (``examples/tutorial.py``) shows the above usage with a very si
   model = Net(hidden, layers)
   if pyrannc.get_rank() == 0:
       print("#Parameters={}".format(sum(p.numel() for p in model.parameters())))
-  model.to(torch.device("cuda"))
+
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, opt)
 
@@ -116,12 +120,13 @@ You can launch the above example script by
   mpirun -np 2 python tutorial.py 64 512 10
 
 
-(Ensure MPI is properly configured in your environment before you try RaNNC. You may need more options for MPI like
+(Ensure MPI is properly configured in your environment before you run RaNNC. You may need more options for MPI like
 ``--mca pml ucx --mca btl ^vader,tcp,openib ...``)
 
-``-np`` indicates the number of ranks (processes).
-RaNNC allocates one CUDA device for each rank.
+``-np`` indicates the number of processes (ranks).
+RaNNC allocates one CUDA device for each process.
 In the above example, there must be two available CUDA devices.
+By properly setting nodes for MPI, you can run processes using RaNNC across multiple nodes (Ensure that numbers of processes and GPUs match).
 
 The following shows the output in our compute node that has eight NVIDIA A100's (40GB memory).
 
@@ -164,26 +169,37 @@ The computational graph that is equivalent to the model was named ``MERGE_0_9`` 
   [Decomposer] [info]  Assigned subgraph MERGE_0_9 to rank[1,0]
 
 
-5. Model partitioning
----------------------
+.. note::
+
+  Each process launched by MPI is expected to load different (mini-)batches.
+  RaNNC automatically gathers the batches from all ranks and computes them as a single batch.
+  Therefore, the effective (global) batch size is [number of processes (np)] * [batch size per process].
+  ``torch.utils.data.distributed.DistributedSampler`` is useful to properly take batches in each process.
+
+
+
+5. Model partitioning for very large models
+-------------------------------------------
 
 If the number of parameters of a model is extremely large, you cannot train the model only with data parallelism.
 RaNNC automatically partitions such models for *model parallelism*.
 
 To see how RaNNC partitions such a large model, set ``hidden`` and ``layers`` to 5000 and 100 respectively.
 Given the configuration, the model has more than 2.5 billion parameters.
-This does not fit the memory of the GPU (40GB) (The model requires 10GB for parameters, 10GB for gradients, 20GB for
-optimizer states, and more for activations).
+
+You cannot train this model using only data parallelism because the size of parameters, gradients
+and optimizer states exceeds the memory of the GPU (40GB) (The model requires 10GB for parameters, 10GB for gradients,
+20GB for optimizer states, and more for activations).
 
 Let's use all the GPUs on the node (eight GPUs) for this configuration.
 
 .. code-block:: bash
 
-  $ mpirun -np 8 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial2.py 64 5000 100
+  $ mpirun -np 8 --mca pml ucx --mca btl ^vader,tcp,openib --mca coll ^hcoll python tutorial.py 64 5000 100
   [RaNNCProcess] [info] RaNNC started on rank 0 (gpunode001)
   [RaNNCProcess] [info] RaNNC started on rank 1 (gpunode001)
   ...
-  #Parameters=2500500000
+  Parameters=2500500000
   ..
   [Decomposer] [info] Starting model partitioning ... (this may take a very long time)
   [DPStaging] [info] Estimated profiles of subgraphs: batch_size=512 np=8 pipeline=1 use_amp=0 zero=0
@@ -193,7 +209,10 @@ Let's use all the GPUs on the node (eight GPUs) for this configuration.
   [Decomposer] [info]  Assigned subgraph MERGE_0_4 to rank[6,4,0,2]
   ...
 
-The model was partitioned into two computational graphs (``MERGE_0_4`` and ``MERGE_5_9``) and they were assigned to rank[6,4,0,2] and ranks[7,5,1,3] respectively.
-In this configuration, RaNNC used the hybrid model/data parallelism.
+The partitioning may take a long time when the model is very large. (It took around five minutes in our environment)
+
+The model was partitioned into two computational graphs (``MERGE_0_4`` and ``MERGE_5_9``) for model parallelism and they were assigned to rank[6,4,0,2] and ranks[7,5,1,3] respectively for data parallelism
+(hybrid model/data parallelism).
+Note that RaNNC may set different numbers of replicas for data parallelism for each computational graph to optimize the training throughput.
 
 For more practical usages, ``test/test_simple.py`` and `examples <https://github.com/nict-wisdom/rannc-examples/>`_ will be helpful.
