@@ -15,6 +15,7 @@ define BUILD_CMD
  && conda activate rannc \
  && export CONDA_PREFIX=/opt/conda/envs/rannc \
  && export BOOST_DIR=/usr/include/boost \
+ && export CUDA_VERSION=$(CUDA_VERSION) \
  && cd /temp/pyrannc \
  && python setup.py clean build -j20 -g bdist_wheel
 endef

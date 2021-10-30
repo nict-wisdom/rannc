@@ -66,10 +66,16 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
+
+VERSION = "0.7.0rc1"
+
+if "CUDA_VERSION" in os.environ:
+    VERSION += "+cu{}".format(os.environ["CUDA_VERSION"].replace(".", ""))
+
 setup(
     name='pyrannc',
     packages=find_packages(),
-    version='0.7.0rc1',
+    version=VERSION,
     author='Masahiro Tanaka',
     author_email='mtnk@nict.go.jp',
     description='Deep learning framework for data/model hybrid parallelism',
