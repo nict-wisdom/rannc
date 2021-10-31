@@ -23,6 +23,7 @@ endef
 define WHEEL_NAME_CMD
  . /opt/conda/etc/profile.d/conda.sh \
  && conda activate rannc \
+ && export CUDA_VERSION=$(CUDA_VERSION) \
  && cd /temp/pyrannc \
  && python setup.py -q bdist_wheel_name
 endef

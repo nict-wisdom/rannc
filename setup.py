@@ -70,7 +70,8 @@ class CMakeBuild(build_ext):
 VERSION = "0.7.0rc1"
 
 if "CUDA_VERSION" in os.environ:
-    VERSION += "+cu{}".format(os.environ["CUDA_VERSION"].replace(".", ""))
+    version_nums = os.environ["CUDA_VERSION"].split(".")
+    VERSION += "+cu{}{}".format(version_nums[0], version_nums[1])
 
 setup(
     name='pyrannc',
