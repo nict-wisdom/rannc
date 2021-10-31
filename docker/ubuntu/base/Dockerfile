@@ -72,4 +72,11 @@ RUN . /opt/conda/etc/profile.d/conda.sh \
     && conda clean --all \
     && echo "conda activate rannc" >> /root/.bashrc
 
+RUN cd ${DOCKER_BUILD_DIR} \
+    && git clone https://github.com/NVIDIA/nccl \
+    && cd nccl \
+    && git checkout v2.11.4-1 \
+    && make -j src.build \
+    && make install
+
 RUN ldconfig
