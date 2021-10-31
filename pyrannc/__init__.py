@@ -99,7 +99,7 @@ def sync_params_on_init(sync):
     _pyrannc.sync_params_on_init(sync)
 
 
-def dump_events():
+def _dump_events():
     _pyrannc.dump_events()
 
 
@@ -200,7 +200,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         :param gather_inputs: Set ``False`` if model uses inputs given on rank 0.
         :param enable_apex_amp: Set ``True`` if ``model`` is processed by `Apex AMP <https://nvidia.github.io/apex/amp.html>`_.
         :param allreduce_amp_master_params: Set ``True`` to allreduce gradients of master parameters of Apex AMP.
+        :param enable_zero: Set ``True`` to remove the redundancy of optimizer states following the approach of DeepSpeed.
         :param check_unused_values: If ``True``, RaNNC throws an exception when it finds unused values in a computation graph.
+        :param offload_params: If ``True``, parameters are moved to host memory until they are used.
         """
 
         old_flag = torch._C._jit_set_profiling_executor(True)
@@ -538,9 +540,16 @@ def allreduce_grads(rmodel, optimizer, prescale=1.0):
     return False
 
 
-def run_dp_dry(path):
+def _run_dp_dry(path):
     _pyrannc.run_dp_dry(path)
 
 
 def show_deployment(path, batch_size):
+    """
+    Show a deployment (Subgraphs and micro-batch sizes in pipeline parallelism) saved in a file.
+    This is used for debugging.
+
+    :param path: Path to a deployment file.
+    :param batch_size: Global batch size.
+    """
     _pyrannc.show_deployment(path, batch_size)
