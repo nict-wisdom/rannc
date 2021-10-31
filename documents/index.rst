@@ -1,5 +1,5 @@
 .. rannc_doc documentation master file, created by
-   sphinx-quickstart on Thu Dec 24 10:23:00 2020.
+sphinx-quickstart on Thu Dec 24 10:23:00 2020.
 You can adapt this file completely to your liking, but it should at least
 contain the root `toctree` directive.
 
@@ -31,7 +31,7 @@ You only need to insert the line highlighted below.
    optimizer.step()               # Update parameters
 
 
-Models used with RaNNC do not need special operators for distributed computation or annotations for partitioning
+Models used with RaNNC (``Net`` in the above example) do not need special operators for distributed computation or annotations for partitioning
 (See our examples:
 `model for the tutorial <https://github.com/nict-wisdom/rannc/blob/main/examples/tutorial.py>`_,
 enlarged versions of `BERT <https://github.com/nict-wisdom/rannc-examples/blob/main/bert/modeling.py>`_ and
@@ -48,7 +48,8 @@ In addition, some existing frameworks including Megatron-LM can be applicable on
 We confirmed that RaNNC can train a BERT model with approximately 100 billion parameters without a manual
 modification/optimization of the definition of the network for model partitioning.
 
-See our IPDPS2021 paper [#f1]_ for the details of RaNNC's partitioning algorithm (`preprint <http://arxiv.org/abs/2103.16063>`_).
+The initial ideas of RaNNC were published at IPDPS 2021.
+See our paper [#f1]_ for RaNNC's partitioning algorithm and performance comparisons with other frameworks (`preprint <http://arxiv.org/abs/2103.16063>`_).
 
 .. toctree::
    :maxdepth: 1
