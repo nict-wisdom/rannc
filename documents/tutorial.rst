@@ -15,7 +15,7 @@ Steps to use RaNNC
 
 Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available in your environment.
 The libraries must be included in ``LD_LIBRARY_PATH`` at runtime.
-Then install ``pyrannc`` following the command shown in :doc:`installation` page.
+Then install ``pyrannc`` following the commands shown in :doc:`installation` page.
 
 
 1. Import RaNNC
@@ -34,14 +34,15 @@ Insert ``import`` in your script.
 Wrap your model by using ``pyrannc.RaNNCModule`` with your optimizer.
 You can use the wrapped model in almost the same manner as the original model (see below).
 
-Note that the original model does not need to be on a CUDA device.
-Thus you can declare a very large model that does not fit to the memory of a GPU.
-
 .. code-block:: python
 
   model = Net()
   opt = optim.SGD(model.parameters(), lr=0.01)
   model = pyrannc.RaNNCModule(model, optimizer)
+
+
+Note that the original model does not need to be on a CUDA device.
+Thus you can declare a very large model that does not fit to the memory of a GPU.
 
 If you do not use an optimizer, pass only the model.
 
@@ -66,7 +67,7 @@ RaNNCModule has several more limitations regarding a wrapped model and inputs/ou
 See :doc:`limitations` for details.
 The optimizer can update model parameters simply by calling ``step()``.
 
-The script below (``examples/tutorial.py``) shows the above usage with a very simple model.
+The `script below <https://github.com/nict-wisdom/rannc/blob/main/examples/tutorial.py>`_ shows the usage with a very simple model.
 
 .. code-block:: python
 
@@ -108,11 +109,11 @@ The script below (``examples/tutorial.py``) shows the above usage with a very si
   print("Finished on rank{}".format(pyrannc.get_rank()))
 
 
-4. Launch
----------
+4. Launch (with a small model)
+------------------------------
 
 A program using RaNNC must be launched using ``mpirun``.
-You can launch the above example script by
+Begin with launching the above script with a very small model using two GPUs.
 
 .. code-block:: bash
 
@@ -126,9 +127,10 @@ You can launch the above example script by
 ``-np`` indicates the number of processes (ranks).
 RaNNC allocates one CUDA device for each process.
 In the above example, there must be two available CUDA devices.
-By properly setting nodes for MPI, you can run processes using RaNNC across multiple nodes (Ensure that numbers of processes and GPUs match).
+By properly setting nodes for MPI, you can run processes using RaNNC across multiple nodes
+(Ensure that you have the equal or more number of GPUs than processes).
 
-The following shows the output in our compute node that has eight NVIDIA A100's (40GB memory).
+The following shows the output on our compute node that has eight NVIDIA A100's (40GB memory).
 
 .. code-block:: bash
 
@@ -181,15 +183,15 @@ The computational graph that is equivalent to the model was named ``MERGE_0_9`` 
 5. Model partitioning for very large models
 -------------------------------------------
 
-If the number of parameters of a model is extremely large, you cannot train the model only with data parallelism.
+If the number of parameters of a model is very large, you cannot train the model only with data parallelism.
 RaNNC automatically partitions such models for *model parallelism*.
 
 To see how RaNNC partitions such a large model, set ``hidden`` and ``layers`` to 5000 and 100 respectively.
 Given the configuration, the model has more than 2.5 billion parameters.
 
 You cannot train this model using only data parallelism because the size of parameters, gradients
-and optimizer states exceeds the memory of the GPU (40GB) (The model requires 10GB for parameters, 10GB for gradients,
-20GB for optimizer states, and more for activations).
+and optimizer states exceeds the memory of the GPU (40GB). (The model requires 10GB for parameters, 10GB for gradients,
+20GB for optimizer states, and more for activations)
 
 Let's use all the GPUs on the node (eight GPUs) for this configuration.
 

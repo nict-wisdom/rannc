@@ -15,17 +15,14 @@ RaNNC requires the following libraries and tools at runtime.
 Installation
 ------------
 
-This version of RaNNC requires PyTorch v1.10.0.
-``pip`` packages for ``linux_x86_64`` are available from the following links.
-We tested these packages on CentOS 7.9, CentOS 8.2, and RHEL 7.6.
+The current version (``0.7.0``) of RaNNC requires PyTorch v1.10.0.
+``pip`` packages for ``linux_x86_64`` are available for the following combinations of Python and CUDA versions.
 
-* :download:`For Python 3.7 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu102-cp37-cp37m-linux_x86_64.whl>`
-* :download:`For Python 3.8 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu102-cp38-cp38-linux_x86_64.whl>`
-* :download:`For Python 3.7 / CUDA 11.1 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu111-cp37-cp37m-linux_x86_64.whl>`
-* :download:`For Python 3.8 / CUDA 11.1 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu111-cp38-cp38-linux_x86_64.whl>`
+* Python version: 3.7, 3.8, 3.9
+* CUDA version: 10.2, 11.3
 
-You can create a new conda environment and install RaNNC using the following commands.
-Set a CUDA version available in your environment.
+The followings show command to create a new conda environment and install RaNNC.
+(The version of RaNNC should be specified as ``0.7.0+cu[CUDA_VERSION_WITHOUT_DOT]``)
 
 .. code-block:: bash
 
@@ -33,6 +30,16 @@ Set a CUDA version available in your environment.
   conda activate rannc
   conda install pytorch==1.10.0 cudatoolkit=10.2 -c pytorch
   pip install pyrannc==0.7.0+cu102 -f https://nict-wisdom.github.io/rannc/installation.html
+
+
+Use the following links to manually download the packages.
+
+* :download:`For Python 3.7 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu102-cp37-cp37m-linux_x86_64.whl>`
+* :download:`For Python 3.8 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu102-cp38-cp38-linux_x86_64.whl>`
+* :download:`For Python 3.9 / CUDA 10.2 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu101-cp39-cp39-linux_x86_64.whl>`
+* :download:`For Python 3.7 / CUDA 11.3 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu113-cp37-cp37m-linux_x86_64.whl>`
+* :download:`For Python 3.8 / CUDA 11.3 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu113-cp38-cp38-linux_x86_64.whl>`
+* :download:`For Python 3.9 / CUDA 11.3 <https://nict-wisdom.github.io/rannc-resources/pyrannc-0.7.0+cu113-cp39-cp39-linux_x86_64.whl>`
 
 
 If the above packages do not match your Python/CUDA versions, create a suitable package using ``Makefile``
