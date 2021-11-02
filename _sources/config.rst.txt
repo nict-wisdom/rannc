@@ -19,7 +19,7 @@ RaNNC's runtime configurations can be set in the following two ways:
      - Show configurations on startup if set to true.
    * - mem_limit_gb
      - 0
-     - Set a limit per device in GB if a positive number is given.
+     - Set a memory limit per device in GB if a positive number is given.
    * - mem_margin
      - 0.1
      - Memory margin for model partitioning.
@@ -50,6 +50,15 @@ RaNNC's runtime configurations can be set in the following two ways:
    * - event_trace_file
      - ``/tmp/rannc_event_trace.json``
      - Path to an event trace file.
+   * - profile_by_acc
+     - false
+     - Estimate computation times/memory usages by accumulating the values of finer-grained subgraphs. This drastically reduces the time for patitioning while the accuracy of the estimation declines.
+   * - sync_allreduce
+     - false
+     - Synchronize allreduce across all stages in pipeline parallelism.
+   * - partitioning_dry_run_np
+     - 0
+     - Performs *dry run* to determine model partitioning if a positive number is given.
 
 The following is an example of the configuration file (``~/.pyrannc/rannc_conf.toml``).
 
