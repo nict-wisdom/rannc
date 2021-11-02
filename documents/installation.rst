@@ -22,7 +22,7 @@ The current version (``0.7.0``) of RaNNC requires PyTorch v1.10.0.
 * CUDA version: 10.2, 11.3
 
 The followings show command to create a new conda environment and install RaNNC.
-(The version of RaNNC should be specified as ``0.7.0+cu[CUDA_VERSION_WITHOUT_DOT]``)
+(The package version should be specified as ``0.7.0+cu[CUDA_VERSION_WITHOUT_DOT]``)
 
 .. code-block:: bash
 
