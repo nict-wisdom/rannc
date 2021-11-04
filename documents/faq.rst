@@ -12,8 +12,8 @@ Convert your model with ``amp.initialize()`` and pass
 the resulting model to ``RaNNCModule`` using ``use_amp_master_params=True``.
 
 
-How to save/load a RaNNC module
--------------------------------
+How can I save/load a RaNNC module?
+-----------------------------------
 
 Use ``state_dict()`` of the RaNNC module.
 The returned *state_dict* can be saved and loaded, as with PyTorch.
@@ -27,8 +27,10 @@ Note that the returned *state_dict* can be loaded after RaNNC partitions the mod
 You can find typical usages in `examples <https://github.com/nict-wisdom/rannc-examples/>`_.
 
 
-How to use gradient accumulation
+Can I use gradient accumulation?
 --------------------------------
+
+Yes.
 
 As default, RaNNC implicitly performs allreduce (sum) of gradients on all ranks after a backward pass.
 To prevent this allreduce, you can use ``pyrannc.delay_grad_allreduce(True)``.
@@ -49,6 +51,23 @@ When you are unsure whether the partitioning process is continuing or has alread
 the partitioning module. Changing log levels of ``MLPartitioner`` and ``DPStaging`` will show you the progress of the
 partitioning process.
 (See also :doc:`logging`)
+
+
+How can I check partitioning results?
+-------------------------------------
+
+You can save a partitioning result using options ``SAVE_DEPLOYMENT=true`` and ``DEPLOYMENT_FILE=[PATH]``.
+When these options are enabled, RaNNC outputs the partitioning result to the specified path. (See also :doc:`config`)
+
+Then, you can read the output file and display the partitioning results using ``pyrannc.show_deployment(PATH, batch_size)``.
+The second argument is an expected batch size;
+This shows partitioned subgraphs and micro batch sizes in pipeline parallelism.
+
+A one-liner using this API is:
+
+.. code-block:: bash
+
+  python -c 'import pyrannc; pyrannc.show_deployment("/.../PATH_TO_DEPLOYMENT_FILE", 64)'
 
 
 .. Custom cpp functions do not work with RaNNC
