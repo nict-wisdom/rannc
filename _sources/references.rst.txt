@@ -6,3 +6,7 @@ API references
 .. automodule:: pyrannc
    :members:
    :undoc-members:
+
+.. automodule:: pyrannc.dist_param
+   :members:
+   :undoc-members:
