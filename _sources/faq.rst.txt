@@ -70,6 +70,13 @@ A one-liner using this API is:
   python -c 'import pyrannc; pyrannc.show_deployment("/.../PATH_TO_DEPLOYMENT_FILE", 64)'
 
 
+.. My model is too large to fit to the host memory
+.. -----------------------------------------------
+
+.. Use ``DistributeModelParams``.
+.. Parameters of a model can exceed the limit of the host memory when the model is extremely large.
+
+
 .. Custom cpp functions do not work with RaNNC
 .. ---------------------------------------------
 
