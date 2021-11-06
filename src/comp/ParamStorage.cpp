@@ -1023,8 +1023,10 @@ at::Tensor ParamStorage::doSyncParam(long param_id, bool grad) {
   auto& tag_map = TagMap::get();
   int tag = tag_map.getRankSetTag(mpi::getAllRanks());
   ar.bcast(tag, {buf}, {root});
+  const auto iv_buf = toCPU(buf, true, false);
+  assert(iv_buf.isTensor());
   syncStream();
-  return buf;
+  return iv_buf.toTensor();
 }
 
 void ParamStorage::useAmpMasterParams(
