@@ -52,6 +52,9 @@ def remove_dist_param(pid):
 
 
 class DistributeModelParams(object):
+    r"""
+     Distributes model parameters on initialization.
+    """
 
     def __init__(self, enable=True):
         self.enable = enable
@@ -76,7 +79,11 @@ class DistributeModelParams(object):
 
             return wrapper
 
-        for subclass in torch.nn.modules.module.Module.__subclasses__():
+        def all_subclasses(cls):
+            return set(cls.__subclasses__()).union(
+                [s for c in cls.__subclasses__() for s in all_subclasses(c)])
+
+        for subclass in all_subclasses(torch.nn.modules.module.Module):
             subclass._old_init = subclass.__init__
             subclass.__init__ = add_post_process(subclass.__init__)
 
