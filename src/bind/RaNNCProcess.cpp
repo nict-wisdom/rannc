@@ -59,7 +59,7 @@ void RaNNCProcess::start() {
   if (no_cuda) {
     if (mpi::isMaster()) {
       logger->warn(
-          "One or more worker nodes have no CUDA devices. RaNNC may work in the CPU mode.");
+          "One or more worker nodes have no CUDA devices. RaNNC will work in the CPU mode.");
     }
   } else {
     std::unordered_map<int, int> dev_alloc; // rank -> dev

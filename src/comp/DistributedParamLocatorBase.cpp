@@ -6,6 +6,9 @@
 #include <comm/ObjectComm.h>
 #include <comm/SComm.h>
 
+#include <Config.h>
+#include <mpi.h>
+
 namespace rannc {
 
 void DistributedParamLocatorBase::doRegister(
@@ -93,10 +96,18 @@ at::Tensor DistributedParamLocatorBase::gather(
   const IRType& ir_type = ir_types_.at(pid);
   const auto& ranks = ranks_.at(pid);
 
+  bool use_mpi =
+      config::Config::get().getVal<bool>(config::USE_MPI_TO_GATHER_DIST_PARAMS);
+
   at::TensorOptions options;
-  options = options.dtype(tensor_part.dtype())
-                .requires_grad(false)
-                .device(c10::Device(c10::DeviceType::CUDA));
+  options = options.dtype(tensor_part.dtype()).requires_grad(false);
+
+  if (use_mpi) {
+    options = options.device(c10::Device(c10::DeviceType::CPU));
+  } else {
+    options = options.device(c10::Device(c10::DeviceType::CUDA));
+  }
+
   at::Tensor buf =
       torch::zeros({(int64_t)(segment_sizes_.at(pid) * ranks.size())}, options);
 
@@ -114,7 +125,17 @@ at::Tensor DistributedParamLocatorBase::gather(
   // Recover the flag
   tensor_part.set_requires_grad(requires_grad);
 
-  nccl_.allgather(tag, {sendbuf}, {buf});
+  if (use_mpi) {
+    SComm& scomm = SComm::get();
+    MPI_Comm communicator = scomm.getCommunicator(tag, ranks);
+    MPI_Allgather(
+        sendbuf.data_ptr(), sendbuf.numel(),
+        scalarTypeToMPIDatatype(sendbuf.scalar_type()), buf.data_ptr(),
+        sendbuf.numel(), scalarTypeToMPIDatatype(buf.scalar_type()),
+        communicator);
+  } else {
+    nccl_.allgather(tag, {sendbuf}, {buf});
+  }
 
   return buf.narrow(0, 0, productDim(ir_type.getTensorDim()))
       .view(ir_type.getTensorDim())
