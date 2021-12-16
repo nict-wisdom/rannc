@@ -3,6 +3,7 @@
 //
 
 #include "ProfilerUtil.h"
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 
 namespace rannc {
@@ -137,7 +138,7 @@ GraphProfile ProfilerUtil::profile(
       }
       profiler_->clear();
       emptyCache();
-      syncStream();
+      syncWithErrorCheck();
     }
   }
   return profile_cache_.at(k);

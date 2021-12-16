@@ -428,6 +428,20 @@ T loadFromFile(const std::string& path) {
   std::vector<char> buffer(std::istreambuf_iterator<char>(input), {});
   return deserialize<T>(buffer);
 }
+
+class CommErrorException : public std::runtime_error {
+ public:
+  CommErrorException(const char* msg, int code)
+      : std::runtime_error(msg), code_(code) {}
+
+  int getCode() const {
+    return code_;
+  }
+
+ private:
+  int code_;
+};
+
 } // namespace rannc
 
 #endif // PT_RANNC_COMMON_H

@@ -17,21 +17,22 @@ int DEFAULT_TAG = 100;
 constexpr size_t NCCL_MAX_COLL_OP_NUM = 2048;
 
 void NCCLBulkJobExecutor::flush() {
-  syncStream();
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  nccl.syncWithErrorCheck();
   for (const auto& f : pre_comm_jobs_) {
     f();
   }
-  syncStream();
+  nccl.syncWithErrorCheck();
   for (const auto& f : comm_jobs_) {
     ncclGroupStart();
     f();
     ncclGroupEnd();
   }
-  syncStream();
+  nccl.syncWithErrorCheck();
   for (const auto& f : post_comm_jobs_) {
     f();
   }
-  syncStream();
+  nccl.syncWithErrorCheck();
 
   pre_comm_jobs_.clear();
   comm_jobs_.clear();
@@ -54,7 +55,9 @@ void NCCLBulkJobExecutor::addPreCommJob(std::function<void(void)> f) {
   doAddJob(f, pre_comm_jobs_);
   if (run_immediate_) {
     ncclGroupEnd();
-    syncStream();
+
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.syncWithErrorCheck();
   }
 }
 void NCCLBulkJobExecutor::addCommJob(std::function<void(void)> f) {
@@ -64,7 +67,8 @@ void NCCLBulkJobExecutor::addCommJob(std::function<void(void)> f) {
   doAddJob(f, comm_jobs_);
   if (run_immediate_) {
     ncclGroupEnd();
-    syncStream();
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.syncWithErrorCheck();
   }
 }
 void NCCLBulkJobExecutor::addPostCommJob(std::function<void(void)> f) {
@@ -74,7 +78,8 @@ void NCCLBulkJobExecutor::addPostCommJob(std::function<void(void)> f) {
   doAddJob(f, post_comm_jobs_);
   if (run_immediate_) {
     ncclGroupEnd();
-    syncStream();
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.syncWithErrorCheck();
   }
 }
 
@@ -84,8 +89,9 @@ struct AllReduceComm {
 
 void NCCLWrapper::createCommunicator(
     int tag, const std::unordered_set<int>& ranks) {
-  if (contains(comm_map_, tag))
+  if (contains(comm_map_, tag)) {
     return;
+  }
 
   std::vector<int> rank_vec = setToVector(ranks);
   std::sort(rank_vec.begin(), rank_vec.end());
@@ -125,12 +131,7 @@ void NCCLWrapper::createCommunicator(
 }
 
 void NCCLWrapper::destroy() {
-  for (const auto& it : comm_map_) {
-    AllReduceComm* comm_info = it.second;
-    ncclCommDestroy(*comm_info->comm);
-    delete comm_info->comm;
-    delete comm_info;
-  }
+  destroyAllCommunicators();
   comm_map_.clear();
   ranks_to_tag_.clear();
   buf_cache_.clear();
@@ -214,8 +215,8 @@ void runCollectiveCommBuf(
     const std::vector<at::Tensor>& send_tensors,
     const std::vector<at::Tensor>& recv_tensors, const std::vector<int>& roots,
     const std::string& op_name,
-    const std::function<
-        void(void*, void*, size_t, int, ncclDataType_t, ncclComm_t*)>& f) {
+    const std::function<ncclResult_t(
+        void*, void*, size_t, int, ncclDataType_t, ncclComm_t*)>& f) {
   assert(send_tensors.size() == recv_tensors.size() || recv_tensors.empty());
   assert(send_tensors.size() == roots.size() || roots.empty());
 
@@ -267,8 +268,8 @@ void runCollectiveComm(
     const std::vector<at::Tensor>& send_tensors,
     const std::vector<at::Tensor>& recv_tensors, const std::vector<int>& roots,
     const std::string& op_name,
-    const std::function<
-        void(void*, void*, size_t, int, ncclDataType_t, ncclComm_t*)>& f) {
+    const std::function<ncclResult_t(
+        void*, void*, size_t, int, ncclDataType_t, ncclComm_t*)>& f) {
   assert(send_tensors.size() == recv_tensors.size() || recv_tensors.empty());
   assert(send_tensors.size() == roots.size() || roots.empty());
 
@@ -311,7 +312,7 @@ void NCCLWrapper::doAllreduce(
           void* sendptr, void* recvptr, size_t count, int root,
           ncclDataType_t datatype, ncclComm_t* ncomm) {
         // in-place only
-        ncclAllReduce(
+        return ncclAllReduce(
             sendptr, sendptr, count, datatype, red_op, *ncomm,
             (cudaStream_t) nullptr);
       });
@@ -335,7 +336,7 @@ void NCCLWrapper::reduce(
       [](void* sendptr, void* recvptr, size_t count, int root,
          ncclDataType_t datatype, ncclComm_t* ncomm) {
         // in-place only
-        ncclReduce(
+        return ncclReduce(
             sendptr, sendptr, count, datatype, ncclSum, root, *ncomm,
             (cudaStream_t) nullptr);
       });
@@ -349,7 +350,7 @@ void NCCLWrapper::bcast(
       [](void* sendptr, void* recvptr, size_t count, int root,
          ncclDataType_t datatype, ncclComm_t* ncomm) {
         // in-place only
-        ncclBcast(
+        return ncclBcast(
             sendptr, count, datatype, root, *ncomm, (cudaStream_t) nullptr);
       });
 }
@@ -357,11 +358,11 @@ void NCCLWrapper::bcast(
 void NCCLWrapper::allgather(
     int tag, const std::vector<at::Tensor>& tensors,
     const std::vector<at::Tensor>& out_bufs) {
-  runCollectiveComm(
+  return runCollectiveComm(
       comm_map_, tag, tensors, out_bufs, {}, "allgather",
       [](void* sendptr, void* recvptr, size_t count, int root,
          ncclDataType_t datatype, ncclComm_t* ncomm) {
-        ncclAllGather(
+        return ncclAllGather(
             sendptr, recvptr, count, datatype, *ncomm, (cudaStream_t) nullptr);
       });
 }
@@ -493,30 +494,6 @@ void NCCLWrapper::redist(
   }
 }
 
-void NCCLWrapper::send(int tag, int dest, const at::Tensor& tensor) {
-  assert(contains(comm_map_, tag));
-  AllReduceComm* comm_info = comm_map_.at(tag);
-  ncclComm_t* ncomm = comm_info->comm;
-
-  ncclDataType_t datatype = getReduceNcclDataType(tensor);
-  ncclSend(
-      tensor.data_ptr(), tensor.numel(), datatype, dest, *ncomm,
-      (cudaStream_t) nullptr);
-  syncStream();
-}
-
-void NCCLWrapper::recv(int tag, int dest, const at::Tensor& tensor) {
-  assert(contains(comm_map_, tag));
-  AllReduceComm* comm_info = comm_map_.at(tag);
-  ncclComm_t* ncomm = comm_info->comm;
-
-  ncclDataType_t datatype = getReduceNcclDataType(tensor);
-  ncclRecv(
-      tensor.data_ptr(), tensor.numel(), datatype, dest, *ncomm,
-      (cudaStream_t) nullptr);
-  syncStream();
-}
-
 void NCCLWrapper::startBulk() {
   job_executor_.setRunImmediate(false);
 }
@@ -524,6 +501,122 @@ void NCCLWrapper::startBulk() {
 void NCCLWrapper::endBulk() {
   job_executor_.flush();
   job_executor_.setRunImmediate(true);
+}
+
+void NCCLWrapper::checkCommError(int tag) {
+  if (!contains(comm_map_, tag)) {
+    return;
+  }
+  AllReduceComm* comm_info = comm_map_.at(tag);
+  ncclComm_t* ncomm = comm_info->comm;
+
+  ncclResult_t ncclAsyncErr;
+  ncclResult_t ncclErr = ncclCommGetAsyncError(*ncomm, &ncclAsyncErr);
+  ncclErr = ncclCommGetAsyncError(*ncomm, &ncclAsyncErr);
+  if (ncclErr != ncclSuccess) {
+    spdlog::warn("NCCL Error : ncclCommGetAsyncError returned {}", ncclErr);
+    throw CommErrorException("NCCL Error : ncclCommGetAsyncError", ncclErr);
+  }
+
+  if (ncclAsyncErr != ncclSuccess) {
+    ncclErr = ncclCommAbort(*ncomm);
+    if (ncclErr != ncclSuccess) {
+      spdlog::warn("NCCL Error : ncclCommAbort returned {}", ncclErr);
+    }
+    throw CommErrorException("NCCL Error : ncclCommAbort", ncclErr);
+  }
+}
+
+void NCCLWrapper::checkAllCommErrors() {
+  for (const auto& it : comm_map_) {
+    checkCommError(it.first);
+  }
+}
+
+void NCCLWrapper::syncWithErrorCheck() {
+  cudaError_t cudaErr;
+  ncclResult_t ncclErr, ncclAsyncErr;
+  while (true) {
+    cudaErr = cudaStreamQuery(nullptr);
+    if (cudaErr == cudaSuccess) {
+      return;
+    }
+
+    if (cudaErr != cudaErrorNotReady) {
+      spdlog::info("CUDA Error : cudaStreamQuery returned {}", cudaErr);
+      throw CommErrorException("CUDA Error : cudaStreamQuery", cudaErr);
+    }
+
+    checkAllCommErrors();
+
+    pthread_yield();
+  }
+}
+
+void NCCLWrapper::destroyCommunicator(int tag) {
+  if (contains(comm_map_, tag)) {
+    AllReduceComm* comm_info = comm_map_.at(tag);
+    ncclCommDestroy(*comm_info->comm);
+    delete comm_info->comm;
+    delete comm_info;
+  }
+}
+
+void NCCLWrapper::destroyAllCommunicators() {
+  for (const auto& it : comm_map_) {
+    destroyCommunicator(it.first);
+  }
+}
+
+void NCCLWrapper::recreateCommunicator(int tag) {
+  if (contains(comm_map_, tag)) {
+    AllReduceComm* comm_info = comm_map_.at(tag);
+
+    ncclResult_t ncclErr;
+    ncclErr = ncclCommAbort(*comm_info->comm);
+    if (ncclErr != ncclSuccess) {
+      spdlog::warn("NCCL Error : ncclCommAbort returned {}", ncclErr);
+    }
+    destroyCommunicator(tag);
+
+    std::unordered_map<int, std::unordered_set<int>> tag_to_ranks;
+    for (const auto& it : ranks_to_tag_) {
+      tag_to_ranks[it.second] = it.first;
+    }
+    assert(contains(tag_to_ranks, tag));
+    const auto& ranks = tag_to_ranks.at(tag);
+
+    if (contains(ranks, mpi::getRank())) {
+      createCommunicator(tag, ranks);
+    }
+  }
+}
+void NCCLWrapper::recreateAllCommunicators() {
+  std::vector<int> sorted_tags;
+  std::unordered_map<int, std::unordered_set<int>> tag_to_ranks;
+  for (const auto& it : ranks_to_tag_) {
+    sorted_tags.push_back(it.second);
+    tag_to_ranks[it.second] = it.first;
+  }
+  std::sort(sorted_tags.begin(), sorted_tags.end());
+
+  for (int tag : sorted_tags) {
+    recreateCommunicator(tag);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void NCCLWrapper::commWithRetry(const std::function<void()>& f) {
+  while (true) {
+    try {
+      f();
+      return;
+    } catch (CommErrorException& e) {
+      spdlog::warn("commWithRetry {}", e.what());
+      sleep(30);
+      recreateAllCommunicators();
+    }
+  }
 }
 
 std::string NCCLWrapper::getImplName() {

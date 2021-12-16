@@ -60,6 +60,11 @@ PYBIND11_MODULE(_pyrannc, m) {
     return ParamStorage::syncOnInit(sync);
   });
 
+  m.def("recreate_all_communicators", []() {
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.recreateAllCommunicators();
+  });
+
   m.def("allreduce_tensor", [](py::handle py_tensor, bool sum) {
     auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
     assert(iv.isTensor());

@@ -10,6 +10,7 @@
 #include <Common.h>
 #include <comp/EventRecorder.h>
 #include <comp/OffloadedParamMap.h>
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include <graph/ConvertGraph.h>
 #include "ConfiguredTorch.h"
@@ -432,7 +433,7 @@ void TorchDriver::createModule(
   functions_[id] =
       std::make_shared<torch::jit::GraphFunction>("forward", graph, nullptr);
 
-  syncStream();
+  syncWithErrorCheck();
   time_counter_.stop("TorchDriver::createModule");
 
   logger->trace("TorchDriver::createModule finished");
@@ -560,7 +561,7 @@ IValueMap TorchDriver::forward(
     graphOut[outNames.at(i)] = contiguous(elem);
   }
 
-  syncStream();
+  syncWithErrorCheck();
 
   time_counter_.stop(tc_key);
 
@@ -811,7 +812,7 @@ IValueMap TorchDriver::backward(
       "TorchDriver", "backward_sum_paramgrad", id, split_idx, false));
 
   recordStart(getFuncKey("TorchDriver", "backward_sync", id, split_idx, false));
-  syncStream();
+  syncWithErrorCheck();
   recordEnd(getFuncKey("TorchDriver", "backward_sync", id, split_idx, false));
 
   if (!getKeepGraph()) {

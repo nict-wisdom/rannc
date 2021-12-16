@@ -60,7 +60,7 @@ int getCudaDeviceCount();
 std::unordered_set<int> getCudaDeviceIds();
 int getCurrentCudaDeviceId();
 CudaDeviceInfo getCudaDeviceInfo(int id);
-void syncStream();
+// void syncStream();
 void syncDevice();
 c10::cuda::CUDAStream getStream();
 bool isDevicePointer(const void* ptr);

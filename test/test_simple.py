@@ -34,7 +34,7 @@ test_models = [
 @pytest.mark.parametrize("allreduce_amp_master_params", [False])
 @pytest.mark.parametrize("enable_zero", [False])
 @pytest.mark.parametrize("dist_params", [False])
-@pytest.mark.parametrize("offload_params", [True])
+@pytest.mark.parametrize("offload_params", [False])
 def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
                use_amp, allreduce_amp_master_params,
                enable_zero, dist_params, offload_params):

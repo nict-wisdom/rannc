@@ -61,10 +61,16 @@ class NCCLWrapper {
   void allgather(
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<at::Tensor>& out_bufs);
-  void send(int tag, int dest, const at::Tensor& tensor);
-  void recv(int tag, int dest, const at::Tensor& tensor);
   void startBulk();
   void endBulk();
+  void checkCommError(int tag);
+  void checkAllCommErrors();
+  void destroyCommunicator(int tag);
+  void destroyAllCommunicators();
+  void recreateCommunicator(int tag);
+  void recreateAllCommunicators();
+  void commWithRetry(const std::function<void()>& f);
+  void syncWithErrorCheck();
 
   int getTag(const std::unordered_set<int>& ranks) {
     if (!contains(ranks_to_tag_, ranks))

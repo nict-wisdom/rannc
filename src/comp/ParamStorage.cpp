@@ -5,6 +5,7 @@
 #include "ParamStorage.h"
 #include <comm/NCCLWrapper.h>
 #include <comm/ObjectComm.h>
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include <graph/Decomposition.h>
 #include "comm/SComm.h"
@@ -354,7 +355,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
     }
   }
 
-  syncStream();
+  syncWithErrorCheck();
   recordEnd(ss.str());
 }
 
@@ -362,7 +363,7 @@ void runReduceWithBucket(
     int tag, std::vector<at::Tensor>& grads_running, std::vector<int>& roots,
     std::vector<at::Tensor>& grads) {
   // Wail for the "previous" reduce to finish
-  syncStream();
+  syncWithErrorCheck();
   // now you can free buffer
   grads_running.clear();
 
@@ -464,7 +465,7 @@ void ParamStorage::allReduceParamGradsZero(
     }
   }
 
-  syncStream();
+  syncWithErrorCheck();
   recordEnd(ss.str());
   logger->trace("allReduceParamGradsZero finished {}", graph_id);
 }
@@ -541,7 +542,7 @@ void ParamStorage::bcastParamsZero(const std::string& graph_id, bool grad) {
       ar.bcast(tag, params, roots);
     }
   }
-  syncStream();
+  syncWithErrorCheck();
   recordEnd(key);
 }
 
@@ -940,7 +941,7 @@ void ParamStorage::syncParamOnInit(
     auto& tag_map = TagMap::get();
     int tag = tag_map.getRankSetTag(ranks);
 
-    syncStream();
+    syncWithErrorCheck();
     nccl.bcast(tag, {buf}, {0});
     {
       torch::NoGradGuard no_grad;
@@ -1025,7 +1026,7 @@ at::Tensor ParamStorage::doSyncParam(long param_id, bool grad) {
   ar.bcast(tag, {buf}, {root});
   const auto iv_buf = toCPU(buf, true, false);
   assert(iv_buf.isTensor());
-  syncStream();
+  syncWithErrorCheck();
   return iv_buf.toTensor();
 }
 

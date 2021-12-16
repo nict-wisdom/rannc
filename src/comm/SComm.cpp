@@ -6,6 +6,7 @@
 #include <comm/SComm.h>
 #include <comp/EventRecorder.h>
 #include <Config.h>
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include "NCCLWrapper.h"
 #include "SCommCommon.h"
@@ -507,7 +508,7 @@ torch::jit::IValue SComm::distributeLossTensor(
         toString(toIRType(val)));
   }
 
-  syncStream();
+  syncWithErrorCheck();
 
   NCCLWrapper& ar = NCCLWrapper::get();
   std::vector<at::Tensor> ar_buf = {src};
@@ -547,7 +548,7 @@ at::Tensor SComm::bcastTensor(
     ten = ivalue.toTensor();
   } else {
     ten = createBufTensor(ir_type);
-    syncStream();
+    syncWithErrorCheck();
   }
 
   if (count > 0) {

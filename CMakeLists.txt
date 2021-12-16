@@ -79,6 +79,7 @@ set(RANNC_SRCS
         src/comp/Validator.cpp
         src/comp/OffloadedParamMap.cpp
         src/cuda/CudaUtil.cpp
+        src/cuda/CudaSync.cpp
         src/graph/ConvertGraph.cpp
         src/graph/Decomposition.cpp
         src/graph/GuessValueTypes.cpp

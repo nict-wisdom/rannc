@@ -544,6 +544,10 @@ def _run_dp_dry(path):
     _pyrannc.run_dp_dry(path)
 
 
+def recreate_all_communicators():
+    _pyrannc.recreate_all_communicators()
+
+
 def show_deployment(path, batch_size):
     """
     Show a deployment (Subgraphs and micro-batch sizes in pipeline parallelism) saved in a file.

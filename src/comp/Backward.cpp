@@ -98,6 +98,7 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
     driver_->backward(graph_id_, inputs_);
 
     if (!delay_grad_allreduce_) {
+      NCCLWrapper& ar = NCCLWrapper::get();
       if (enable_zero_) {
         param_storage_->allReduceParamGradsZero(graph_id_, 1.0);
       } else {
