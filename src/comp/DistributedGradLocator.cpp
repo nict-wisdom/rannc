@@ -24,8 +24,8 @@ at::Tensor DistributedGradLocator::getLocalParamSegment(long pid) {
 }
 
 void DistributedGradLocator::setGradToLocalParamSegment(long pid) {
-  assert(contains(local_param_segments_, pid));
-  getMutableGradRef(local_param_segments_.at(pid)) =
+  auto local_param_segment = getLocalParamSegment(pid);
+  getMutableGradRef(local_param_segment) =
       getSegment(pid, my_indices_.at(pid), true);
 }
 
