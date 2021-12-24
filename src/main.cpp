@@ -240,21 +240,21 @@ PYBIND11_MODULE(_pyrannc, m) {
                   fwdFunc, params, buffers, var_lookup_fn, args, gather_inputs);
             } catch (c10::Error& e) {
               std::cerr << "Torch exception caught: " << e.what() << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -1);
+              throw e;
             } catch (std::runtime_error& e) {
               std::cerr << "Runtime error caught: " << e.what() << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -2);
+              throw e;
             } catch (std::invalid_argument& e) {
               std::cerr << "Invalid argument exception caught: " << e.what()
                         << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -3);
+              throw e;
             } catch (std::exception& e) {
               std::cerr << "Unknown exception caught: " << e.what()
                         << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -4);
+              throw e;
             }
-            std::cerr << "Failed to init model. exiting." << std::endl;
-            std::exit(-5);
+            std::cerr << "Failed to init RaNNC." << std::endl;
+            throw std::runtime_error("Failed to init RaNNC.");
           })
       .def(
           "__call__",
@@ -263,21 +263,21 @@ PYBIND11_MODULE(_pyrannc, m) {
               return self(args, kwargs);
             } catch (c10::Error& e) {
               std::cerr << "Torch exception caught: " << e.what() << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -1);
+              throw e;
             } catch (std::runtime_error& e) {
               std::cerr << "Runtime error caught: " << e.what() << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -2);
+              throw e;
             } catch (std::invalid_argument& e) {
               std::cerr << "Invalid argument exception caught: " << e.what()
                         << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -3);
+              throw e;
             } catch (std::exception& e) {
               std::cerr << "Unknown exception caught: " << e.what()
                         << std::endl;
-              MPI_Abort(MPI_COMM_WORLD, -4);
+              throw e;
             }
-            std::cerr << "Failed to compute forward. exiting." << std::endl;
-            std::exit(-5);
+            std::cerr << "Failed to compute forward." << std::endl;
+            throw std::runtime_error("Failed to compute forward.");
           })
       .def(
           "allreduce_grads",
