@@ -67,6 +67,8 @@ extern const char DUMP_DP_CACHE[];
 extern const char PARTITIONING_DRY_RUN_NP[];
 extern const char OFFLOAD_PARAMS[];
 extern const char USE_MPI_TO_GATHER_DIST_PARAMS[];
+extern const char RUN_WATCHDOG[];
+extern const char WATCHDOG_LOCKFILE_DIR[];
 
 extern const char
     CONF_DIR[]; // this is special because Config itself sets this item

@@ -535,7 +535,6 @@ void NCCLWrapper::checkAllCommErrors() {
 
 void NCCLWrapper::syncWithErrorCheck() {
   cudaError_t cudaErr;
-  ncclResult_t ncclErr, ncclAsyncErr;
   while (true) {
     cudaErr = cudaStreamQuery(nullptr);
     if (cudaErr == cudaSuccess) {
@@ -559,12 +558,26 @@ void NCCLWrapper::destroyCommunicator(int tag) {
     ncclCommDestroy(*comm_info->comm);
     delete comm_info->comm;
     delete comm_info;
+    comm_map_.erase(tag);
   }
 }
 
 void NCCLWrapper::destroyAllCommunicators() {
+  std::vector<int> tags;
   for (const auto& it : comm_map_) {
-    destroyCommunicator(it.first);
+    tags.push_back(it.first);
+  }
+  for (const auto& tag : tags) {
+    destroyCommunicator(tag);
+  }
+}
+
+void NCCLWrapper::abortAllCommunicators() {
+  for (const auto& it : comm_map_) {
+    ncclResult_t ncclErr = ncclCommAbort(*it.second->comm);
+    if (ncclErr != ncclSuccess) {
+      spdlog::warn("NCCL Error : ncclCommAbort returned {}", ncclErr);
+    }
   }
 }
 

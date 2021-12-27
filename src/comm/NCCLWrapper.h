@@ -67,6 +67,7 @@ class NCCLWrapper {
   void checkAllCommErrors();
   void destroyCommunicator(int tag);
   void destroyAllCommunicators();
+  void abortAllCommunicators();
   void recreateCommunicator(int tag);
   void recreateAllCommunicators();
   void commWithRetry(const std::function<void()>& f);

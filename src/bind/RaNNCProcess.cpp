@@ -10,6 +10,7 @@
 #include <comm/ObjectComm.h>
 #include <Common.h>
 #include <comp/NodeProfiler.h>
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 
 #include "graph/FairWeightDecomposer.h"
@@ -96,6 +97,11 @@ void RaNNCProcess::start() {
   }
 
   param_storage_ = std::make_shared<ParamStorage>();
+
+  if (config::Config::get().getVal<bool>(config::RUN_WATCHDOG)) {
+    SyncWatchDog& watch_dog = SyncWatchDog::get();
+    watch_dog.start();
+  }
 }
 
 void RaNNCProcess::registerModule(const std::string& id, RaNNCModule* module) {
@@ -114,6 +120,13 @@ void RaNNCProcess::clear() {
 
   if (param_storage_) {
     param_storage_->clear();
+  }
+
+  if (config::Config::get().getVal<bool>(config::RUN_WATCHDOG)) {
+    SyncWatchDog& watch_dog = SyncWatchDog::get();
+    if (watch_dog.isRunning()) {
+      watch_dog.stop(false);
+    }
   }
 }
 } // namespace rannc

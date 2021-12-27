@@ -17,6 +17,7 @@
 #include "comm/MPIUtil.h"
 #include "comp/DistributedParamLocator.h"
 #include "comp/RaNNCModule.h"
+#include "cuda/CudaSync.h"
 #include "graph/DeploymentSerializer.h"
 #include "Logging.h"
 
@@ -61,6 +62,10 @@ PYBIND11_MODULE(_pyrannc, m) {
   });
 
   m.def("recreate_all_communicators", []() {
+    if (config::Config::get().getVal<bool>(config::RUN_WATCHDOG)) {
+      SyncWatchDog& watch_dog = SyncWatchDog::get();
+      watch_dog.start();
+    }
     NCCLWrapper& nccl = NCCLWrapper::get();
     nccl.recreateAllCommunicators();
   });
