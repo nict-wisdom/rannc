@@ -178,6 +178,8 @@ void DPStaging::dumpNodeProfiles(
     const std::string& path, const MLGraph& graph, size_t dev_num,
     size_t min_pipeline_num, size_t max_pipeline_num) {
   int node_idx = 0;
+  int opt_param_factor =
+      config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
   nlohmann::ordered_json nodes_prof;
   nlohmann::json graphs;
 
@@ -208,6 +210,10 @@ void DPStaging::dumpNodeProfiles(
         prof_obj["bwd_time"] = prof.bwd_time;
         prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
         prof_obj["checkpointing"] = prof.checkpointing;
+        prof_obj["zero"] = enable_zero_;
+        prof_obj["opt_mem"] = getOptMemSize(
+            node.graph, opt_param_factor, use_amp_master_params_, enable_zero_,
+            d);
 
         prof_dev.push_back(prof_obj);
       }
@@ -582,7 +588,7 @@ AllocSolution DPStaging::doRunDpComm(
                   table[s - 1][b_prev][d_prev].max_bwd,
                   table[s - 1][b_prev][d_prev].max_allreduce);
 
-              static int opt_param_factor =
+              int opt_param_factor =
                   config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
               long opt_mem = 0;
               for (size_t i = b_prev; i <= (b - 1); i++) {
