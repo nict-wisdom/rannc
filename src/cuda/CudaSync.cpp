@@ -69,6 +69,7 @@ void SyncWatchDog::run_loop() {
         logger->warn("lockfile not found: {}", p.string());
         NCCLWrapper& nccl = NCCLWrapper::get();
         nccl.abortAllCommunicators();
+        logger->warn("Aborted all communicators");
         return;
       }
     }

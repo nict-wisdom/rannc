@@ -8,6 +8,7 @@
 #include <graph/ir.h>
 #include "Backward.h"
 #include "bind/RaNNCProcess.h"
+#include "cuda/CudaSync.h"
 #include "EventRecorder.h"
 
 namespace py = pybind11;
@@ -120,6 +121,10 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
   } catch (c10::Error& e) {
     std::cerr << "Torch exception caught: " << e.what() << std::endl;
     throw e;
+  } catch (CommErrorException& e) {
+    SyncWatchDog& watch_dog = SyncWatchDog::get();
+    watch_dog.stop(true);
+    throw e;
   } catch (std::runtime_error& e) {
     std::cerr << "Runtime error caught: " << e.what() << std::endl;
     throw e;
@@ -130,8 +135,6 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
     std::cerr << "Unknown exception caught: " << e.what() << std::endl;
     throw e;
   }
-  std::cerr << "Failed to compute backward." << std::endl;
-  throw std::runtime_error("Failed to compute backward.");
 }
 
 } // namespace rannc

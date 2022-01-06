@@ -21,10 +21,14 @@
 #include "graph/DeploymentSerializer.h"
 #include "Logging.h"
 
+#include "cpg/CPG.h"
+
 namespace py = pybind11;
 using namespace rannc;
 
 PYBIND11_MODULE(_pyrannc, m) {
+  m.def("test_cpg", []() { testCPG(); });
+
   m.add_object("_cleanup", py::capsule([]() {
                  EventRecorder& erec = EventRecorder::get();
                  erec.dump(config::Config::get().getVal<std::string>(
@@ -246,6 +250,10 @@ PYBIND11_MODULE(_pyrannc, m) {
             } catch (c10::Error& e) {
               std::cerr << "Torch exception caught: " << e.what() << std::endl;
               throw e;
+            } catch (CommErrorException& e) {
+              SyncWatchDog& watch_dog = SyncWatchDog::get();
+              watch_dog.stop(true);
+              throw e;
             } catch (std::runtime_error& e) {
               std::cerr << "Runtime error caught: " << e.what() << std::endl;
               throw e;
@@ -268,6 +276,10 @@ PYBIND11_MODULE(_pyrannc, m) {
               return self(args, kwargs);
             } catch (c10::Error& e) {
               std::cerr << "Torch exception caught: " << e.what() << std::endl;
+              throw e;
+            } catch (CommErrorException& e) {
+              SyncWatchDog& watch_dog = SyncWatchDog::get();
+              watch_dog.stop(true);
               throw e;
             } catch (std::runtime_error& e) {
               std::cerr << "Runtime error caught: " << e.what() << std::endl;
