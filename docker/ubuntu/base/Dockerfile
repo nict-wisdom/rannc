@@ -47,7 +47,7 @@ RUN cd ${DOCKER_BUILD_DIR} \
     && wget --quiet https://download.open-mpi.org/release/open-mpi/v${OPENMPI_VERSION%.*}/openmpi-${OPENMPI_VERSION}.tar.gz \
     && tar -xzf openmpi-${OPENMPI_VERSION}.tar.gz \
     && cd openmpi-${OPENMPI_VERSION} \
-    && ./configure --enable-mpi-cxx --enable-mpi-cxx-seek --with-cuda \
+    && ./configure --with-cuda \
         --with-ucx=/usr/local/ucx --disable-dependency-tracking \
         --disable-getpwuid --without-usnic --enable-orterun-prefix-by-default \
     && make -j 4 && make install

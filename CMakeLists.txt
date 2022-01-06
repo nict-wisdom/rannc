@@ -8,6 +8,7 @@ set(PYBIND11_CPP_STANDARD -std=c++11)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(MPI_CXX_SKIP_MPICXX ON)
 
 set(CMAKE_PREFIX_PATH
         $ENV{BOOST_DIR}
@@ -78,6 +79,7 @@ set(RANNC_SRCS
         src/comp/EventRecorder.cpp
         src/comp/Validator.cpp
         src/comp/OffloadedParamMap.cpp
+        src/cpg/CPG.cpp
         src/cuda/CudaUtil.cpp
         src/cuda/CudaSync.cpp
         src/graph/ConvertGraph.cpp
