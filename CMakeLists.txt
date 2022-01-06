@@ -8,7 +8,7 @@ set(PYBIND11_CPP_STANDARD -std=c++11)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(MPI_CXX_SKIP_MPICXX ON)
+set(MPI_CXX_SKIP_MPICXX TRUE)
 
 set(CMAKE_PREFIX_PATH
         $ENV{BOOST_DIR}
@@ -110,15 +110,7 @@ if(NCCL_SUPPORTS_BFLOAT16)
 endif()
 
 pybind11_add_module(_pyrannc ${RANNC_SRCS})
-target_link_libraries(_pyrannc PRIVATE "${TORCH_LIBRARIES}" "${MPI_C_LIBRARIES}" "${MPI_CXX_LIBRARIES}" "${CUDA_LIBRARIES}" "${Boost_LIBRARIES}" nccl)
+target_link_libraries(_pyrannc PRIVATE "${TORCH_LIBRARIES}" "${MPI_C_LIBRARIES}" "${CUDA_LIBRARIES}" "${Boost_LIBRARIES}" nccl)
 
 find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
 target_link_libraries(_pyrannc PRIVATE "${TORCH_PYTHON_LIBRARY}")
-
-if(MPI_CXX_COMPILE_FLAGS)
-    set_target_properties(_pyrannc PROPERTIES COMPILE_FLAGS "${MPI_CXX_COMPILE_FLAGS}")
-endif()
-if(MPI_CXX_LINK_FLAGS)
-    set_target_properties(_pyrannc PROPERTIES LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
-endif()
-
