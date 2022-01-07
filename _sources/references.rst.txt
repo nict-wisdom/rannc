@@ -6,4 +6,3 @@ API references
 .. automodule:: pyrannc
    :members:
    :undoc-members:
-

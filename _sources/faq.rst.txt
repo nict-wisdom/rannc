@@ -60,7 +60,7 @@ You can save a partitioning result using options ``SAVE_DEPLOYMENT=true`` and ``
 When these options are enabled, RaNNC outputs the partitioning result to the specified path. (See also :doc:`config`)
 
 Then, you can read the output file and display the partitioning results using ``pyrannc.show_deployment(PATH, batch_size)``.
-The second argument is an expected batch size.
+The second argument is an expected batch size;
 This shows partitioned subgraphs and micro batch sizes in pipeline parallelism.
 
 A one-liner using this API is:
@@ -68,13 +68,6 @@ A one-liner using this API is:
 .. code-block:: bash
 
   python -c 'import pyrannc; pyrannc.show_deployment("/.../PATH_TO_DEPLOYMENT_FILE", 64)'
-
-
-.. My model is too large to fit to the host memory
-.. -----------------------------------------------
-
-.. Use ``DistributeModelParams``.
-.. Parameters of a model can exceed the limit of the host memory when the model is extremely large.
 
 
 .. Custom cpp functions do not work with RaNNC
