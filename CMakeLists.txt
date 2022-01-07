@@ -107,10 +107,17 @@ option(NCCL_SUPPORTS_BFLOAT16 "Enable Bfloat16 support of NCCL." off)
 if(NCCL_SUPPORTS_BFLOAT16)
     message("Enabling NCCL's Bfloat16 support.")
     add_definitions(-D__NCCL_SUPPORTS_BFLOAT16__)
-endif()
+endif ()
 
 pybind11_add_module(_pyrannc ${RANNC_SRCS})
 target_link_libraries(_pyrannc PRIVATE "${TORCH_LIBRARIES}" "${MPI_C_LIBRARIES}" "${CUDA_LIBRARIES}" "${Boost_LIBRARIES}" nccl)
 
 find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
 target_link_libraries(_pyrannc PRIVATE "${TORCH_PYTHON_LIBRARY}")
+
+if (MPI_CXX_COMPILE_FLAGS)
+    set_target_properties(_pyrannc PROPERTIES COMPILE_FLAGS "${MPI_CXX_COMPILE_FLAGS}")
+endif ()
+if (MPI_CXX_LINK_FLAGS)
+    set_target_properties(_pyrannc PROPERTIES LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
+endif ()
