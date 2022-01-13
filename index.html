@@ -4,8 +4,7 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>RaNNC (Rapid Neural Network Connector) &mdash; RaNNC 0.7.2 documentation</title>
@@ -164,7 +163,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <section id="rannc-rapid-neural-network-connector">
+  <div class="section" id="rannc-rapid-neural-network-connector">
 <h1>RaNNC (Rapid Neural Network Connector)<a class="headerlink" href="#rannc-rapid-neural-network-connector" title="Permalink to this headline">¶</a></h1>
 <p>RaNNC is an automatic parallelization middleware for training very large-scale neural networks.
 Since modern networks often have billions of parameters, they do not fit the memory of GPUs.
@@ -200,7 +199,7 @@ In addition, some existing frameworks including Megatron-LM can be applicable on
 <p>We confirmed that RaNNC can train a BERT model with approximately 100 billion parameters without a manual
 modification/optimization of the definition of the network for model partitioning.</p>
 <p>The initial ideas of RaNNC were published at IPDPS 2021.
-See our paper <a class="footnote-reference brackets" href="#f1" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> for RaNNC’s partitioning algorithm and performance comparisons with other frameworks (<a class="reference external" href="http://arxiv.org/abs/2103.16063">preprint</a>).</p>
+See our paper <a class="footnote-reference brackets" href="#f1" id="id1">1</a> for RaNNC’s partitioning algorithm and performance comparisons with other frameworks (<a class="reference external" href="http://arxiv.org/abs/2103.16063">preprint</a>).</p>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
@@ -214,14 +213,15 @@ See our paper <a class="footnote-reference brackets" href="#f1" id="id1" role="d
 <li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 </div>
-</section>
-<section id="reference">
+</div>
+<div class="section" id="reference">
 <h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
-<aside class="footnote brackets" id="f1" role="note">
-<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
-<p>Automatic Graph Partitioning for Very Large-scale Deep Learning, Masahiro Tanaka, Kenjiro Taura, Toshihiro Hanawa and Kentaro Torisawa, In the Proceedings of 35th IEEE International Parallel and Distributed Processing Symposium (IPDPS 2021), pp. 1004-1013, May, 2021.</p>
-</aside>
-</section>
+<dl class="footnote brackets">
+<dt class="label" id="f1"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Automatic Graph Partitioning for Very Large-scale Deep Learning, Masahiro Tanaka, Kenjiro Taura, Toshihiro Hanawa and Kentaro Torisawa, In the Proceedings of 35th IEEE International Parallel and Distributed Processing Symposium (IPDPS 2021), pp. 1004-1013, May, 2021.</p>
+</dd>
+</dl>
+</div>
 
 
            </div>

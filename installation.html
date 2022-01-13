@@ -4,8 +4,7 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Installation &mdash; RaNNC 0.7.2 documentation</title>
@@ -169,9 +168,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <section id="installation">
+  <div class="section" id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<section id="prerequisites">
+<div class="section" id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
 <p>RaNNC works only with CUDA devices (CPU only or TPU environments are not supported).
 RaNNC requires the following libraries and tools at runtime.</p>
@@ -185,8 +184,8 @@ RaNNC requires the following libraries and tools at runtime.</p>
 <li><p><em>MPI</em>: A program using RaNNC must be launched with MPI. MPI libraries must also be available at runtime. RaNNC has been tested with OpenMPI v4.0.5.</p></li>
 <li><p><em>libstd++</em>: <code class="docutils literal notranslate"><span class="pre">libstd++</span></code> must support <code class="docutils literal notranslate"><span class="pre">GLIBCXX_3.4.21</span></code> to use the distributed <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages (these packages are built with gcc 5.4.0).</p></li>
 </ul>
-</section>
-<section id="id1">
+</div>
+<div class="section" id="id1">
 <h2>Installation<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
 <p>The current version (<code class="docutils literal notranslate"><span class="pre">0.7.2</span></code>) of RaNNC requires PyTorch v1.10.1.
 <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages for <code class="docutils literal notranslate"><span class="pre">linux_x86_64</span></code> are available for the following combinations of Python and CUDA versions.</p>
@@ -213,8 +212,8 @@ pip install <span class="nv">pyrannc</span><span class="o">==</span><span class=
 </ul>
 <p>If the above packages do not match your Python/CUDA versions, create a suitable package using <code class="docutils literal notranslate"><span class="pre">Makefile</span></code>
 in <code class="docutils literal notranslate"><span class="pre">docker/</span></code>. <code class="docutils literal notranslate"><span class="pre">make.sh</span></code> shows the commands to create wheel packages.</p>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

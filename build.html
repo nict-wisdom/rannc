@@ -4,8 +4,7 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Building from source &mdash; RaNNC 0.7.2 documentation</title>
@@ -168,17 +167,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <section id="building-from-source">
+  <div class="section" id="building-from-source">
 <h1>Building from source<a class="headerlink" href="#building-from-source" title="Permalink to this headline">¶</a></h1>
-<section id="compiler-version">
+<div class="section" id="compiler-version">
 <h2>Compiler version<a class="headerlink" href="#compiler-version" title="Permalink to this headline">¶</a></h2>
 <p>You must use GCC v5.4 or newer. RaNNC has been tested with GCC v8.2.
 Note that RaNNC must be built in compliance with ABI of PyTorch.</p>
 <p>RaNNC is built with <em>Pre-cxx11 ABI</em> (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=0</span></code>) as default because PyTorch installed via conda is built with it.
 You can change the ABI setting in <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>.
 PyTorch provides you with <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html">function</a> below to understand how the binary is compiled.</p>
-</section>
-<section id="build-and-install">
+</div>
+<div class="section" id="build-and-install">
 <h2>Build and Install<a class="headerlink" href="#build-and-install" title="Permalink to this headline">¶</a></h2>
 <p>Clone the repository with the submodules (<code class="docutils literal notranslate"><span class="pre">--recursive</span></code> is required).</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone --recursive https://github.com/nict-wisdom/rannc
@@ -187,6 +186,10 @@ PyTorch provides you with <a class="reference external" href="https://pytorch.or
 <p>You need to set some environment variables before building RaNNC to help cmake find the dependent libraries.</p>
 <table class="docutils align-default" id="id1">
 <caption><span class="caption-text">Variables for building configurations</span><a class="headerlink" href="#id1" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
 <tbody>
 <tr class="row-odd"><td><p>Variable</p></td>
 <td></td>
@@ -228,8 +231,8 @@ The following script shows the configurations used to install RaNNC from the sou
 </div>
 <p><em>Makefiles</em> under <code class="docutils literal notranslate"><span class="pre">docker/</span></code> show the complete process used to build and install RaNNC.
 These are used to build the pip packages.</p>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

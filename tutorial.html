@@ -4,8 +4,7 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Tutorial &mdash; RaNNC 0.7.2 documentation</title>
@@ -176,28 +175,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <section id="tutorial">
+  <div class="section" id="tutorial">
 <h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
 <p>The greatest feature of RaNNC is that it can automatically partition a model written for PyTorch and train it using
 multiple GPUs (model parallelism).
 Unlike other frameworks for model parallelism, users do not need to modify the model for partitioning.</p>
 <p>In this tutorial, you will learn how to use RaNNC to train very large models that cannot be trained using data parallelism only.</p>
-<section id="steps-to-use-rannc">
+<div class="section" id="steps-to-use-rannc">
 <h2>Steps to use RaNNC<a class="headerlink" href="#steps-to-use-rannc" title="Permalink to this headline">¶</a></h2>
-<section id="set-up-environment">
+<div class="section" id="set-up-environment">
 <h3>0. Set up environment<a class="headerlink" href="#set-up-environment" title="Permalink to this headline">¶</a></h3>
 <p>Ensure the required tools and libraries (CUDA, NCCL, OpenMPI, etc.) are available in your environment.
 The libraries must be included in <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> at runtime.
 Then install <code class="docutils literal notranslate"><span class="pre">pyrannc</span></code> following the commands shown in <a class="reference internal" href="installation.html"><span class="doc">Installation</span></a> page.</p>
-</section>
-<section id="import-rannc">
+</div>
+<div class="section" id="import-rannc">
 <h3>1. Import RaNNC<a class="headerlink" href="#import-rannc" title="Permalink to this headline">¶</a></h3>
 <p>Insert <code class="docutils literal notranslate"><span class="pre">import</span></code> in your script.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pyrannc</span>
 </pre></div>
 </div>
-</section>
-<section id="wrap-your-model">
+</div>
+<div class="section" id="wrap-your-model">
 <h3>2. Wrap your model<a class="headerlink" href="#wrap-your-model" title="Permalink to this headline">¶</a></h3>
 <p>Wrap your model by using <code class="docutils literal notranslate"><span class="pre">pyrannc.RaNNCModule</span></code> with your optimizer.
 You can use the wrapped model in almost the same manner as the original model (see below).</p>
@@ -212,8 +211,8 @@ Thus you can declare a very large model that does not fit to the memory of a GPU
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">pyrannc</span><span class="o">.</span><span class="n">RaNNCModule</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre></div>
 </div>
-</section>
-<section id="run-forward-backward-passes">
+</div>
+<div class="section" id="run-forward-backward-passes">
 <h3>3. Run forward/backward passes<a class="headerlink" href="#run-forward-backward-passes" title="Permalink to this headline">¶</a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code> can run forward/backward passes, as with <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
@@ -264,8 +263,8 @@ The optimizer can update model parameters simply by calling <code class="docutil
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Finished on rank</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pyrannc</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()))</span>
 </pre></div>
 </div>
-</section>
-<section id="launch-with-a-small-model">
+</div>
+<div class="section" id="launch-with-a-small-model">
 <h3>4. Launch (with a small model)<a class="headerlink" href="#launch-with-a-small-model" title="Permalink to this headline">¶</a></h3>
 <p>A program using RaNNC must be launched using <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>.
 Begin with launching the above script with a very small model using two GPUs.</p>
@@ -322,9 +321,9 @@ The computational graph that is equivalent to the model was named <code class="d
 RaNNC automatically gathers the batches from all ranks and computes them as a single batch.
 Therefore, the effective (global) batch size is [number of processes (np)] * [batch size per process].
 <code class="docutils literal notranslate"><span class="pre">torch.utils.data.distributed.DistributedSampler</span></code> is useful to properly take batches in each process.</p>
-</aside>
-</section>
-<section id="model-partitioning-for-very-large-models">
+</div>
+</div>
+<div class="section" id="model-partitioning-for-very-large-models">
 <h3>5. Model partitioning for very large models<a class="headerlink" href="#model-partitioning-for-very-large-models" title="Permalink to this headline">¶</a></h3>
 <p>If the number of parameters of a model is very large, you cannot train the model only with data parallelism.
 RaNNC automatically partitions such models for <em>model parallelism</em>.</p>
@@ -354,9 +353,9 @@ and optimizer states exceeds the memory of the GPU (40GB). (The model requires 1
 (hybrid model/data parallelism).
 Note that RaNNC may set different numbers of replicas for data parallelism for each computational graph to optimize the training throughput.</p>
 <p>For more practical usages, <code class="docutils literal notranslate"><span class="pre">test/test_simple.py</span></code> and <a class="reference external" href="https://github.com/nict-wisdom/rannc-examples/">examples</a> will be helpful.</p>
-</section>
-</section>
-</section>
+</div>
+</div>
+</div>
 
 
            </div>
