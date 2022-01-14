@@ -266,7 +266,7 @@ std::vector<long> RaNNCModule::init(
         logger->warn(
             "Unused value(s) found in graph. It is likely that the autograd graph will not "
             "be properly constructed. "
-            "To ignore this warning, set check_unused_values=True when creating RaNNCModule. "
+            "To ignore this warning, set check_unused_values=False when creating RaNNCModule. "
             "unused_values={} graph={}",
             join_as_str(unused_vals), graph->toString());
         throw std::runtime_error("The graph is invalid.");
