@@ -413,6 +413,10 @@ void ParamStorage::allReduceParamGradsZero(
       size_t comm_size = 0;
 
       for (long pid : param_ids) {
+        if (!getParamTensor(pid).requires_grad()) {
+          continue;
+        }
+
         for (int i = 0; i < locator->getSegmentNum(pid); i++) {
           const auto range = locator->getSegmentRange(pid, i);
           if (range.first == range.second) {

@@ -16,17 +16,20 @@ void DistributedGradLocator::registerGrad(
 at::Tensor DistributedGradLocator::getLocalParamSegment(long pid) {
   if (!contains(local_param_segments_, pid)) {
     // Keep local segment to set grad to it.
+    auto& param = params_.at(pid);
     local_param_segments_[pid] = getSegment(pid, my_indices_.at(pid), false)
                                      .detach()
-                                     .set_requires_grad(true);
+                                     .set_requires_grad(param.requires_grad());
   }
   return local_param_segments_.at(pid);
 }
 
 void DistributedGradLocator::setGradToLocalParamSegment(long pid) {
   auto local_param_segment = getLocalParamSegment(pid);
-  getMutableGradRef(local_param_segment) =
-      getSegment(pid, my_indices_.at(pid), true);
+  if (local_param_segment.requires_grad()) {
+    getMutableGradRef(local_param_segment) =
+        getSegment(pid, my_indices_.at(pid), true);
+  }
 }
 
 at::Tensor DistributedGradLocator::getSegment(long pid, int index, bool grad) {
