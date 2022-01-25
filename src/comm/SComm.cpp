@@ -665,6 +665,34 @@ MPI_Comm SComm::getCommunicator(int tag, const std::unordered_set<int>& ranks) {
   return *comm_map_.at(tag);
 }
 
+int64_t allReduceBatchSize(
+    int64_t batch_size, const std::function<void(int, at::Tensor)>& f) {
+  at::TensorOptions options =
+      torch::TensorOptions().dtype(c10::ScalarType::Long);
+  at::Tensor ten = torch::from_blob(&batch_size, {}, options).cuda();
+
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  TagMap& tag_map = TagMap::get();
+  int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+  nccl.createCommunicator(tag, mpi::getAllRanks());
+  f(tag, {ten});
+  return ten.cpu().item<int64_t>();
+}
+
+int64_t SComm::allReduceSumBatchSize(int64_t batch_size) {
+  return allReduceBatchSize(batch_size, [](int tag, at::Tensor ten) {
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.allreduce(tag, {ten});
+  });
+}
+
+int64_t SComm::allReduceMaxBatchSize(int64_t batch_size) {
+  return allReduceBatchSize(batch_size, [](int tag, at::Tensor ten) {
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.allreduceMax(tag, {ten});
+  });
+}
+
 void SComm::destroy() {
   for (auto& c : comm_map_) {
     c.second.reset();

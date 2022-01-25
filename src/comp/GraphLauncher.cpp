@@ -401,7 +401,9 @@ torch::jit::IValue GraphLauncher::forward(
   IValueMap pad_inputs;
   int64_t global_batch_size;
   if (gather_inputs_) {
-    int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
+    SComm& scomm = SComm::get();
+    int64_t max_local_batch_size =
+        scomm.allReduceMaxBatchSize(input_batch_size);
     last_batch_size_ = max_local_batch_size;
     global_batch_size = max_local_batch_size * mpi::getSize();
     pad_inputs =
@@ -472,7 +474,9 @@ IValueMap GraphLauncher::backward(
   IValueMap scaled_inputs;
   int64_t global_batch_size;
   if (gather_inputs_) {
-    int64_t max_local_batch_size = mpi::allReduceMaxBatchSize(input_batch_size);
+    SComm& scomm = SComm::get();
+    int64_t max_local_batch_size =
+        scomm.allReduceMaxBatchSize(input_batch_size);
     const auto pad_inputs =
         alignBatch(inputs, max_local_batch_size, deployment_.graph, true);
     global_batch_size = max_local_batch_size * mpi::getSize();

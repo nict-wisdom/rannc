@@ -104,6 +104,9 @@ class SComm {
       const torch::jit::IValue& tensor, const RouteDP& route, bool is_bwd,
       const IRType& global_type, int split_delay = 0);
 
+  int64_t allReduceSumBatchSize(int64_t batch_size);
+  int64_t allReduceMaxBatchSize(int64_t batch_size);
+
   MPI_Comm getCommunicator(int tag, const std::unordered_set<int>& ranks);
 
   void destroy();

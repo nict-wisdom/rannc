@@ -327,6 +327,11 @@ void NCCLWrapper::allreduceMin(
   doAllreduce(tag, tensors, ncclMin);
 }
 
+void NCCLWrapper::allreduceMax(
+    int tag, const std::vector<at::Tensor>& tensors) {
+  doAllreduce(tag, tensors, ncclMax);
+}
+
 void NCCLWrapper::reduce(
     int tag, const std::vector<at::Tensor>& tensors,
     const std::vector<int>& roots) {

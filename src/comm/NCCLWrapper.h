@@ -49,6 +49,7 @@ class NCCLWrapper {
 
   void allreduce(int tag, const std::vector<at::Tensor>& tensors);
   void allreduceMin(int tag, const std::vector<at::Tensor>& tensors);
+  void allreduceMax(int tag, const std::vector<at::Tensor>& tensors);
   void reduce(
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<int>& roots);

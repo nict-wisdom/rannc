@@ -160,8 +160,9 @@ std::vector<long> RaNNCModule::init(
   std::vector<torch::jit::IValue> input_ivals =
       torch::jit::_toTypeInferredIValue(args).toTuple()->elements();
   int64_t local_batch_size = guessBatchSize(input_ivals);
+  SComm& scomm = SComm::get();
   int64_t batch_size = gather_inputs
-      ? mpi::allReduceSumBatchSize(local_batch_size)
+      ? scomm.allReduceSumBatchSize(local_batch_size)
       : local_batch_size;
 
   config::Config& conf = config::Config::get();
