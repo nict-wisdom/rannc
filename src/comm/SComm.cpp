@@ -535,13 +535,9 @@ torch::jit::IValue SComm::distributeLossTensor(
 at::Tensor SComm::bcastTensor(
     const torch::jit::IValue& ivalue, const IRType& ir_type,
     const RouteDP& route, MPI_Comm comm) {
-  auto scalar_type =
-      fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType());
   int count = productDim(ir_type.getTensorDim());
-  MPI_Datatype datatype = scalarTypeToMPIDatatype(scalar_type);
   int root = getBcastRoot(route);
 
-  void* ptr;
   at::Tensor ten;
   if (mpi::getRank(comm) == root) {
     assert(ivalue.isTensor());
@@ -552,8 +548,12 @@ at::Tensor SComm::bcastTensor(
   }
 
   if (count > 0) {
-    ptr = ten.data_ptr();
-    mpi::checkMPIResult(MPI_Bcast(ptr, count, datatype, root, comm));
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    TagMap& tag_map = TagMap::get();
+    const auto ranks = mpi::getRanksInComm(comm);
+    int tag = tag_map.getRankSetTag(ranks);
+    nccl.createCommunicator(tag, ranks);
+    nccl.bcast(tag, {ten}, {root});
   }
 
   return ten;
