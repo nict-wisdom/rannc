@@ -226,7 +226,8 @@ void GraphConnector::deployGraph(const Deployment& deployment) {
 
     const std::string& sg_name = subgraph->getName();
     driver_.createModule(
-        sg_name, subgraph, constants, this->functions_, param_tensors);
+        sg_name, deployment.id, subgraph, constants, this->functions_,
+        param_tensors);
 
     checkpointing_[sg_name] = deployment.checkpointing;
     assert(contains(deployment.allocation, sg_name));
@@ -636,5 +637,9 @@ std::unordered_map<std::string, IValueMap> GraphConnector::backward(
   recordEnd(getFuncKey("GraphConnector", "backward", id, split_index, false));
 
   return values;
+}
+
+void GraphConnector::enableDropout(const std::string& id, bool enable) {
+  driver_.enableDropout(id, enable);
 }
 } // namespace rannc

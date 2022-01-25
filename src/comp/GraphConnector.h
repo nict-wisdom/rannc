@@ -25,7 +25,7 @@ class GraphConnector {
   GraphConnector(
       std::string id, std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
-      const FunctionStorage& functions, bool offload_params)
+      std::shared_ptr<FunctionStorage> functions, bool offload_params)
       : id_(std::move(id)),
         param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
@@ -57,13 +57,15 @@ class GraphConnector {
       const std::unordered_map<std::string, IValueMap>& inputs,
       int split_index);
 
+  void enableDropout(const std::string& id, bool enable);
+
  private:
   const std::string id_;
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs_;
 
   std::shared_ptr<ParamStorage> param_storage_;
   std::shared_ptr<GraphValueStorage> value_storage_;
-  const FunctionStorage& functions_;
+  std::shared_ptr<FunctionStorage> functions_;
   TorchDriver driver_;
 
   std::unordered_map<std::string, std::unordered_map<int, IValueMap>> inputs_;

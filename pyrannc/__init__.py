@@ -459,6 +459,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                 self._sync_orig_params(sync_all_ranks=sync)
             super().undeploy()
 
+    def enable_dropout(self, enable):
+        if self.ready:
+            super().enable_dropout(enable)
+        else:
+            logger.warning("Unable to change dropout mode because the module is not initialized.")
+
     def __del__(self):
         self.undeploy(sync=False)
 

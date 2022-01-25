@@ -370,12 +370,15 @@ std::shared_ptr<IRGraph> insertOffloadingPostHooks(
 bool TorchDriver::keep_graph_ = false;
 
 void TorchDriver::createModule(
-    const std::string& id, const std::shared_ptr<rannc::IRGraph>& irGraph,
-    const IValueMap& constants, const FunctionStorage& functions,
+    const std::string& id, const std::string& model_id,
+    const std::shared_ptr<rannc::IRGraph>& irGraph, const IValueMap& constants,
+    const std::shared_ptr<FunctionStorage>& functions,
     const std::unordered_map<std::string, at::Tensor>& parameters) {
   logger->trace("TorchDriver::createModule starting");
 
   time_counter_.start("TorchDriver::createModule");
+
+  subgraph_ids_[model_id].push_back(id);
 
   ir_graphs_[id] = irGraph;
   param_tensors_[id] = parameters;
@@ -384,11 +387,11 @@ void TorchDriver::createModule(
   clone_input_ir_graphs_[id] = clone_results.first;
   input_clone_names_[id] = clone_results.second;
 
-  IValueMap constants_mod = constants;
+  constants_[id] = constants;
 
   if (display_act_values_) {
     clone_input_ir_graphs_[id] =
-        insertValueHook(clone_input_ir_graphs_[id], constants_mod);
+        insertValueHook(clone_input_ir_graphs_[id], constants_[id]);
   }
 
   if (offload_params_) {
@@ -399,13 +402,14 @@ void TorchDriver::createModule(
     }
 
     clone_input_ir_graphs_[id] =
-        insertOffloadingPostHooks(clone_input_ir_graphs_[id], constants_mod);
+        insertOffloadingPostHooks(clone_input_ir_graphs_[id], constants_[id]);
     clone_input_ir_graphs_[id] =
-        insertOffloadingPreHooks(clone_input_ir_graphs_[id], constants_mod);
+        insertOffloadingPreHooks(clone_input_ir_graphs_[id], constants_[id]);
   }
 
   ConvertGraph cg;
-  auto graph = cg.toTorch(clone_input_ir_graphs_[id], constants_mod, functions);
+  auto graph =
+      cg.toTorch(clone_input_ir_graphs_[id], constants_[id], functions);
 
   logger->trace("Finished to convert graph.");
   logger->debug("Subgraph {} deployed: {}", id, graph->toString());
@@ -428,6 +432,8 @@ void TorchDriver::createModule(
       grad.zero_();
     }
   }
+
+  func_storages_[id] = functions;
 
   logger->trace("TorchDriver::createModule creating function.");
   functions_[id] =
@@ -837,6 +843,7 @@ void TorchDriver::destroyModule(const std::string& id) {
   last_inputs_.erase(id);
   last_outputs_.erase(id);
   ir_graphs_.erase(id);
+  subgraph_ids_.erase(id);
 
   param_tensors_.erase(id);
   ordered_param_names_.erase(id);
@@ -852,6 +859,18 @@ void TorchDriver::destroy() {
   const auto all_ids = keys(ir_graphs_);
   for (const auto& id : all_ids) {
     destroyModule(id);
+  }
+}
+
+void TorchDriver::enableDropout(const std::string& id, bool enable) {
+  for (const auto& sub_id : subgraph_ids_[id]) {
+    ConvertGraph cg;
+    auto graph = cg.toTorch(
+        clone_input_ir_graphs_[sub_id], constants_[sub_id],
+        func_storages_[sub_id]);
+    const auto graph_dropout = rannc::enableDropout(graph, enable);
+    functions_[sub_id] = std::make_shared<torch::jit::GraphFunction>(
+        "forward", graph_dropout, nullptr);
   }
 }
 

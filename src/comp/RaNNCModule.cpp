@@ -217,11 +217,11 @@ std::vector<long> RaNNCModule::init(
     }
   }
 
-  auto value_storage = std::make_shared<GraphValueStorage>();
-  value_storage->deploy(graph);
+  value_storage_ = std::make_shared<GraphValueStorage>();
+  value_storage_->deploy(graph);
 
-  FunctionStorage function_storage;
-  function_storage.deploy(graph);
+  func_storage_ = std::make_shared<FunctionStorage>();
+  func_storage_->deploy(graph);
 
   DistributedParamLocator& zpl = DistributedParamLocator::get();
   zpl.fetchStart();
@@ -229,8 +229,8 @@ std::vector<long> RaNNCModule::init(
     const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
     std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
         param_storage_, ir_graph_, non_param_inputs, graph_params,
-        value_storage->getValues(), function_storage, batch_size,
-        mpi::getSize(), min_pipeline, offload_params_);
+        value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
+        min_pipeline, offload_params_);
 
     sg_prof->setCacheParamValues(true);
 
@@ -368,8 +368,8 @@ std::vector<long> RaNNCModule::init(
       } else {
         Validator validator;
         if (!validator.validate(
-                graph, input_ivals, param_inputs, value_storage->getValues(),
-                function_storage, deployment_)) {
+                graph, input_ivals, param_inputs, value_storage_->getValues(),
+                func_storage_, deployment_)) {
           throw std::runtime_error("Partitioning verification failed.");
         }
         logger->info("Partitioning verification passed.");
@@ -402,7 +402,7 @@ std::vector<long> RaNNCModule::init(
   param_storage_->deploy(deployment_, graph_params, enable_zero_);
 
   driver_ = std::make_shared<GraphLauncher>(
-      param_storage_, value_storage, function_storage, deployment_.pipeline_num,
+      param_storage_, value_storage_, func_storage_, deployment_.pipeline_num,
       gather_inputs, offload_params_);
   logger->debug("Calling driver->deployGraph");
   driver_->deployGraph(deployment_);
@@ -565,4 +565,9 @@ void RaNNCModule::destroy() {
 
   destroyed_ = true;
 }
+
+void RaNNCModule::enableDropout(bool enable) {
+  driver_->enableDropout(id_, enable);
+}
+
 } // namespace rannc

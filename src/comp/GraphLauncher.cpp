@@ -516,4 +516,9 @@ IValueMap GraphLauncher::backward(
 
   return outputs;
 }
+
+void GraphLauncher::enableDropout(const std::string& id, bool enable) {
+  driver_[id]->enableDropout(id, enable);
+}
+
 } // namespace rannc

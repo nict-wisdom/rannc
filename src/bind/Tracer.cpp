@@ -371,15 +371,7 @@ std::shared_ptr<torch::jit::Graph> _createGraphByTracing(
   auto lookup_fn_adapter =
       [var_name_lookup_fn](const Variable& var) -> std::string {
     AutoGIL ag;
-    std::stringstream ss;
-    int rank = getCurrentRank();
-    if (rank == 0) {
-      ss << py::cast<std::string>(var_name_lookup_fn(var));
-    } else {
-      ss << "r" << getCurrentRank() << "_"
-         << py::cast<std::string>(var_name_lookup_fn(var));
-    }
-    return ss.str();
+    return py::cast<std::string>(var_name_lookup_fn(var));
   };
 
   auto outs = _trace(

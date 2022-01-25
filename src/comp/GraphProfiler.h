@@ -91,14 +91,14 @@ class GraphProfiler {
       std::shared_ptr<IRGraph> base_graph,
       std::unordered_map<std::string, torch::jit::IValue> non_param_inputs,
       std::unordered_map<std::string, long> graph_params, IValueMap constants,
-      const FunctionStorage& functions, size_t batch_size, int dev_num,
-      size_t min_pipeline_num, bool offload_params)
+      std::shared_ptr<FunctionStorage> functions, size_t batch_size,
+      int dev_num, size_t min_pipeline_num, bool offload_params)
       : param_storage_(std::move(param_storage)),
         base_graph_(std::move(base_graph)),
         non_param_inputs_(std::move(non_param_inputs)),
         graph_params_(std::move(graph_params)),
         constants_(std::move(constants)),
-        functions_(functions),
+        functions_(std::move(functions)),
         batch_size_(batch_size),
         dev_num_(dev_num),
         min_pipeline_num_(min_pipeline_num),
@@ -137,7 +137,7 @@ class GraphProfiler {
   std::unordered_map<std::string, torch::jit::IValue> non_param_inputs_;
   std::unordered_map<std::string, long> graph_params_;
   IValueMap constants_;
-  const FunctionStorage& functions_;
+  std::shared_ptr<FunctionStorage> functions_;
   size_t batch_size_;
   int dev_num_;
   size_t min_pipeline_num_;

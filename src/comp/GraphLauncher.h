@@ -26,11 +26,11 @@ class GraphLauncher {
   GraphLauncher(
       std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
-      const FunctionStorage& function_storage, int pipeline_num,
+      std::shared_ptr<FunctionStorage> function_storage, int pipeline_num,
       bool gather_inputs, bool offload_params)
       : param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
-        function_storage_(function_storage),
+        function_storage_(std::move(function_storage)),
         pipeline_num_(pipeline_num),
         gather_inputs_(gather_inputs) {
     enable_profiling_ = config::Config::get().getVal<bool>(config::PROFILING);
@@ -42,6 +42,7 @@ class GraphLauncher {
   void undeployGraph(const std::string& id);
   torch::jit::IValue forward(const std::string& id, const IValueMap& inputs);
   IValueMap backward(const std::string& id, const IValueMap& inputs);
+  void enableDropout(const std::string& id, bool enable);
 
  private:
   IValueMap compute(
@@ -55,7 +56,7 @@ class GraphLauncher {
 
   std::shared_ptr<ParamStorage> param_storage_;
   std::shared_ptr<GraphValueStorage> value_storage_;
-  const FunctionStorage& function_storage_;
+  std::shared_ptr<FunctionStorage> function_storage_;
   std::unordered_map<std::string, std::shared_ptr<GraphConnector>> driver_;
   std::unordered_map<std::string, std::atomic_bool> bwd_running_;
 

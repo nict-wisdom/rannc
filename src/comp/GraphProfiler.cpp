@@ -2,13 +2,15 @@
 // Created by Masahiro Tanaka on 2019/12/20.
 //
 
-#include "GraphProfiler.h"
+#include <regex>
+
 #include <graph/GuessValueTypes.h>
 #include <torch/TorchEngine.h>
 #include <torch/TorchUtil.h>
 #include "comp/ParamStorage.h"
 #include "ConfiguredTorch.h"
 #include "graph/ConvertGraph.h"
+#include "GraphProfiler.h"
 
 namespace rannc {
 
@@ -122,12 +124,52 @@ void GraphValueCache::put(
 torch::jit::IValue GraphValueCache::get(
     const std::string& name, size_t batch_size) {}
 
+static at::Dimname dimnameFromString(const std::string& str) {
+  return at::Dimname::fromSymbol(at::Symbol::dimname(str));
+}
+
+static std::vector<at::Dimname> dimnamesFromStringVector(
+    const std::vector<std::string>& names) {
+  std::vector<at::Dimname> dim_names;
+  for (const auto& n : names) {
+    dim_names.push_back(dimnameFromString(n));
+  }
+  return dim_names;
+}
+
+std::vector<at::Dimname> createDimnames(
+    const std::string& val_name, const at::Tensor& ten) {
+  size_t dim_num = ten.sizes().size();
+  size_t dim_name_num = ten.names().size();
+
+  std::vector<std::string> dim_names;
+  size_t idx = 0;
+  for (const auto& n : ten.names()) {
+    std::stringstream ss;
+    ss << "v_" << std::regex_replace(val_name, std::regex("\\."), "_") << "_D"
+       << idx;
+    dim_names.push_back(ss.str());
+    idx++;
+  }
+
+  return dimnamesFromStringVector(dim_names);
+}
+
 ProfilingResult GraphProfiler::compute(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
     int iteration, IValueMap& values, int split_index, bool checkpointing) {
   TimeCounter time_counter(true);
   ProfilingResult ret_profiles;
   std::unordered_set<std::string> graphs_done;
+
+  //  IValueMap named_values = values;
+  //  for (const auto& it: values) {
+  //    if (it.second.isTensor()) {
+  //      dim_names = setDimnames(it.first, it.second.toTensor());
+  ////      at::DimnameList dim_names = dimnamesFromStringVector({"B"});
+  ////      it.second.toTensor().rename(dim_names);
+  //    }
+  //  }
 
   std::unordered_set<IValueLocation, IValueLocationHash> avail_locs;
   for (const auto& it : values) {
@@ -172,9 +214,19 @@ ProfilingResult GraphProfiler::compute(
         emptyCache();
 
         IValueMap graph_inputs;
+        std::unordered_map<std::string, std::vector<at::Dimname>> dim_names;
         size_t input_size = 0;
         for (const auto& in_name : input_names) {
           assert(contains(values, in_name));
+          //          const auto in_val =
+          //          contiguous(toCUDAIfAvailable(values.at(in_name), true));
+          //
+          //          graph_inputs[in_name] = in_val;
+          //          if (in_val.isTensor()) {
+          //            dim_names[in_name] = createDimnames(in_name,
+          //            in_val.toTensor()); graph_inputs[in_name] =
+          //            in_val.toTensor().rename(dim_names[in_name]);
+          //          }
           graph_inputs[in_name] =
               contiguous(toCUDAIfAvailable(values.at(in_name), true));
           ret_profiles.value_types[in_name] = toIRType(graph_inputs[in_name]);
@@ -193,7 +245,7 @@ ProfilingResult GraphProfiler::compute(
         const auto graph_params = paramsToCuda(getGraphParams(subgraph));
 
         driver_.createModule(
-            it.first, subgraph, constants_, functions_, graph_params);
+            it.first, it.first, subgraph, constants_, functions_, graph_params);
 
         // clear grads
         long param_size = 0;
@@ -260,6 +312,12 @@ ProfilingResult GraphProfiler::compute(
 
         for (const auto& it : driver_out) {
           avail_locs.insert(it.first);
+          //
+          //          if (it.second.isTensor()) {
+          //            for (const auto& d: it.second.toTensor().names()) {
+          //              spdlog::info("OUT d={}", d.symbol().toQualString());
+          //            }
+          //          }
         }
 
         size_t output_size = 0;

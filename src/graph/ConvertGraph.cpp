@@ -61,17 +61,17 @@ torch::jit::TypePtr fromIRListType(const IRType& ir_type) {
 }
 
 torch::jit::Value* createFunctionConstantNode(
-    const FunctionStorage& functions, const IRValue& irv,
+    const std::shared_ptr<FunctionStorage>& functions, const IRValue& irv,
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_map<std::string, torch::jit::Value*>& regValues) {
-  const FunctionStorage::FunctionTable& functable = functions.getFunctions();
+  const FunctionStorage::FunctionTable& functable = functions->getFunctions();
 
   const std::string func_name = irv.getFunctionName();
   assert(contains(functable, func_name));
   torch::jit::Function* const callee = functable.at(func_name);
 
   const std::string out_name = irv.getName();
-  const std::string& attr_name = functions.getAttrName(func_name);
+  const std::string& attr_name = functions->getAttrName(func_name);
   auto node = graph->insertNode(graph->create(c10::prim::Constant));
 
   torch::jit::Value* fn_constant =
@@ -87,11 +87,11 @@ void ConvertGraph::doToTorch(
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_map<std::string, torch::jit::Value*>& regValues,
     const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-    const FunctionStorage& function_storage,
+    const std::shared_ptr<FunctionStorage>& function_storage,
     const std::vector<IRValue>& no_param_inputs) {
   const std::unordered_map<std::string, IRValue>& values = irGraph->getValues();
   const FunctionStorage::FunctionTable& functions =
-      function_storage.getFunctions();
+      function_storage->getFunctions();
 
   for (const auto& irNode : irGraph->getNodes()) {
     //            logger()->info("Adding node. name={}", irNode.getName());
@@ -269,7 +269,7 @@ void ConvertGraph::doToTorch(
 
 std::shared_ptr<torch::jit::Graph> ConvertGraph::toTorch(
     const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-    const FunctionStorage& functions) {
+    const std::shared_ptr<FunctionStorage>& functions) {
   //        std::cout << "ConvertGraph::toTorch graph=" <<
   //            *irGraph << std::endl;
 
@@ -369,7 +369,7 @@ torch::jit::Value* addInput(
 
 std::shared_ptr<torch::jit::Graph> ConvertGraph::toTorchNoMerge(
     const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-    const FunctionStorage& functions) {
+    const std::shared_ptr<FunctionStorage>& functions) {
   auto graph = std::make_shared<torch::jit::Graph>();
   std::unordered_map<std::string, torch::jit::Value*> regValues;
 
@@ -671,8 +671,8 @@ std::shared_ptr<IRGraph> fromTorch(
   return ir_graph;
 }
 
-std::shared_ptr<torch::jit::Graph> disableDropout(
-    const std::shared_ptr<torch::jit::Graph>& g) {
+std::shared_ptr<torch::jit::Graph> enableDropout(
+    const std::shared_ptr<torch::jit::Graph>& g, bool flag) {
   auto copy_graph = g->copy();
 
   for (auto node : copy_graph->nodes()) {
@@ -682,7 +682,7 @@ std::shared_ptr<torch::jit::Graph> disableDropout(
       assert(inputs.size() > 2);
       auto flag_out_val = inputs.at(2);
       auto flag_node = flag_out_val->node();
-      flag_node->i_(c10::Symbol::attr("value"), 0);
+      flag_node->i_(c10::Symbol::attr("value"), flag ? 1 : 0);
     }
   }
   return copy_graph;

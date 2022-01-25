@@ -313,6 +313,9 @@ PYBIND11_MODULE(_pyrannc, m) {
           "calc_grad_norm",
           [](RaNNCModule& self) { return self.calcGradL2Norm(); })
       .def(
+          "enable_dropout",
+          [](RaNNCModule& self, bool enable) { self.enableDropout(enable); })
+      .def(
           "is_checkpointing_enabled",
           [](RaNNCModule& self) { return self.isCheckpointingEnabled(); })
       .def("zero_grad", [](RaNNCModule& self) { self.clearParamGrads(); })

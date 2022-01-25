@@ -46,14 +46,16 @@ class TorchDriver {
    * argument is converted to *torch::jit::Graph* using *GraphConv::toTorch()*.
    *
    * @param id ID of the given Graph.
-   * @param irGraph Graph to compute.
+   * @param ir_graph Graph to compute.
    * @param constants Constant values used within the graph.
    * @param [in] functions   Functions used within the graph.
    * @param parameters Parameters given to the graph as inputs.
    */
   void createModule(
-      const std::string& id, const std::shared_ptr<rannc::IRGraph>& irGraph,
-      const IValueMap& constants, const FunctionStorage& functions,
+      const std::string& id, const std::string& model_id,
+      const std::shared_ptr<rannc::IRGraph>& ir_graph,
+      const IValueMap& constants,
+      const std::shared_ptr<FunctionStorage>& functions,
       const std::unordered_map<std::string, at::Tensor>& parameters);
 
   /**
@@ -79,6 +81,8 @@ class TorchDriver {
   void destroyModule(const std::string& id);
 
   void destroy();
+
+  void enableDropout(const std::string& id, bool enable);
 
   // for profiling
   bool isProfilingEnabled() const;
@@ -111,6 +115,8 @@ class TorchDriver {
   std::unordered_map<std::string, std::shared_ptr<rannc::IRGraph>>
       clone_input_ir_graphs_;
 
+  std::unordered_map<std::string, std::vector<std::string>> subgraph_ids_;
+
   /**
    * Parameter tensors.
    */
@@ -132,6 +138,9 @@ class TorchDriver {
       functions_;
 
   std::unordered_map<std::string, BufferTensorCache> buffer_cache_;
+  std::unordered_map<std::string, IValueMap> constants_;
+  std::unordered_map<std::string, std::shared_ptr<FunctionStorage>>
+      func_storages_;
 
   int last_split_idx_ = INT32_MAX;
 

@@ -74,7 +74,8 @@ std::unordered_map<std::string, at::Tensor> graphParamTensors(
 IValueMap compute(
     const IValueMap& inputs, const std::shared_ptr<IRGraph>& graph,
     const std::unordered_map<std::string, torch::jit::IValue>& params,
-    const IValueMap& const_vals, const FunctionStorage& functions,
+    const IValueMap& const_vals,
+    const std::shared_ptr<rannc::FunctionStorage>& functions,
     bool offload_params) {
   std::unordered_map<std::string, at::Tensor> graph_params =
       graphParamTensors(graph, params);
@@ -91,7 +92,8 @@ IValueMap compute(
 
   TorchDriver driver(offload_params);
   driver.createModule(
-      graph->getName(), graph, const_vals, functions, params_gpu);
+      graph->getName(), graph->getName(), graph, const_vals, functions,
+      params_gpu);
 
   const auto out = driver.forward(graph->getName(), inputs_gpu, 0);
   driver.destroy();
@@ -108,12 +110,13 @@ bool Validator::validate(
     const std::shared_ptr<torch::jit::Graph>& graph,
     const std::vector<torch::jit::IValue>& input_ivals,
     const std::unordered_map<std::string, torch::jit::IValue>& param_inputs,
-    const IValueMap& const_vals, const FunctionStorage& functions,
+    const IValueMap& const_vals,
+    const std::shared_ptr<rannc::FunctionStorage>& functions,
     const Deployment& deployment) {
   torch::NoGradGuard no_grad;
 
   logger->info("Running torch traced model with dropout disabled ...");
-  const auto no_dropout_graph = disableDropout(graph);
+  const auto no_dropout_graph = enableDropout(graph, false);
   auto func = std::make_shared<torch::jit::GraphFunction>(
       "forward", no_dropout_graph, nullptr);
   std::vector<torch::jit::IValue> stack;

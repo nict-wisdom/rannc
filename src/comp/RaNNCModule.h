@@ -16,6 +16,7 @@
 #include <Logging.h>
 
 #include <comp/ParamStorage.h>
+#include "GraphValueStorage.h"
 
 namespace py = pybind11;
 
@@ -75,6 +76,8 @@ class RaNNCModule {
 
   void destroy();
 
+  void enableDropout(bool enable);
+
  private:
   std::string id_;
   std::shared_ptr<RaNNCProcess> master_;
@@ -83,6 +86,8 @@ class RaNNCModule {
 
   std::shared_ptr<GraphLauncher> driver_;
   std::shared_ptr<ParamStorage> param_storage_;
+  std::shared_ptr<GraphValueStorage> value_storage_;
+  std::shared_ptr<FunctionStorage> func_storage_;
   std::shared_ptr<DistributedGradLocator> zero_grad_locator_;
   std::vector<long> param_ids_on_rank_;
 

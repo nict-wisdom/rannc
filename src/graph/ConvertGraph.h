@@ -23,18 +23,18 @@ class ConvertGraph {
 
   std::shared_ptr<torch::jit::Graph> toTorch(
       const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-      const FunctionStorage& functions);
+      const std::shared_ptr<FunctionStorage>& functions);
 
   std::shared_ptr<torch::jit::Graph> toTorchNoMerge(
       const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-      const FunctionStorage& functions);
+      const std::shared_ptr<FunctionStorage>& functions);
 
  private:
   void doToTorch(
       std::shared_ptr<torch::jit::Graph>& graph,
       std::unordered_map<std::string, torch::jit::Value*>& regValues,
       const std::shared_ptr<IRGraph>& irGraph, const IValueMap& constants,
-      const FunctionStorage& functions,
+      const std::shared_ptr<FunctionStorage>& functions,
       const std::vector<IRValue>& no_param_inputs);
 };
 
@@ -50,8 +50,9 @@ std::shared_ptr<IRGraph> setValueTypes(
     const std::shared_ptr<IRGraph>& g,
     const std::unordered_map<std::string, IRType>& value_types);
 
-std::shared_ptr<torch::jit::Graph> disableDropout(
-    const std::shared_ptr<torch::jit::Graph>& g);
+std::shared_ptr<torch::jit::Graph> enableDropout(
+    const std::shared_ptr<torch::jit::Graph>& g, bool enable);
+
 IValueMap createInputMap(
     const std::vector<torch::jit::IValue>& input_ivals,
     const std::shared_ptr<IRGraph>& graph);

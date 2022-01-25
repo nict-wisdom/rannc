@@ -17,7 +17,8 @@ class Validator {
       const std::shared_ptr<torch::jit::Graph>& graph,
       const std::vector<torch::jit::IValue>& input_ivals,
       const std::unordered_map<std::string, torch::jit::IValue>& param_inputs,
-      const IValueMap& const_vals, const FunctionStorage& functions,
+      const IValueMap& const_vals,
+      const std::shared_ptr<rannc::FunctionStorage>& functions,
       const Deployment& deployment);
 
  private:
