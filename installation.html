@@ -1,73 +1,34 @@
-
-
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
-  
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <title>Installation &mdash; RaNNC 0.7.2 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-
-  
-  
-
-  
-  
-
-  
-
-  
+  <title>Installation &mdash; RaNNC 0.7.3 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
         <script src="_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Tutorial" href="tutorial.html" />
     <link rel="prev" title="RaNNC (Rapid Neural Network Connector)" href="index.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
-
-          
             <a href="index.html" class="icon icon-home"> RaNNC
-          
-
-          
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -75,18 +36,7 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
@@ -103,75 +53,34 @@
 <li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">RaNNC</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
       <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
       <li>Installation</li>
-    
-    
       <li class="wy-breadcrumbs-aside">
-        
-          
             <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="installation">
-<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+             
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline"></a></h1>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline"></a></h2>
 <p>RaNNC works only with CUDA devices (CPU only or TPU environments are not supported).
 RaNNC requires the following libraries and tools at runtime.</p>
 <ul class="simple">
@@ -184,83 +93,66 @@ RaNNC requires the following libraries and tools at runtime.</p>
 <li><p><em>MPI</em>: A program using RaNNC must be launched with MPI. MPI libraries must also be available at runtime. RaNNC has been tested with OpenMPI v4.0.5.</p></li>
 <li><p><em>libstd++</em>: <code class="docutils literal notranslate"><span class="pre">libstd++</span></code> must support <code class="docutils literal notranslate"><span class="pre">GLIBCXX_3.4.21</span></code> to use the distributed <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages (these packages are built with gcc 5.4.0).</p></li>
 </ul>
-</div>
-<div class="section" id="id1">
-<h2>Installation<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
-<p>The current version (<code class="docutils literal notranslate"><span class="pre">0.7.2</span></code>) of RaNNC requires PyTorch v1.10.1.
+</section>
+<section id="id1">
+<h2>Installation<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
+<p>The current version (<code class="docutils literal notranslate"><span class="pre">0.7.3</span></code>) of RaNNC requires PyTorch v1.10.1.
 <code class="docutils literal notranslate"><span class="pre">pip</span></code> packages for <code class="docutils literal notranslate"><span class="pre">linux_x86_64</span></code> are available for the following combinations of Python and CUDA versions.</p>
 <ul class="simple">
 <li><p>Python version: 3.7, 3.8, 3.9</p></li>
 <li><p>CUDA version: 10.2, 11.3</p></li>
 </ul>
 <p>The followings show command to create a new conda environment and install RaNNC.
-(The package version should be specified as <code class="docutils literal notranslate"><span class="pre">0.7.2+cu[CUDA_VERSION_WITHOUT_DOT]</span></code>)</p>
+(The package version should be specified as <code class="docutils literal notranslate"><span class="pre">0.7.3+cu[CUDA_VERSION_WITHOUT_DOT]</span></code>)</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda create -n rannc <span class="nv">python</span><span class="o">=</span><span class="m">3</span>.8
 conda activate rannc
 conda install <span class="nv">pytorch</span><span class="o">==</span><span class="m">1</span>.10.1 <span class="nv">cudatoolkit</span><span class="o">=</span><span class="m">10</span>.2 -c pytorch
-pip install <span class="nv">pyrannc</span><span class="o">==</span><span class="m">0</span>.7.2+cu102 -f https://nict-wisdom.github.io/rannc/installation.html
+pip install <span class="nv">pyrannc</span><span class="o">==</span><span class="m">0</span>.7.3+cu102 -f https://nict-wisdom.github.io/rannc/installation.html
 </pre></div>
 </div>
 <p>Use the following links to manually download the packages.</p>
 <ul class="simple">
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu102-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu102-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu102-cp39-cp39-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.9</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu113-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu113-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
-<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.2/pyrannc-0.7.2+cu113-cp39-cp39-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.9</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu102-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu102-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu102-cp39-cp39-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.9</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">10.2</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu113-cp37-cp37m-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.7</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu113-cp38-cp38-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.8</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
+<li><p><a class="reference download external" download="" href="https://github.com/nict-wisdom/rannc/releases/download/v0.7.3/pyrannc-0.7.3+cu113-cp39-cp39-linux_x86_64.whl"><code class="xref download docutils literal notranslate"><span class="pre">For</span> <span class="pre">Python</span> <span class="pre">3.9</span> <span class="pre">/</span> <span class="pre">CUDA</span> <span class="pre">11.3</span></code></a></p></li>
 </ul>
 <p>If the above packages do not match your Python/CUDA versions, create a suitable package using <code class="docutils literal notranslate"><span class="pre">Makefile</span></code>
 in <code class="docutils literal notranslate"><span class="pre">docker/</span></code>. <code class="docutils literal notranslate"><span class="pre">make.sh</span></code> shows the commands to create wheel packages.</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="tutorial.html" class="btn btn-neutral float-right" title="Tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="index.html" class="btn btn-neutral float-left" title="RaNNC (Rapid Neural Network Connector)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tutorial.html" class="btn btn-neutral float-right" title="Tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &#169; Copyright 2021, Data-driven Intelligent System Research Center (DIRECT), National Institute of Information and Communications Technology (NICT).
-
-    </p>
+    <p>&#169; Copyright 2021, Data-driven Intelligent System Research Center (DIRECT), National Institute of Information and Communications Technology (NICT).</p>
   </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>
