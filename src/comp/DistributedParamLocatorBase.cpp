@@ -135,6 +135,7 @@ at::Tensor DistributedParamLocatorBase::gather(
         communicator);
   } else {
     nccl_.allgather(tag, {sendbuf}, {buf});
+    nccl_.syncWithErrorCheck();
   }
 
   return buf.narrow(0, 0, productDim(ir_type.getTensorDim()))
