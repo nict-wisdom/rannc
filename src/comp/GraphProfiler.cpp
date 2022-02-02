@@ -146,11 +146,11 @@ std::vector<at::Dimname> createDimnames(
       dim_names.emplace_back("N");
     } else {
       std::string name =
-          std::regex_replace(val_name, std::regex("[_:\\[\\]\\.]+"), "_");
+          std::regex_replace(val_name, std::regex(R"([_:\[\]\.]+)"), "_");
       name = std::regex_replace(name, std::regex("_+"), "_");
 
       std::stringstream ss;
-      ss << "v_" << name << "_D" << idx;
+      ss << name << "_D" << idx;
       dim_names.push_back(ss.str());
     }
     idx++;
@@ -755,6 +755,14 @@ ProfilingResult GraphProfiler::init() {
   base_graph_ = setValueTypes(base_graph_, ret.value_types);
   base_graph_ = guessValueTypes(base_graph_);
   base_graph_->setBatchSize(batch_size_);
+
+  std::unordered_map<std::string, std::vector<std::string>> str_dim_names;
+  for (const auto& it : dim_names_) {
+    for (const auto& d : it.second) {
+      str_dim_names[it.first.value_name].push_back(d.symbol().toQualString());
+    }
+  }
+  base_graph_->setDimNames(str_dim_names);
 
   logger->trace("Scaling {} intermediate values ...", values.size());
   for (auto& it : values) {

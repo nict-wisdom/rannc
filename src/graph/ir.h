@@ -562,6 +562,17 @@ class IRGraph {
 
   void setBatchSize(int64_t batch_size);
 
+  const std::unordered_map<std::string, std::vector<std::string>>& getDimNames()
+      const {
+    return dim_names_;
+  }
+
+  void setDimNames(
+      const std::unordered_map<std::string, std::vector<std::string>>&
+          dimNames) {
+    dim_names_ = dimNames;
+  }
+
   friend std::ostream& operator<<(std::ostream& os, const IRGraph& graph);
 
   MSGPACK_DEFINE(
@@ -574,6 +585,7 @@ class IRGraph {
   std::vector<std::string> input_names_;
   std::vector<std::string> output_names_;
   bool is_replicable_;
+  std::unordered_map<std::string, std::vector<std::string>> dim_names_;
 };
 
 std::vector<IRValue> graphNonParamInputValues(

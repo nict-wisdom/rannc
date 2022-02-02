@@ -351,10 +351,18 @@ std::ostream& operator<<(std::ostream& os, const IRNode& node) {
 }
 
 std::ostream& operator<<(std::ostream& os, const IRGraph& graph) {
+  const auto& dim_names = graph.getDimNames();
+
   os << "Graph " << graph.getName() << std::endl;
   for (const std::string& input_name : graph.getInputNames()) {
     const auto& value = graph.getValue(input_name);
-    os << "Graph input: " << value << std::endl;
+    os << "Graph input: " << value;
+
+    if (contains(dim_names, input_name)) {
+      os << join_as_str(dim_names.at(input_name));
+    }
+
+    os << std::endl;
   }
 
   for (const auto& in_node : graph.getNodes()) {
@@ -363,6 +371,11 @@ std::ostream& operator<<(std::ostream& os, const IRGraph& graph) {
       const auto& out_v = graph.getValue(node_out_name);
       std::stringstream ss;
       ss << out_v;
+
+      if (contains(dim_names, node_out_name)) {
+        ss << join_as_str(dim_names.at(node_out_name));
+      }
+
       outputs.push_back(ss.str());
     }
 
