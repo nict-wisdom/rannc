@@ -215,6 +215,9 @@ bool inPlaceOpName(const std::string& name);
 at::Tensor createTensorFromIRType(
     const IRType& ir_type, const c10::Device& device);
 
+std::string toString(const std::vector<at::Dimname>& dims);
+std::string toString(const at::DimnameList& dims);
+
 template <typename T>
 bool almostEqualTensorsWithTolerance(
     const at::Tensor& t1, const at::Tensor& t2, T tolerance,

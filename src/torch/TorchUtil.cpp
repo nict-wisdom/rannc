@@ -726,7 +726,9 @@ at::Tensor padTensor(const at::Tensor& tensor, int batch_size, bool zero) {
     targets.push_back(pad);
     current_size += pad_size;
   }
-  return torch::cat(targets).contiguous().detach();
+  at::Tensor ret = torch::cat(targets).contiguous().detach();
+  ret.set_requires_grad(tensor.requires_grad());
+  return ret;
 }
 
 at::Tensor unpadTensor(const at::Tensor& tensor, int batch_size) {
@@ -739,7 +741,9 @@ at::Tensor unpadTensor(const at::Tensor& tensor, int batch_size) {
   if (original_size > batch_size) {
     dummy_result = tensor.slice(0, 0, batch_size);
   }
-  return dummy_result.detach();
+  at::Tensor ret = dummy_result.detach();
+  ret.set_requires_grad(tensor.requires_grad());
+  return ret;
 }
 
 // This aligns the first dimension of the arg to *batch_size*
@@ -1482,5 +1486,21 @@ at::Tensor createTensorFromIRType(
           .dtype(fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType()))
           .device(c10::Device(c10::DeviceType::CUDA));
   return torch::zeros(ir_type.getTensorDim(), options);
+}
+
+std::string toString(const std::vector<at::Dimname>& dims) {
+  std::vector<std::string> dim_names;
+  for (const auto& dn : dims) {
+    dim_names.push_back(dn.symbol().toQualString());
+  }
+  return join_as_str(dim_names);
+}
+
+std::string toString(const at::DimnameList& dims) {
+  std::vector<at::Dimname> dim_names;
+  for (const auto& d : dims) {
+    dim_names.push_back(d);
+  }
+  return toString(dim_names);
 }
 } // namespace rannc

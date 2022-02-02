@@ -136,6 +136,9 @@ class GraphProfiler {
   std::shared_ptr<IRGraph> base_graph_;
   std::unordered_map<std::string, torch::jit::IValue> non_param_inputs_;
   std::unordered_map<std::string, long> graph_params_;
+  std::unordered_map<
+      IValueLocation, std::vector<at::Dimname>, IValueLocationHash>
+      dim_names_;
   IValueMap constants_;
   std::shared_ptr<FunctionStorage> functions_;
   size_t batch_size_;
@@ -154,11 +157,18 @@ class GraphProfiler {
   ProfilingResult compute(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
-      int iteration, IValueMap& values, int split_index, bool checkpointing);
+      int iteration, IValueMap& values, int split_index, bool checkpointing,
+      bool on_init);
+  std::pair<IValueMap, GraphProfile> computeGraph(
+      const std::shared_ptr<IRGraph>& subgraph, const IValueMap& graph_inputs,
+      const std::unordered_map<std::string, at::Tensor>& graph_params,
+      int iteration, IValueMap& values, int split_index, bool checkpointing,
+      bool on_init);
   ProfilingResult doProfile(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
-      IValueMap& values, int iteration, size_t replica_num, bool checkpointing);
+      IValueMap& values, int iteration, size_t replica_num, bool checkpointing,
+      bool on_init);
   size_t setRequiresGrad(
       const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs);
   std::unordered_map<std::string, at::Tensor> getGraphParams(

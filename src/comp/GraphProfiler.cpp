@@ -138,38 +138,210 @@ static std::vector<at::Dimname> dimnamesFromStringVector(
 }
 
 std::vector<at::Dimname> createDimnames(
-    const std::string& val_name, const at::Tensor& ten) {
-  size_t dim_num = ten.sizes().size();
-  size_t dim_name_num = ten.names().size();
-
+    const std::string& val_name, const at::Tensor& ten, bool batch) {
   std::vector<std::string> dim_names;
   size_t idx = 0;
   for (const auto& n : ten.names()) {
-    std::stringstream ss;
-    ss << "v_" << std::regex_replace(val_name, std::regex("\\."), "_") << "_D"
-       << idx;
-    dim_names.push_back(ss.str());
+    if (batch && idx == 0) {
+      dim_names.emplace_back("N");
+    } else {
+      std::string name =
+          std::regex_replace(val_name, std::regex("[_:\\[\\]\\.]+"), "_");
+      name = std::regex_replace(name, std::regex("_+"), "_");
+
+      std::stringstream ss;
+      ss << "v_" << name << "_D" << idx;
+      dim_names.push_back(ss.str());
+    }
     idx++;
   }
 
   return dimnamesFromStringVector(dim_names);
 }
 
+at::Tensor setDimNamesOnTensor(
+    const at::Tensor& t, const IValueLocation& loc, bool batch,
+    std::unordered_map<
+        IValueLocation, std::vector<at::Dimname>, IValueLocationHash>&
+        dim_names) {
+  const auto new_names = createDimnames(toString(loc), t, batch);
+  std::vector<at::Dimname> merged_names;
+  if (contains(dim_names, loc)) {
+    const auto& current_names = dim_names.at(loc);
+    for (size_t idx = 0; idx < new_names.size(); idx++) {
+      if (idx < current_names.size() && !current_names.at(idx).isWildcard()) {
+        merged_names.push_back(current_names.at(idx));
+      } else {
+        merged_names.push_back(new_names.at(idx));
+      }
+    }
+  } else {
+    merged_names = new_names;
+  }
+  dim_names[loc] = merged_names;
+
+  bool requires_grad = t.requires_grad();
+  at::Tensor ret = t.rename(merged_names).detach();
+  ret.set_requires_grad(requires_grad);
+
+  return ret;
+}
+
+torch::jit::IValue setDimNamesOnIValue(
+    const torch::jit::IValue& ivalue, const std::string& name, bool batch,
+    std::unordered_map<
+        IValueLocation, std::vector<at::Dimname>, IValueLocationHash>&
+        dim_names) {
+  return transformTensorsInIValueWithPath(
+      ivalue, name,
+      [&dim_names, batch](const at::Tensor& t, const IValueLocation& loc) {
+        return setDimNamesOnTensor(t, loc, batch, dim_names);
+      });
+}
+
+torch::jit::IValue resetDimNamesOnIValue(const torch::jit::IValue& ivalue) {
+  return transformTensorsInIValue(ivalue, [](const at::Tensor& t) {
+    bool requires_grad = t.requires_grad();
+    return t.rename({}).detach().set_requires_grad(requires_grad);
+  });
+}
+
+void recordDimNamesFromIValue(
+    const torch::jit::IValue& ivalue, const std::string& name,
+    std::unordered_map<
+        IValueLocation, std::vector<at::Dimname>, IValueLocationHash>&
+        dim_names) {
+  transformTensorsInIValueWithPath(
+      ivalue, name,
+      [&dim_names](const at::Tensor& t, const IValueLocation& loc) {
+        std::vector<at::Dimname> dims;
+        for (const auto& d : t.names()) {
+          dims.push_back(d);
+        }
+        dim_names[loc] = dims;
+        return t;
+      });
+  return;
+}
+
+void recordDimNamesFromIValue(
+    const IValueMap& values,
+    std::unordered_map<
+        IValueLocation, std::vector<at::Dimname>, IValueLocationHash>&
+        dim_names) {
+  for (const auto& it : values) {
+    recordDimNamesFromIValue(it.second, it.first.value_name, dim_names);
+  }
+}
+
+std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
+    const std::shared_ptr<IRGraph>& subgraph,
+    const IValueMap& graph_inputs_with_names,
+    const std::unordered_map<std::string, at::Tensor>& graph_params,
+    int iteration, IValueMap& values, int split_index, bool checkpointing,
+    bool on_init) {
+  emptyCache();
+
+  ProfilingResult ret_profiles;
+
+  const std::string& id = subgraph->getName();
+  std::string fwd_time_key = getFwdTimeKey(id);
+  std::string bwd_time_key = getBwdTimeKey(id);
+
+  driver_.createModule(id, id, subgraph, constants_, functions_, graph_params);
+
+  // clear grads
+  long param_size = 0;
+  for (auto& param_it : getGraphParams(subgraph)) {
+    auto& param = param_it.second;
+    param_size += param.numel() * param.element_size();
+    getMutableGradRef(param) = at::Tensor();
+  }
+
+  long alloc_mem_start = getAllocatedMemory();
+  resetMaxAllocatedMemory();
+  IValueMap graph_inputs = graph_inputs_with_names;
+  IValueMap driver_out;
+  TimeCounter time_counter(true);
+  for (size_t i = 0; i < iteration; i++) {
+    driver_out.clear();
+
+    auto& driver = driver_;
+    if (checkpointing) {
+      // Run forward enabling grad to judge whether bwd is required or not
+      driver_out = driver.forward(id, graph_inputs, split_index);
+      bool run_bwd = setRequiresGrad(subgraph, driver_out) > 0;
+
+      // Clear to release memory
+      driver_out.clear();
+      {
+        torch::NoGradGuard no_grad;
+        driver_out = measureTime<IValueMap>(
+            [&driver, &id, &graph_inputs, split_index]() {
+              return driver.forward(id, graph_inputs, split_index);
+            },
+            i, iteration / 2, time_counter, fwd_time_key);
+      }
+
+      if (run_bwd) {
+        driver_out = measureTime<IValueMap>(
+            [&driver, &id, &graph_inputs, this, &subgraph, split_index]() {
+              const auto out = driver.forward(id, graph_inputs, split_index);
+              setRequiresGrad(subgraph, out);
+              this->backward(subgraph, out, split_index);
+              return out;
+            },
+            i, iteration / 2, time_counter, bwd_time_key);
+      }
+    } else {
+      driver_out = measureTime<IValueMap>(
+          [&driver, &id, &graph_inputs, split_index]() {
+            return driver.forward(id, graph_inputs, split_index);
+          },
+          i, iteration / 2, time_counter, fwd_time_key);
+      if (on_init) {
+        recordDimNamesFromIValue(driver_out, dim_names_);
+        for (auto& it : graph_inputs) {
+          graph_inputs[it.first] = resetDimNamesOnIValue(it.second);
+        }
+        for (auto& it : driver_out) {
+          driver_out[it.first] = resetDimNamesOnIValue(it.second);
+        }
+      }
+
+      if (setRequiresGrad(subgraph, driver_out) > 0) {
+        measureTime(
+            [this, &subgraph, &driver_out, split_index]() {
+              this->backward(subgraph, driver_out, split_index);
+            },
+            i, iteration / 2, time_counter, bwd_time_key);
+      }
+    }
+  }
+
+  driver_.destroyModule(id);
+
+  long bwd_time = time_counter.hasRecord(bwd_time_key)
+      ? time_counter.get<std::chrono::microseconds>(bwd_time_key)
+      : 0;
+
+  // Add param size because params remain on a cuda device
+  long total_mem = getMaxAllocatedMemory() - alloc_mem_start + param_size;
+
+  GraphProfile prof{
+      id, time_counter.get<std::chrono::microseconds>(fwd_time_key), bwd_time,
+      total_mem, checkpointing};
+
+  return {driver_out, prof};
+}
+
 ProfilingResult GraphProfiler::compute(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    int iteration, IValueMap& values, int split_index, bool checkpointing) {
+    int iteration, IValueMap& values, int split_index, bool checkpointing,
+    bool on_init) {
   TimeCounter time_counter(true);
   ProfilingResult ret_profiles;
   std::unordered_set<std::string> graphs_done;
-
-  //  IValueMap named_values = values;
-  //  for (const auto& it: values) {
-  //    if (it.second.isTensor()) {
-  //      dim_names = setDimnames(it.first, it.second.toTensor());
-  ////      at::DimnameList dim_names = dimnamesFromStringVector({"B"});
-  ////      it.second.toTensor().rename(dim_names);
-  //    }
-  //  }
 
   std::unordered_set<IValueLocation, IValueLocationHash> avail_locs;
   for (const auto& it : values) {
@@ -179,11 +351,6 @@ ProfilingResult GraphProfiler::compute(
   size_t prev_done = 0;
   size_t prev_locs = 0;
   size_t infinite = 0;
-
-  //        spdlog::info("Before profiler graph loop: #ir_graphs={}",
-  //        ir_graphs.size()); for (const auto& it: ir_graphs) {
-  //            spdlog::info("graph={}", toString(*it.second));
-  //        }
 
   while (graphs_done.size() < ir_graphs.size()) {
     for (const auto& it : ir_graphs) {
@@ -214,21 +381,18 @@ ProfilingResult GraphProfiler::compute(
         emptyCache();
 
         IValueMap graph_inputs;
-        std::unordered_map<std::string, std::vector<at::Dimname>> dim_names;
         size_t input_size = 0;
         for (const auto& in_name : input_names) {
           assert(contains(values, in_name));
-          //          const auto in_val =
-          //          contiguous(toCUDAIfAvailable(values.at(in_name), true));
-          //
-          //          graph_inputs[in_name] = in_val;
-          //          if (in_val.isTensor()) {
-          //            dim_names[in_name] = createDimnames(in_name,
-          //            in_val.toTensor()); graph_inputs[in_name] =
-          //            in_val.toTensor().rename(dim_names[in_name]);
-          //          }
+
           graph_inputs[in_name] =
               contiguous(toCUDAIfAvailable(values.at(in_name), true));
+
+          if (on_init) {
+            graph_inputs[in_name] = setDimNamesOnIValue(
+                graph_inputs[in_name], in_name, false, dim_names_);
+          }
+
           ret_profiles.value_types[in_name] = toIRType(graph_inputs[in_name]);
           input_size += ret_profiles.value_types[in_name].getSizeInByte();
         }
@@ -236,98 +400,77 @@ ProfilingResult GraphProfiler::compute(
           ret_profiles.value_types[it.first] = toIRType(it.second);
         }
 
-        IValueMap driver_out;
-        std::string fwd_time_key = getFwdTimeKey(id);
-        std::string bwd_time_key = getBwdTimeKey(id);
-
         const auto& subgraph =
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
-        const auto graph_params = paramsToCuda(getGraphParams(subgraph));
+        auto graph_params = paramsToCuda(getGraphParams(subgraph));
 
-        driver_.createModule(
-            it.first, it.first, subgraph, constants_, functions_, graph_params);
-
-        // clear grads
-        long param_size = 0;
-        for (auto& param_it : getGraphParams(subgraph)) {
-          auto& param = param_it.second;
-          param_size += param.numel() * param.element_size();
-          getMutableGradRef(param) = at::Tensor();
-        }
-
-        long alloc_mem_start = getAllocatedMemory();
-        long alloc_mem_after_fwd = alloc_mem_start;
-        resetMaxAllocatedMemory();
-
-        for (size_t i = 0; i < iteration; i++) {
-          driver_out.clear();
-
-          auto& driver = driver_;
-          if (checkpointing) {
-            // Run forward enabling grad to judge whether bwd is required or not
-            driver_out = driver.forward(id, graph_inputs, split_index);
-            bool run_bwd = setRequiresGrad(subgraph, driver_out) > 0;
-
-            // Clear to release memory
-            driver_out.clear();
-            {
-              torch::NoGradGuard no_grad;
-              driver_out = measureTime<IValueMap>(
-                  [&driver, &id, &graph_inputs, split_index]() {
-                    return driver.forward(id, graph_inputs, split_index);
-                  },
-                  i, iteration / 2, time_counter, fwd_time_key);
-            }
-
-            if (run_bwd) {
-              driver_out = measureTime<IValueMap>(
-                  [&driver, &id, &graph_inputs, this, &subgraph,
-                   split_index]() {
-                    const auto out =
-                        driver.forward(id, graph_inputs, split_index);
-                    setRequiresGrad(subgraph, out);
-                    this->backward(subgraph, out, split_index);
-                    return out;
-                  },
-                  i, iteration / 2, time_counter, bwd_time_key);
-            }
-          } else {
-            driver_out = measureTime<IValueMap>(
-                [&driver, &id, &graph_inputs, split_index]() {
-                  return driver.forward(id, graph_inputs, split_index);
-                },
-                i, iteration / 2, time_counter, fwd_time_key);
-
-            alloc_mem_after_fwd = getAllocatedMemory();
-
-            if (setRequiresGrad(subgraph, driver_out) > 0) {
-              measureTime(
-                  [this, &subgraph, &driver_out, split_index]() {
-                    this->backward(subgraph, driver_out, split_index);
-                  },
-                  i, iteration / 2, time_counter, bwd_time_key);
-            }
+        if (on_init) {
+          for (const auto& it : graph_params) {
+            graph_params[it.first] =
+                setDimNamesOnTensor(it.second, it.first, false, dim_names_);
           }
         }
 
-        for (const auto& it : driver_out) {
-          avail_locs.insert(it.first);
-          //
-          //          if (it.second.isTensor()) {
-          //            for (const auto& d: it.second.toTensor().names()) {
-          //              spdlog::info("OUT d={}", d.symbol().toQualString());
-          //            }
-          //          }
+        bool dimnames_set = false;
+        std::pair<IValueMap, GraphProfile> prof_results;
+        try {
+          prof_results = computeGraph(
+              subgraph, graph_inputs, graph_params, iteration, values,
+              split_index, checkpointing, on_init);
+          dimnames_set = true;
+        } catch (std::runtime_error& e) {
+          driver_.destroyModule(subgraph->getName());
+
+          std::string msg = e.what();
+          std::string::size_type pos1 =
+              msg.find("not yet supported with named tensors");
+          std::string::size_type pos2 =
+              msg.find("Error when attempting to broadcast dims");
+
+          if (pos2 != std::string::npos) {
+            dimnames_set = true;
+          }
+
+          // Remove dim names if unsupported.
+          size_t input_idx = 0;
+          for (const auto& in_name : getNonParamInputNames(subgraph)) {
+            if (pos2 == std::string::npos || input_idx != 0) {
+              graph_inputs[in_name] =
+                  resetDimNamesOnIValue(graph_inputs[in_name]);
+            }
+            input_idx++;
+          }
+          for (const auto& it : graph_params) {
+            graph_params[it.first] =
+                resetDimNamesOnIValue(it.second).toTensor();
+          }
+
+          // Try again without dim names
+          prof_results = computeGraph(
+              subgraph, graph_inputs, graph_params, iteration, values,
+              split_index, checkpointing, on_init);
+
+          // Set dim names again on params
+          if (on_init) {
+            for (const auto& it : graph_params) {
+              graph_params[it.first] =
+                  setDimNamesOnTensor(it.second, it.first, false, dim_names_);
+            }
+          }
         }
+        IValueMap& driver_out = prof_results.first;
 
         size_t output_size = 0;
         for (const auto& it_out : driver_out) {
+          avail_locs.insert(it_out.first);
+
           torch::jit::IValue out_val;
           if (it_out.second.isList()) {
             out_val = toTensorListIfElemsAreTensors(it_out.second);
           } else {
             out_val = it_out.second;
           }
+          out_val = resetDimNamesOnIValue(out_val);
           values[it_out.first] = toCPU(out_val, true);
           ret_profiles.value_types[it_out.first.value_name] = toIRType(out_val);
 
@@ -335,26 +478,9 @@ ProfilingResult GraphProfiler::compute(
               ret_profiles.value_types[it_out.first.value_name].getSizeInByte();
         }
 
-        long bwd_time = time_counter.hasRecord(bwd_time_key)
-            ? time_counter.get<std::chrono::microseconds>(bwd_time_key)
-            : 0;
-
-        // Add param size because params remain on a cuda device
-        long total_mem = getMaxAllocatedMemory() - alloc_mem_start + param_size;
-
-        GraphProfile prof{
-            id, time_counter.get<std::chrono::microseconds>(fwd_time_key),
-            bwd_time, total_mem, checkpointing};
-
-        logger->trace(
-            "profile {} input_size={} output_size={} param_size={} activation_size={}",
-            toString(prof), input_size, output_size, param_size,
-            alloc_mem_after_fwd - alloc_mem_start);
-
-        ret_profiles.node_profiles[id] = prof;
+        ret_profiles.node_profiles[id] = prof_results.second;
 
         driver_out.clear();
-        driver_.destroyModule(id);
 
         // clear grad again
         for (auto& param_it : getGraphParams(subgraph)) {
@@ -486,7 +612,8 @@ std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
 
 ProfilingResult GraphProfiler::doProfile(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    IValueMap& values, int iteration, size_t replica_num, bool checkpointing) {
+    IValueMap& values, int iteration, size_t replica_num, bool checkpointing,
+    bool on_init) {
   for (const auto& it : ir_graphs) {
     for (const auto& in_name : it.second->getInputNames()) {
       IValueLocation loc{in_name};
@@ -516,7 +643,7 @@ ProfilingResult GraphProfiler::doProfile(
   logger->trace(
       "GraphProfiler::profile starting doCompute replica_num={}", replica_num);
   ProfilingResult ret_profiles =
-      compute(ir_graphs, iteration, values, 0, checkpointing);
+      compute(ir_graphs, iteration, values, 0, checkpointing, on_init);
   logger->trace("GraphProfiler::profile finished doCompute");
 
   driver_.destroy();
@@ -547,8 +674,8 @@ ProfilingResult GraphProfiler::profile(
   }
 
   IValueMap values; // temporal value
-  auto ret_profiles =
-      doProfile(ir_graphs, values, iteration, replica_num, checkpointing);
+  auto ret_profiles = doProfile(
+      ir_graphs, values, iteration, replica_num, checkpointing, false);
 
   ProfileItem prof_item{key, ret_profiles};
   profile_db_.add(prof_item);
@@ -557,9 +684,6 @@ ProfilingResult GraphProfiler::profile(
 }
 
 ProfilingResult GraphProfiler::init() {
-  std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs;
-  std::unordered_map<std::string, IRNode> node_map;
-
   for (const auto& it : non_param_inputs_) {
     IValueLocation loc{it.first};
     if (!contains(values_, loc)) {
@@ -568,6 +692,14 @@ ProfilingResult GraphProfiler::init() {
     }
   }
 
+  const auto graph_params = getGraphParams(base_graph_);
+  for (const auto& p_it : graph_params) {
+    const auto dim_names = createDimnames(p_it.first, p_it.second, false);
+    dim_names_[p_it.first] = dim_names;
+  }
+
+  std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs;
+  std::unordered_map<std::string, IRNode> node_map;
   const auto& nodes = base_graph_->getNodes();
   for (const auto& n : nodes) {
     std::vector<IRNode> pf_nodes = {n};
@@ -602,7 +734,7 @@ ProfilingResult GraphProfiler::init() {
   IValueMap values; // temporal value
   size_t replica_num = dev_num_ * min_pipeline_num_;
   bool checkpointing = false;
-  auto ret = doProfile(graphs, values, 1, replica_num, checkpointing);
+  auto ret = doProfile(graphs, values, 1, replica_num, checkpointing, true);
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {
