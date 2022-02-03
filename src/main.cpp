@@ -22,6 +22,7 @@
 #include "Logging.h"
 
 #include "cpg/CPG.h"
+#include "distop/DistMatmul.h"
 
 namespace py = pybind11;
 using namespace rannc;
@@ -425,6 +426,19 @@ PYBIND11_MODULE(_pyrannc, m) {
     }
 
     spdlog::info(ss.str());
+  });
+
+  m.def("matmul_dist", [](py::handle py_tensor1, py::handle py_tensor2) {
+    auto iv1 = torch::jit::_toTypeInferredIValue(py_tensor1);
+    assert(iv1.isTensor());
+    at::Tensor ten1 = iv1.toTensor().cuda();
+
+    auto iv2 = torch::jit::_toTypeInferredIValue(py_tensor2);
+    assert(iv2.isTensor());
+    at::Tensor ten2 = iv2.toTensor().cuda();
+
+    DistMatmul dist_mm;
+    return dist_mm.run(ten1, ten2);
   });
 
 #ifdef VERSION_INFO
