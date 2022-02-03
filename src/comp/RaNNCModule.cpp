@@ -13,6 +13,7 @@
 #include <comp/DistributedGradLocator.h>
 #include <comp/DistributedParamLocator.h>
 #include <comp/FunctionStorage.h>
+#include <comp/PartitionTensor.h>
 #include <Config.h>
 #include <cuda/CudaUtil.h>
 #include <graph/ConvertGraph.h>
@@ -195,6 +196,14 @@ std::vector<long> RaNNCModule::init(
     logger->info("Converting torch model to IR ...");
   }
   ir_graph_ = fromTorch(id_, graph, args.size());
+
+  if (conf.getVal<bool>(config::FORCE_DIST_MATMUL)) {
+    //// under development
+    ir_graph_ = replaceNodeOpNames(ir_graph_, getDistOpNameMap());
+    spdlog::info("mod for linear_dist {}", toString(*ir_graph_));
+    ////
+  }
+
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;
     ss << "The target model is empty: " << graph->toString();

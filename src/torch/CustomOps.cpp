@@ -8,6 +8,7 @@
 #include <torch/torch.h>
 
 #include "comp/OffloadedParamMap.h"
+#include "distop/DistMatmul.h"
 #include "graph/ir.h"
 #include "torch/TorchUtil.h"
 
@@ -30,9 +31,21 @@ at::Tensor offloadingPostHook(
   return OffloadingHookFunction::apply(tensor, name, false);
 }
 
+at::Tensor matmulDist(
+    const at::Tensor& input, const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias) {
+  return DistLinearFunction::apply(input, weight, bias);
+}
+
 TORCH_LIBRARY(rannc, m) {
   m.def("displayValueHook", displayValueHook);
   m.def("offloadingPreHook", offloadingPreHook);
   m.def("offloadingPostHook", offloadingPostHook);
+
+  //  m.def("linear_dist", matmulDist);
+  m.def(
+      TORCH_SELECTIVE_SCHEMA(
+          "rannc::linear_dist(Tensor input, Tensor weight, Tensor? bias) -> Tensor"),
+      matmulDist);
 }
 } // namespace rannc

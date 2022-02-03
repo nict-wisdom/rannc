@@ -18,6 +18,18 @@ class DistMatmul {
  private:
   at::Tensor out_buf_;
 };
+
+class DistLinearFunction
+    : public torch::autograd::Function<DistLinearFunction> {
+ public:
+  static torch::Tensor forward(
+      torch::autograd::AutogradContext* ctx, torch::Tensor input,
+      torch::Tensor weight, c10::optional<torch::Tensor> bias);
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs);
+};
 } // namespace rannc
 
 #endif // TPTESTS_DISTMATMUL_H
