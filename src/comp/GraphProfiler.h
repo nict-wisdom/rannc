@@ -110,7 +110,7 @@ class GraphProfiler {
     clear();
   }
 
-  ProfilingResult init();
+  ProfilingResult init(bool trace_dim_names);
   ProfilingResult profile(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,

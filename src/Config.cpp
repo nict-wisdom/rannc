@@ -74,6 +74,7 @@ const char USE_MPI_TO_GATHER_DIST_PARAMS[] = "use_mpi_to_gather_dist_params";
 const char RUN_WATCHDOG[] = "run_watchdog";
 const char WATCHDOG_LOCKFILE_DIR[] = "watchdog_lockfile_dir";
 const char FORCE_DIST_MATMUL[] = "force_dist_matmul";
+const char USE_NAMED_TENSORS[] = "use_named_tensors";
 
 const char CONF_DIR[] = "conf_dir";
 
@@ -180,6 +181,7 @@ Config::Config() {
       makeConfigItem(RUN_WATCHDOG, false),
       makeConfigItem(WATCHDOG_LOCKFILE_DIR, std::string("")),
       makeConfigItem(FORCE_DIST_MATMUL, false),
+      makeConfigItem(USE_NAMED_TENSORS, false),
 
       makeConfigItem(CONF_DIR, "")};
 

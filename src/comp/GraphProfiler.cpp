@@ -239,7 +239,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
     const IValueMap& graph_inputs_with_names,
     const std::unordered_map<std::string, at::Tensor>& graph_params,
     int iteration, IValueMap& values, int split_index, bool checkpointing,
-    bool on_init) {
+    bool trace_dim_names) {
   emptyCache();
 
   ProfilingResult ret_profiles;
@@ -299,7 +299,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
             return driver.forward(id, graph_inputs, split_index);
           },
           i, iteration / 2, time_counter, fwd_time_key);
-      if (on_init) {
+      if (trace_dim_names) {
         recordDimNamesFromIValue(driver_out, dim_names_);
         for (auto& it : graph_inputs) {
           graph_inputs[it.first] = resetDimNamesOnIValue(it.second);
@@ -338,7 +338,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 ProfilingResult GraphProfiler::compute(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
     int iteration, IValueMap& values, int split_index, bool checkpointing,
-    bool on_init) {
+    bool trace_dim_names) {
   TimeCounter time_counter(true);
   ProfilingResult ret_profiles;
   std::unordered_set<std::string> graphs_done;
@@ -375,7 +375,7 @@ ProfilingResult GraphProfiler::compute(
       bool graph_ready = isGraphReady(input_names, avail_locs);
       if (graph_ready) {
         logger->debug(
-            "GraphProfiler::doCompute starting graph {} ({}/{})", id,
+            "GraphProfiler::compute starting graph {} ({}/{})", id,
             graphs_done.size() + 1, ir_graphs.size());
 
         emptyCache();
@@ -388,7 +388,7 @@ ProfilingResult GraphProfiler::compute(
           graph_inputs[in_name] =
               contiguous(toCUDAIfAvailable(values.at(in_name), true));
 
-          if (on_init) {
+          if (trace_dim_names) {
             graph_inputs[in_name] = setDimNamesOnIValue(
                 graph_inputs[in_name], in_name, false, dim_names_);
           }
@@ -404,7 +404,7 @@ ProfilingResult GraphProfiler::compute(
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
         auto graph_params = paramsToCuda(getGraphParams(subgraph));
 
-        if (on_init) {
+        if (trace_dim_names) {
           for (const auto& it : graph_params) {
             graph_params[it.first] =
                 setDimNamesOnTensor(it.second, it.first, false, dim_names_);
@@ -416,7 +416,7 @@ ProfilingResult GraphProfiler::compute(
         try {
           prof_results = computeGraph(
               subgraph, graph_inputs, graph_params, iteration, values,
-              split_index, checkpointing, on_init);
+              split_index, checkpointing, trace_dim_names);
           dimnames_set = true;
         } catch (std::runtime_error& e) {
           driver_.destroyModule(subgraph->getName());
@@ -426,6 +426,10 @@ ProfilingResult GraphProfiler::compute(
               msg.find("not yet supported with named tensors");
           std::string::size_type pos2 =
               msg.find("Error when attempting to broadcast dims");
+
+          if (pos1 == std::string::npos && pos2 == std::string::npos) {
+            throw e;
+          }
 
           if (pos2 != std::string::npos) {
             dimnames_set = true;
@@ -448,14 +452,12 @@ ProfilingResult GraphProfiler::compute(
           // Try again without dim names
           prof_results = computeGraph(
               subgraph, graph_inputs, graph_params, iteration, values,
-              split_index, checkpointing, on_init);
+              split_index, checkpointing, trace_dim_names);
 
           // Set dim names again on params
-          if (on_init) {
-            for (const auto& it : graph_params) {
-              graph_params[it.first] =
-                  setDimNamesOnTensor(it.second, it.first, false, dim_names_);
-            }
+          for (const auto& it : graph_params) {
+            graph_params[it.first] =
+                setDimNamesOnTensor(it.second, it.first, false, dim_names_);
           }
         }
         IValueMap& driver_out = prof_results.first;
@@ -470,7 +472,9 @@ ProfilingResult GraphProfiler::compute(
           } else {
             out_val = it_out.second;
           }
-          out_val = resetDimNamesOnIValue(out_val);
+          if (trace_dim_names) {
+            out_val = resetDimNamesOnIValue(out_val);
+          }
           values[it_out.first] = toCPU(out_val, true);
           ret_profiles.value_types[it_out.first.value_name] = toIRType(out_val);
 
@@ -492,7 +496,7 @@ ProfilingResult GraphProfiler::compute(
 
         graphs_done.insert(id);
 
-        logger->trace("GraphProfiler::doCompute finished graph {}", id);
+        logger->trace("GraphProfiler::compute finished graph {}", id);
       } //  End if (graph_ready)
     } //  End for (it_graphs)
 
@@ -613,7 +617,7 @@ std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
 ProfilingResult GraphProfiler::doProfile(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
     IValueMap& values, int iteration, size_t replica_num, bool checkpointing,
-    bool on_init) {
+    bool trace_dim_names) {
   for (const auto& it : ir_graphs) {
     for (const auto& in_name : it.second->getInputNames()) {
       IValueLocation loc{in_name};
@@ -643,7 +647,7 @@ ProfilingResult GraphProfiler::doProfile(
   logger->trace(
       "GraphProfiler::profile starting doCompute replica_num={}", replica_num);
   ProfilingResult ret_profiles =
-      compute(ir_graphs, iteration, values, 0, checkpointing, on_init);
+      compute(ir_graphs, iteration, values, 0, checkpointing, trace_dim_names);
   logger->trace("GraphProfiler::profile finished doCompute");
 
   driver_.destroy();
@@ -683,7 +687,7 @@ ProfilingResult GraphProfiler::profile(
   return ret_profiles;
 }
 
-ProfilingResult GraphProfiler::init() {
+ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   for (const auto& it : non_param_inputs_) {
     IValueLocation loc{it.first};
     if (!contains(values_, loc)) {
@@ -693,9 +697,11 @@ ProfilingResult GraphProfiler::init() {
   }
 
   const auto graph_params = getGraphParams(base_graph_);
-  for (const auto& p_it : graph_params) {
-    const auto dim_names = createDimnames(p_it.first, p_it.second, false);
-    dim_names_[p_it.first] = dim_names;
+  if (trace_dim_names) {
+    for (const auto& p_it : graph_params) {
+      const auto dim_names = createDimnames(p_it.first, p_it.second, false);
+      dim_names_[p_it.first] = dim_names;
+    }
   }
 
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs;
@@ -734,7 +740,8 @@ ProfilingResult GraphProfiler::init() {
   IValueMap values; // temporal value
   size_t replica_num = dev_num_ * min_pipeline_num_;
   bool checkpointing = false;
-  auto ret = doProfile(graphs, values, 1, replica_num, checkpointing, true);
+  auto ret =
+      doProfile(graphs, values, 1, replica_num, checkpointing, trace_dim_names);
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {

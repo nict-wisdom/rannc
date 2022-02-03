@@ -256,7 +256,8 @@ std::vector<long> RaNNCModule::init(
     pybind11::gil_scoped_release no_gil;
     ProfilingResult prof_results;
     try {
-      prof_results = sg_prof->init();
+      bool use_named_tensors = conf.getVal<bool>(config::USE_NAMED_TENSORS);
+      prof_results = sg_prof->init(use_named_tensors);
     } catch (std::exception& e) {
       std::stringstream ss;
       ss << "Failed to profile graph."
