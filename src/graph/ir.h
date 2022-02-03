@@ -661,6 +661,9 @@ std::unordered_set<std::string> findUnusedValue(
 bool noUnusedValue(const std::shared_ptr<IRGraph>& g, bool show_msg = false);
 std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g);
 size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g);
+std::shared_ptr<IRGraph> replaceNodeOpNames(
+    const std::shared_ptr<IRGraph>& g,
+    const std::unordered_map<std::string, std::string>& name_map);
 } // namespace rannc
 
 #endif // PT_RANNC_IR_H
