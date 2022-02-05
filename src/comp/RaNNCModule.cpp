@@ -16,6 +16,7 @@
 #include <comp/PartitionTensor.h>
 #include <Config.h>
 #include <cuda/CudaUtil.h>
+#include <distop/DistTaskDispatcher.h>
 #include <graph/ConvertGraph.h>
 #include <graph/DeploymentSerializer.h>
 #include <graph/GuessValueTypes.h>
@@ -233,8 +234,8 @@ std::vector<long> RaNNCModule::init(
   func_storage_ = std::make_shared<FunctionStorage>();
   func_storage_->deploy(graph);
 
-  DistributedParamLocator& zpl = DistributedParamLocator::get();
-  zpl.fetchStart();
+  DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+  dtd.start();
   if (mpi::isMaster()) {
     const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
     std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
@@ -389,7 +390,7 @@ std::vector<long> RaNNCModule::init(
   }
 
   emptyCache();
-  zpl.fetchEnd();
+  dtd.stop();
   MPI_Barrier(MPI_COMM_WORLD);
 
   if (dry_run_np > 0) {

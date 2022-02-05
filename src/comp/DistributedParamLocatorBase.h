@@ -21,6 +21,7 @@ class DistributedParamLocatorBase {
   std::pair<int64_t, int64_t> getSegmentRange(long pid, int index);
   std::pair<int64_t, int64_t> getSegmentRange(long pid);
   at::Tensor gather(const at::Tensor& tensor_part, long pid);
+  long pidToLocal(long global_pid) const;
   virtual void clear();
 
  protected:

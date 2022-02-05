@@ -84,6 +84,7 @@ set(RANNC_SRCS
         src/cuda/CudaUtil.cpp
         src/cuda/CudaSync.cpp
         src/distop/DistMatmul.cpp
+        src/distop/DistTaskDispatcher.cpp
         src/graph/ConvertGraph.cpp
         src/graph/Decomposition.cpp
         src/graph/GuessValueTypes.cpp

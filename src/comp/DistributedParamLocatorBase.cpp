@@ -145,6 +145,11 @@ at::Tensor DistributedParamLocatorBase::gather(
       .set_requires_grad(requires_grad);
 }
 
+long DistributedParamLocatorBase::pidToLocal(long global_pid) const {
+  assert(contains(global_id_to_local_, global_pid));
+  return global_id_to_local_.at(global_pid);
+}
+
 void DistributedParamLocatorBase::clear() {
   offsets_.clear();
   src_sizes_.clear();

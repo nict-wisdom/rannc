@@ -7,6 +7,7 @@
 #include <comm/ObjectComm.h>
 #include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
+#include <distop/DistTaskDispatcher.h>
 #include <graph/Decomposition.h>
 #include "comm/SComm.h"
 #include "Common.h"
@@ -270,8 +271,8 @@ at::Tensor ParamStorage::getParamTensor(long param_id) const {
   }
 
   if (distributed(param_id)) {
-    DistributedParamLocator& zpl = DistributedParamLocator::get();
-    return zpl.fetch(param_id);
+    DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+    return dtd.getParam(param_id);
   }
 
   return params_.at(param_id);
