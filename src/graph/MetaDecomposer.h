@@ -5,6 +5,7 @@
 #ifndef PYRANNC_METADECOMPOSER_H
 #define PYRANNC_METADECOMPOSER_H
 
+#include <comp/GraphProfiler.h>
 #include "Decomposition.h"
 
 namespace rannc {

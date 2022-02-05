@@ -9,7 +9,6 @@
 #include <comm/MPIUtil.h>
 #include <comm/ObjectComm.h>
 #include <Common.h>
-#include <comp/NodeProfiler.h>
 #include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 

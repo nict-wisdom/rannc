@@ -16,6 +16,7 @@
 #include <Logging.h>
 
 #include <comp/ParamStorage.h>
+#include "FunctionStorage.h"
 #include "GraphValueStorage.h"
 
 namespace py = pybind11;

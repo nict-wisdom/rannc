@@ -5,6 +5,7 @@
 #ifndef PYRANNC_VALIDATOR_H
 #define PYRANNC_VALIDATOR_H
 
+#include "FunctionStorage.h"
 #include "graph/Decomposition.h"
 
 namespace rannc {
@@ -18,7 +19,7 @@ class Validator {
       const std::vector<torch::jit::IValue>& input_ivals,
       const std::unordered_map<std::string, torch::jit::IValue>& param_inputs,
       const IValueMap& const_vals,
-      const std::shared_ptr<rannc::FunctionStorage>& functions,
+      const std::shared_ptr<FunctionStorage>& functions,
       const Deployment& deployment);
 
  private:

@@ -19,7 +19,6 @@
 
 #include <comm/MPIUtil.h>
 #include <comm/SComm.h>
-#include <comp/NodeProfiler.h>
 #include <graph/ir.h>
 
 namespace rannc {

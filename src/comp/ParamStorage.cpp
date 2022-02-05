@@ -5,6 +5,7 @@
 #include "ParamStorage.h"
 #include <comm/NCCLWrapper.h>
 #include <comm/ObjectComm.h>
+#include <Config.h>
 #include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include <distop/DistTaskDispatcher.h>
