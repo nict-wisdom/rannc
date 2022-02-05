@@ -1,4 +1,3 @@
-import functools
 import types
 
 import torch
@@ -65,13 +64,11 @@ class DistributeModelParams(object):
             # So we create a communicator including all ranks on initialization.
             _allreduce_sum(torch.zeros(3, 3).cuda())
 
-
     def __enter__(self):
         if not self.enable:
             return
 
         def add_post_process(f):
-            @functools.wraps(f)
             def wrapper(model, *args, **kwargs):
                 f(model, *args, **kwargs)
                 self._store_dist_params(model)
@@ -79,20 +76,25 @@ class DistributeModelParams(object):
 
             return wrapper
 
-        def all_subclasses(cls):
-            return set(cls.__subclasses__()).union(
-                [s for c in cls.__subclasses__() for s in all_subclasses(c)])
+        def fq_classname(cls):
+            module = cls.__module__
+            name = cls.__qualname__
+            if module is not None and module != "__builtin__":
+                name = module + "." + name
+            return name
 
-        for subclass in all_subclasses(torch.nn.modules.module.Module):
-            subclass._old_init = subclass.__init__
-            subclass.__init__ = add_post_process(subclass.__init__)
+        for subclass in self._all_subclasses(torch.nn.modules.module.Module):
+            if "torch.jit" not in fq_classname(subclass):
+                subclass._old_init = subclass.__init__
+                subclass.__init__ = add_post_process(subclass.__init__)
 
     def __exit__(self, exc_type, exc_value, traceback):
         if not self.enable:
             return
 
-        for subclass in torch.nn.modules.module.Module.__subclasses__():
-            subclass.__init__ = subclass._old_init
+        for subclass in self._all_subclasses(torch.nn.modules.module.Module):
+            if hasattr(subclass, "_old_init"):
+                subclass.__init__ = subclass._old_init
 
     def _store_dist_params(self, model):
         for p in model.parameters(recurse=False):
@@ -122,5 +124,9 @@ class DistributeModelParams(object):
                 b.data = get_dist_param_segment(id(b))
             _pyrannc.set_tracing_state(True)
 
-        model.register_forward_pre_hook(_pre_hook_for_tracing)
-        model.register_forward_hook(_post_hook_for_tracing)
+        self.hooks.append(model.register_forward_pre_hook(_pre_hook_for_tracing))
+        self.hooks.append(model.register_forward_hook(_post_hook_for_tracing))
+
+    def _all_subclasses(self, cls):
+        return set(cls.__subclasses__()).union(
+            [s for c in cls.__subclasses__() for s in self._all_subclasses(c)])
