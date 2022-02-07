@@ -115,9 +115,18 @@ class GraphProfiler {
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
       int iteration, size_t replica_num = 1, bool checkpointing = false);
+  ProfilingResult profile(
+      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
+          ir_graphs,
+      IValueMap values, int iteration, size_t replica_num = 1,
+      bool checkpointing = false);
   void clear();
   void load(const std::string& file);
   void save(const std::string& file);
+
+  const IValueMap& getValues() const {
+    return values_;
+  }
 
   bool isCacheParamValues() const {
     return cache_param_values_;

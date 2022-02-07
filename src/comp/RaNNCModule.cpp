@@ -234,15 +234,15 @@ std::vector<long> RaNNCModule::init(
   func_storage_ = std::make_shared<FunctionStorage>();
   func_storage_->deploy(graph);
 
-  DistTaskDispatcher& dtd = DistTaskDispatcher::get();
-  dtd.start();
-  if (mpi::isMaster()) {
-    const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
-    std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
-        param_storage_, ir_graph_, non_param_inputs, graph_params,
-        value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
-        min_pipeline, offload_params_);
+  const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
+  std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
+      param_storage_, ir_graph_, non_param_inputs, graph_params,
+      value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
+      min_pipeline, offload_params_);
 
+  DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+  dtd.start(sg_prof);
+  if (mpi::isMaster()) {
     sg_prof->setCacheParamValues(true);
 
     bool load_profile = conf.getVal<bool>(config::LOAD_GRAPH_PROFILE);

@@ -687,6 +687,14 @@ ProfilingResult GraphProfiler::profile(
   return ret_profiles;
 }
 
+ProfilingResult GraphProfiler::profile(
+    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
+    IValueMap values, int iteration, size_t replica_num, bool checkpointing) {
+  auto ret_profiles = doProfile(
+      ir_graphs, values, iteration, replica_num, checkpointing, false);
+  return ret_profiles;
+}
+
 ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   for (const auto& it : non_param_inputs_) {
     IValueLocation loc{it.first};

@@ -26,8 +26,8 @@ class DPStaging {
   DPStaging(
       std::shared_ptr<GraphProfiler> profiler,
       std::shared_ptr<IRGraph> ir_graph, size_t batch_size, size_t dev_mem,
-      bool use_amp_master_params, bool enable_zero)
-      : prof_util_(std::move(profiler)),
+      bool use_amp_master_params, bool enable_zero, bool force_dist_matmul)
+      : prof_util_(std::move(profiler), force_dist_matmul),
         ir_graph_(ir_graph),
         batch_size_(batch_size),
         dev_mem_(dev_mem),
@@ -111,7 +111,7 @@ class DPDryStaging : public DPStaging {
         DPStaging(
             std::shared_ptr<GraphProfiler>(nullptr), cache.ir_graph,
             cache.batch_size, cache.dev_mem, cache.use_amp_master_params,
-            cache.enable_zero) {
+            cache.enable_zero, false) {
     prof_util_.setProfileCache(cache.ml_profile_cache);
 
     min_pipeline_num_ = cache.min_pipeline_num;

@@ -5,6 +5,7 @@
 #include "ProfilerUtil.h"
 #include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
+#include <distop/DistTaskDispatcher.h>
 
 namespace rannc {
 
@@ -117,8 +118,32 @@ GraphProfile ProfilerUtil::profile(
   prof_in_v[g->getName()] = g;
 
   try {
-    ProfilingResult prof_v =
-        profiler_->profile(prof_in_v, 3, replica_num, checkpointing);
+    ProfilingResult prof_v;
+    if (dist_profile_) {
+      spdlog::info("Profiling with dist_profile_={}", dist_profile_);
+
+      IValueMap in_values;
+      const IValueMap& avail_vals = profiler_->getValues();
+
+      for (const auto& it : prof_in_v) {
+        for (const auto& in_name : getNonParamInputNames(g)) {
+          assert(contains(avail_vals, in_name));
+
+          in_values[in_name] = avail_vals.at(in_name);
+        }
+      }
+      std::unordered_set<int> target_ranks;
+      for (int i = 0; i < replica_num; i++) {
+        target_ranks.insert(i);
+      }
+      DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+      spdlog::info("Starting dist profiling");
+      prof_v =
+          dtd.profile(prof_in_v, 3, replica_num, checkpointing, target_ranks);
+      spdlog::info("Finished dist profiling");
+    } else {
+      prof_v = profiler_->profile(prof_in_v, 3, replica_num, checkpointing);
+    }
     assert(prof_v.node_profiles.size() == 1);
     profile_cache_[k] = prof_v.node_profiles.begin()->second;
   } catch (std::exception& e) {

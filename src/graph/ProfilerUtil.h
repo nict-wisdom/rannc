@@ -59,7 +59,10 @@ using MLProfileCache =
 class ProfilerUtil {
  public:
   ProfilerUtil(std::shared_ptr<GraphProfiler> profiler)
-      : profiler_(std::move(profiler)){};
+      : profiler_(std::move(profiler)), dist_profile_(false){};
+  ProfilerUtil(std::shared_ptr<GraphProfiler> profiler, bool dist_profile)
+      : profiler_(std::move(profiler)), dist_profile_(dist_profile){};
+
   GraphProfile profile(
       const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
       bool checkpointing = false);
@@ -79,6 +82,7 @@ class ProfilerUtil {
   std::unordered_map<bool, std::unordered_map<std::string, size_t>>
       max_batch_size_cache_;
   std::shared_ptr<GraphProfiler> profiler_;
+  bool dist_profile_;
 };
 
 GraphProfile accProfileValues(
