@@ -6,6 +6,7 @@
 #define PYRANNC_PROFILERUTIL_H
 
 #include <comp/GraphProfiler.h>
+#include <distop/PartitionTensor.h>
 #include "ir.h"
 
 namespace rannc {
@@ -67,8 +68,7 @@ class ProfilerUtil {
       const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
       size_t pipeline_num, bool checkpointing = false);
   GraphProfile profileDist(
-      const std::shared_ptr<IRGraph>& g,
-      const std::unordered_map<std::string, int>& dist_ranks, size_t batch_size,
+      const TensorPartioningGraphInfo& part_info, size_t batch_size,
       size_t replica_num, size_t pipeline_num, bool checkpointing);
 
   const MLProfileCache& getProfileCache() const {

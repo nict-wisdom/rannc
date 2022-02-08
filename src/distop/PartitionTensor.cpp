@@ -38,8 +38,7 @@ std::unordered_map<std::string, std::pair<size_t, size_t>> getDistParams(
   return ret;
 }
 
-std::pair<std::shared_ptr<IRGraph>, std::unordered_map<std::string, int>>
-replaceWithDistOp(
+TensorPartioningGraphInfo replaceWithDistOp(
     const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks) {
   std::vector<IRNode> new_nodes;
   std::unordered_map<std::string, IRValue> new_values;
@@ -96,14 +95,13 @@ replaceWithDistOp(
     }
   }
 
-  const auto ret_graph = std::make_shared<IRGraph>(
+  std::shared_ptr<IRGraph> ret_graph = std::make_shared<IRGraph>(
       g->getName(), new_nodes, new_values, g->getInputNames(),
       g->getOutputNames());
 
-  return {
-      std::make_shared<IRGraph>(
-          g->getName(), new_nodes, new_values, g->getInputNames(),
-          g->getOutputNames()),
-      dist_ranks};
+  std::unordered_map<std::string, std::pair<size_t, size_t>> param_part =
+      getDistParams(ret_graph);
+
+  return TensorPartioningGraphInfo{ret_graph, param_part, dist_ranks};
 }
 } // namespace rannc

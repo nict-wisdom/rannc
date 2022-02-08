@@ -21,8 +21,18 @@ std::unordered_map<std::string, std::string> getDistOpNameMap();
 
 std::unordered_map<std::string, std::pair<size_t, size_t>> getDistParams(
     const std::shared_ptr<IRGraph>& g);
-std::pair<std::shared_ptr<IRGraph>, std::unordered_map<std::string, int>>
-replaceWithDistOp(
+
+struct TensorPartioningGraphInfo {
+  std::shared_ptr<IRGraph> graph;
+  // param name -> (arg index, dim index)
+  std::unordered_map<std::string, std::pair<size_t, size_t>> param_partitions;
+  // value name -> rank
+  std::unordered_map<std::string, int> rank_values;
+
+  MSGPACK_DEFINE(graph, param_partitions, rank_values);
+};
+
+TensorPartioningGraphInfo replaceWithDistOp(
     const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks);
 } // namespace rannc
 

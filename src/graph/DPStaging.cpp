@@ -5,7 +5,7 @@
 #include "DPStaging.h"
 #include <cuda/CudaUtil.h>
 
-#include <comp/PartitionTensor.h>
+#include <distop/PartitionTensor.h>
 #include <json.hpp>
 
 namespace {
@@ -618,12 +618,12 @@ AllocSolution DPStaging::doRunDpComm(
                 for (int i = 0; i < (d - d_prev) * replica_num; i++) {
                   ranks.push_back(i);
                 }
-                auto dist_graph = replaceWithDistOp(step_graph, ranks);
-                step_graph = dist_graph.first;
-
+                TensorPartioningGraphInfo part_info =
+                    replaceWithDistOp(step_graph, ranks);
+                step_graph = part_info.graph;
                 step_prof = prof_util_.profileDist(
-                    step_graph, dist_graph.second, batch_size_,
-                    (d - d_prev) * replica_num, pipeline_num, checkpointing);
+                    part_info, batch_size_, (d - d_prev) * replica_num,
+                    pipeline_num, checkpointing);
                 ////
               } else {
                 // run profiler for the merged graph

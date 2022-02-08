@@ -22,20 +22,24 @@ struct ProfilingInput {
   int iteration;
   size_t replica_num;
   bool checkpointing;
+  TensorPartioningGraphInfo part_info;
 
   ProfilingInput() {}
 
   ProfilingInput(
       std::unordered_map<std::string, std::shared_ptr<IRGraph>> irGraph,
       std::unordered_map<IValueLocation, IRType, IValueLocationHash> types,
-      int iteration, size_t replicaNum, bool checkpointing)
+      int iteration, size_t replicaNum, bool checkpointing,
+      TensorPartioningGraphInfo part_info)
       : ir_graphs(irGraph),
         types(types),
         iteration(iteration),
         replica_num(replicaNum),
-        checkpointing(checkpointing) {}
+        checkpointing(checkpointing),
+        part_info(part_info) {}
 
-  MSGPACK_DEFINE(ir_graphs, types, iteration, replica_num, checkpointing);
+  MSGPACK_DEFINE(
+      ir_graphs, types, iteration, replica_num, checkpointing, part_info);
 };
 
 class DistTaskDispatcher {
@@ -47,8 +51,8 @@ class DistTaskDispatcher {
   ProfilingResult profile(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
-      const IValueMap& input_vals, const IValueMap& constants, int iteration,
-      size_t replica_num, bool checkpointing,
+      const IValueMap& input_vals, const TensorPartioningGraphInfo& part_info,
+      int iteration, size_t replica_num, bool checkpointing,
       const std::unordered_set<int>& target_ranks);
 
   static DistTaskDispatcher& get() {
@@ -58,6 +62,11 @@ class DistTaskDispatcher {
 
  private:
   DistTaskDispatcher();
+  ProfilingResult runProfiling(
+      std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs,
+      IValueMap input_vals, TensorPartioningGraphInfo part_info, int iteration,
+      size_t replica_num, bool checkpointing,
+      std::unordered_set<int> target_ranks);
 
   NCCLWrapper& nccl_;
   DistributedParamLocator& dpl_;

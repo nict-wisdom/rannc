@@ -13,10 +13,10 @@
 #include <comp/DistributedGradLocator.h>
 #include <comp/DistributedParamLocator.h>
 #include <comp/FunctionStorage.h>
-#include <comp/PartitionTensor.h>
 #include <Config.h>
 #include <cuda/CudaUtil.h>
 #include <distop/DistTaskDispatcher.h>
+#include <distop/PartitionTensor.h>
 #include <graph/ConvertGraph.h>
 #include <graph/DeploymentSerializer.h>
 #include <graph/GuessValueTypes.h>

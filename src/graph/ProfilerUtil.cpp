@@ -6,6 +6,7 @@
 #include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include <distop/DistTaskDispatcher.h>
+#include <distop/PartitionTensor.h>
 
 namespace rannc {
 
@@ -109,12 +110,11 @@ GraphProfile ProfilerUtil::profile(
 }
 
 GraphProfile ProfilerUtil::profileDist(
-    const std::shared_ptr<IRGraph>& g,
-    const std::unordered_map<std::string, int>& dist_ranks, size_t batch_size,
+    const TensorPartioningGraphInfo& part_info, size_t batch_size,
     size_t replica_num, size_t pipeline_num, bool checkpointing) {
   return doProfile(
-      g, batch_size, replica_num, pipeline_num, checkpointing,
-      [this, &dist_ranks](
+      part_info.graph, batch_size, replica_num, pipeline_num, checkpointing,
+      [this, &part_info](
           const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
               ir_graphs,
           int iteration, size_t replica_num, size_t pipeline_num,
@@ -138,12 +138,9 @@ GraphProfile ProfilerUtil::profileDist(
         }
         DistTaskDispatcher& dtd = DistTaskDispatcher::get();
         spdlog::info("Starting dist profiling");
-        IValueMap constants;
-        for (const auto& it : dist_ranks) {
-          constants[it.first] = it.second;
-        }
+
         return dtd.profile(
-            ir_graphs, in_values, constants, iteration,
+            ir_graphs, in_values, part_info, iteration,
             replica_num * pipeline_num, checkpointing, target_ranks);
       });
 }
