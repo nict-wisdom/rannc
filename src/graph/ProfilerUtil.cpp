@@ -91,13 +91,16 @@ GraphProfile makeErrorProfile() {
   return p;
 }
 
+const int ProfilerUtil::DEFALUT_ITERATION_NUM = 3;
+
 GraphProfile ProfilerUtil::profile(
     const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-    bool checkpointing) {
+    size_t pipeline_num, bool checkpointing) {
   assert(replica_num > 0);
+  assert(pipeline_num > 0);
   assert(g);
 
-  size_t bs = ceil(batch_size / (double)replica_num);
+  size_t bs = ceil(batch_size / (double)(replica_num * pipeline_num));
 
   const MLProfileKey k{g->getName(), bs, checkpointing};
   if (contains(profile_cache_, k)) {
@@ -128,21 +131,24 @@ GraphProfile ProfilerUtil::profile(
       for (const auto& it : prof_in_v) {
         for (const auto& in_name : getNonParamInputNames(g)) {
           assert(contains(avail_vals, in_name));
-
-          in_values[in_name] = avail_vals.at(in_name);
+          in_values[in_name] = toCUDAIfAvailable(avail_vals.at(in_name), true);
         }
       }
+
       std::unordered_set<int> target_ranks;
       for (int i = 0; i < replica_num; i++) {
         target_ranks.insert(i);
       }
       DistTaskDispatcher& dtd = DistTaskDispatcher::get();
       spdlog::info("Starting dist profiling");
-      prof_v =
-          dtd.profile(prof_in_v, 3, replica_num, checkpointing, target_ranks);
+      prof_v = dtd.profile(
+          prof_in_v, in_values, DEFALUT_ITERATION_NUM,
+          replica_num * pipeline_num, checkpointing, target_ranks);
       spdlog::info("Finished dist profiling");
     } else {
-      prof_v = profiler_->profile(prof_in_v, 3, replica_num, checkpointing);
+      prof_v = profiler_->profile(
+          prof_in_v, DEFALUT_ITERATION_NUM, replica_num * pipeline_num,
+          checkpointing);
     }
     assert(prof_v.node_profiles.size() == 1);
     profile_cache_[k] = prof_v.node_profiles.begin()->second;
@@ -152,8 +158,8 @@ GraphProfile ProfilerUtil::profile(
     std::string::size_type pos2 = msg.find("Too many elements");
     if (pos1 == std::string::npos && pos2 == std::string::npos) {
       spdlog::error(
-          "Failed to profile graph: {} batch_size={} replica_num={} {}",
-          g->getName(), batch_size, replica_num, e.what());
+          "Failed to profile graph: {} batch_size={} replica_num={} pipeline_num={} {}",
+          g->getName(), batch_size, replica_num, pipeline_num, e.what());
       throw std::runtime_error("Failed to profile graph: " + toString(*g));
     } else {
       profile_cache_[k] = makeErrorProfile();
@@ -172,7 +178,7 @@ GraphProfile ProfilerUtil::profile(
 GraphProfile accProfileValues(
     ProfilerUtil& prof_util, size_t batch_size,
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, bool checkpointing) {
+    size_t dev_num, size_t pipeline_num, bool checkpointing) {
   assert(from <= to);
   assert(to < graphs.size());
 
@@ -180,8 +186,8 @@ GraphProfile accProfileValues(
 
   for (size_t i = from; i <= to; i++) {
     const auto& graph = graphs.at(i);
-    const auto prof =
-        prof_util.profile(graph, batch_size, dev_num, checkpointing);
+    const auto prof = prof_util.profile(
+        graph, batch_size, dev_num, pipeline_num, checkpointing);
 
     prof_sum.fwd_time += prof.fwd_time;
     prof_sum.bwd_time += prof.bwd_time;

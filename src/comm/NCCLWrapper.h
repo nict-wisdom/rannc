@@ -101,6 +101,8 @@ class NCCLWrapper {
 
   std::shared_ptr<spdlog::logger> logger = getLogger("NCCLWrapper");
 };
+
+void createRouteCommunicator(const std::vector<RouteDP>& routes);
 } // namespace rannc
 
 #endif // PYRANNC_MPIALLREDUCERUNNER_H

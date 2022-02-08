@@ -32,7 +32,8 @@ class DPStaging {
         batch_size_(batch_size),
         dev_mem_(dev_mem),
         use_amp_master_params_(use_amp_master_params),
-        enable_zero_(enable_zero) {
+        enable_zero_(enable_zero),
+        force_dist_matmul_(force_dist_matmul) {
     config::Config& config = config::Config::get();
     dump_dp_node_profiles_ =
         config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
@@ -55,7 +56,7 @@ class DPStaging {
 
   GraphProfile estimateProf(
       const MLGraph& graph, size_t from, size_t to, size_t dev_num,
-      bool checkpointing);
+      size_t pipeline_num, bool checkpointing);
 
   void dumpNodeProfiles(
       const std::string& path, const MLGraph& graph, size_t dev_num,
@@ -71,6 +72,7 @@ class DPStaging {
 
   bool use_amp_master_params_;
   bool enable_zero_;
+  bool force_dist_matmul_;
 
   GraphMergeCache graph_merge_cache_;
 

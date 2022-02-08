@@ -198,12 +198,6 @@ std::vector<long> RaNNCModule::init(
   }
   ir_graph_ = fromTorch(id_, graph, args.size());
 
-  if (conf.getVal<bool>(config::FORCE_DIST_MATMUL)) {
-    //// under development
-    ir_graph_ = replaceNodeOpNames(ir_graph_, getDistOpNameMap());
-    spdlog::info("mod for linear_dist {}", toString(*ir_graph_));
-    ////
-  }
 
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;

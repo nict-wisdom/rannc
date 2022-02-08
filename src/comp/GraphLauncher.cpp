@@ -71,18 +71,6 @@ IValueMap GraphLauncher::alignBatch(
   return pad_input;
 }
 
-void createRouteCommunicator(const std::vector<RouteDP>& routes) {
-  TagMap& tag_map = TagMap::get();
-  NCCLWrapper& ar = NCCLWrapper::get();
-
-  for (const auto& r : routes) {
-    const auto ranks = getRanksInRoute(r);
-    int tag = tag_map.getRankSetTag(ranks);
-    if (contains(ranks, mpi::getRank())) {
-      ar.createCommunicator(tag, ranks);
-    }
-  }
-}
 
 std::unordered_map<std::string, IValueMap> toCPU(
     const std::unordered_map<std::string, IValueMap>& inputs, bool detach) {

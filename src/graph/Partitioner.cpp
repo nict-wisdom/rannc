@@ -24,11 +24,7 @@ long MLPartitioner::eval(const GraphProfile& prof) {
 }
 
 GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
-  int repl_num = dev_num_ * max_pipeline_num_;
-  if (min_pipeline_bs_ > 0) {
-    repl_num = std::min((int)(batch_size_ / min_pipeline_bs_), repl_num);
-  }
-  return prof_util_.profile(g, batch_size_, repl_num);
+  return prof_util_.profile(g, batch_size_, dev_num_, max_pipeline_num_);
 }
 
 std::vector<MLVertex> MLPartitioner::sortNodesByEval(

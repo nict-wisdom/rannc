@@ -373,6 +373,12 @@ ProfilingResult GraphProfiler::compute(
       }
 
       bool graph_ready = isGraphReady(input_names, avail_locs);
+
+      //      spdlog::info("avail_locs num={}", avail_locs.size());
+      //      for (const auto& it: avail_locs) {
+      //        spdlog::info("loc={}", toString(it));
+      //      }
+
       if (graph_ready) {
         logger->debug(
             "GraphProfiler::compute starting graph {} ({}/{})", id,

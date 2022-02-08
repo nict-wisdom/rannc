@@ -65,7 +65,7 @@ class ProfilerUtil {
 
   GraphProfile profile(
       const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-      bool checkpointing = false);
+      size_t pipeline_num, bool checkpointing = false);
 
   const MLProfileCache& getProfileCache() const {
     return profile_cache_;
@@ -83,12 +83,14 @@ class ProfilerUtil {
       max_batch_size_cache_;
   std::shared_ptr<GraphProfiler> profiler_;
   bool dist_profile_;
+
+  static const int DEFALUT_ITERATION_NUM;
 };
 
 GraphProfile accProfileValues(
     ProfilerUtil& prof_util, size_t batch_size,
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, bool checkpointing);
+    size_t dev_num, size_t pipeline_num, bool checkpointing);
 
 std::string displayGraphProfiles(
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t batch_size,

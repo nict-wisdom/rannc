@@ -5,6 +5,7 @@
 #include "DistTaskDispatcher.h"
 #include <comm/ObjectComm.h>
 #include <comm/SComm.h>
+#include <pybind11/pybind11.h>
 
 namespace rannc {
 
@@ -41,11 +42,7 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
         case DistTaskType::PROFILE: {
           logger->trace("Received PROFILE");
           std::vector<int> target_ranks_vec;
-          spdlog::info(
-              "Bcasting target_ranks ranks={}", join_as_str(target_ranks_vec));
           target_ranks_vec = ocomm_.bcast(target_ranks_vec);
-          spdlog::info(
-              "Bcasted target_ranks ranks={}", join_as_str(target_ranks_vec));
           std::unordered_set<int> target_ranks = vectorToSet(target_ranks_vec);
 
           if (!contains(target_ranks, mpi::getRank())) {
@@ -55,15 +52,23 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
           int comm_tag = tag_map.getRankSetTag(target_ranks);
           MPI_Comm comm = scomm_.getCommunicator(comm_tag, target_ranks);
           ProfilingInput prof_input;
-          spdlog::info(
-              "Bcasting prof_input ranks={}", join_as_str(target_ranks_vec));
           prof_input = ocomm_.bcast(prof_input, 0, comm);
-          spdlog::info(
-              "Bcasted prof_input ranks={}", join_as_str(target_ranks_vec));
-          //          spdlog::info("DUMMY Profiling {}",
-          //          prof_input.ir_graph->getName()); prof_util_->profile(
-          //              prof_input.ir_graph, prof_input.iteration,
-          //              prof_input.replica_num, prof_input.checkpointing);
+
+          int tag = tag_map.getRankSetTag(target_ranks);
+          int src_tag = tag_map.getRankSetTag({0});
+          RouteDP bcast_route(
+              IValueLocation("PROF_INPUTS"), {0}, target_ranks_vec, tag,
+              src_tag, RouteTypeDP::BROADCAST);
+          createRouteCommunicator({bcast_route});
+
+          IValueMap input_vals;
+          input_vals = scomm_.bcastIValueMap(input_vals, bcast_route);
+          nccl_.syncWithErrorCheck();
+
+          pybind11::gil_scoped_release no_gil;
+          sg_prof_->profile(
+              prof_input.ir_graphs, input_vals, prof_input.iteration,
+              prof_input.replica_num, prof_input.checkpointing);
 
         } break;
         case DistTaskType::STOP:
@@ -85,26 +90,36 @@ at::Tensor DistTaskDispatcher::getParam(long param_id) {
 
 ProfilingResult DistTaskDispatcher::profile(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    int iteration, size_t replica_num, bool checkpointing,
-    const std::unordered_set<int>& target_ranks) {
+    const IValueMap& input_vals, int iteration, size_t replica_num,
+    bool checkpointing, const std::unordered_set<int>& target_ranks) {
   int task_type_buf = static_cast<int>(DistTaskType::PROFILE);
   MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   std::vector<int> target_ranks_vec = setToVector(target_ranks);
-  spdlog::info("Bcasting target ranks {}", join_as_str(target_ranks_vec));
   ocomm_.bcast(target_ranks_vec);
-  spdlog::info("Bcasted target ranks {}", join_as_str(target_ranks_vec));
+
+  std::unordered_map<IValueLocation, IRType, IValueLocationHash> types;
+  for (const auto& it : input_vals) {
+    types[it.first] = toIRType(it.second);
+  }
 
   TagMap& tag_map = TagMap::get();
   int comm_tag = tag_map.getRankSetTag(target_ranks);
   MPI_Comm comm = scomm_.getCommunicator(comm_tag, target_ranks);
 
-  ProfilingInput prof_input{ir_graphs, iteration, replica_num, checkpointing};
-  spdlog::info("Bcasting prof_inputs ranks={}", join_as_str(target_ranks_vec));
+  ProfilingInput prof_input{
+      ir_graphs, types, iteration, replica_num, checkpointing};
   ocomm_.bcast(prof_input, 0, comm);
-  spdlog::info("Bcasted prof_inputs ranks={}", join_as_str(target_ranks_vec));
 
-  //  spdlog::info("Profiling {}", prof_input.ir_graph->getName());
+  int tag = tag_map.getRankSetTag(target_ranks);
+  int src_tag = tag_map.getRankSetTag({0});
+  RouteDP bcast_route(
+      IValueLocation("PROF_INPUTS"), {0}, target_ranks_vec, tag, src_tag,
+      RouteTypeDP::BROADCAST);
+  createRouteCommunicator({bcast_route});
+
+  scomm_.bcastIValueMap(input_vals, bcast_route);
+  nccl_.syncWithErrorCheck();
   return sg_prof_->profile(ir_graphs, iteration, replica_num, checkpointing);
 }
 

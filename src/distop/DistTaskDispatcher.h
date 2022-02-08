@@ -18,6 +18,7 @@ enum class DistTaskType { STOP, GET_PARAM, PROFILE };
 
 struct ProfilingInput {
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
+  std::unordered_map<IValueLocation, IRType, IValueLocationHash> types;
   int iteration;
   size_t replica_num;
   bool checkpointing;
@@ -26,13 +27,15 @@ struct ProfilingInput {
 
   ProfilingInput(
       std::unordered_map<std::string, std::shared_ptr<IRGraph>> irGraph,
+      std::unordered_map<IValueLocation, IRType, IValueLocationHash> types,
       int iteration, size_t replicaNum, bool checkpointing)
       : ir_graphs(irGraph),
+        types(types),
         iteration(iteration),
         replica_num(replicaNum),
         checkpointing(checkpointing) {}
 
-  MSGPACK_DEFINE(ir_graphs, iteration, replica_num, checkpointing);
+  MSGPACK_DEFINE(ir_graphs, types, iteration, replica_num, checkpointing);
 };
 
 class DistTaskDispatcher {
@@ -44,8 +47,8 @@ class DistTaskDispatcher {
   ProfilingResult profile(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
-      int iteration, size_t replica_num, bool checkpointing,
-      const std::unordered_set<int>& target_ranks);
+      const IValueMap& input_vals, int iteration, size_t replica_num,
+      bool checkpointing, const std::unordered_set<int>& target_ranks);
 
   static DistTaskDispatcher& get() {
     static DistTaskDispatcher instance;

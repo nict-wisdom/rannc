@@ -5,6 +5,7 @@
 #include "DPStaging.h"
 #include <cuda/CudaUtil.h>
 
+#include <comp/PartitionTensor.h>
 #include <json.hpp>
 
 namespace {
@@ -155,14 +156,15 @@ size_t estimateOutputSize(const std::vector<std::shared_ptr<IRGraph>>& graphs) {
 
 GraphProfile DPStaging::estimateProf(
     const MLGraph& graph, size_t from, size_t to, size_t dev_num,
-    bool checkpointing) {
+    size_t pipeline_num, bool checkpointing) {
   std::vector<std::shared_ptr<IRGraph>> graphs;
   for (const auto& node : graph.nodes) {
     graphs.push_back(node.graph);
   }
 
   return accProfileValues(
-      prof_util_, batch_size_, graphs, from, to, dev_num, checkpointing);
+      prof_util_, batch_size_, graphs, from, to, dev_num, pipeline_num,
+      checkpointing);
 }
 
 long estimateEval(
@@ -205,7 +207,7 @@ void DPStaging::dumpNodeProfiles(
         prof_obj["pipeline_num"] = pipeline_num;
 
         const auto prof = prof_util_.profile(
-            node.graph, batch_size_, d * pipeline_num, pipeline_num > 1);
+            node.graph, batch_size_, d, pipeline_num, pipeline_num > 1);
         prof_obj["fwd_time"] = prof.fwd_time;
         prof_obj["bwd_time"] = prof.bwd_time;
         prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
@@ -283,7 +285,7 @@ GraphProfile DPStaging::estimateSolutionGraph(
   assert(contains(sol.repl_nums, sg->getName()));
   int repl = sol.repl_nums.at(sg->getName());
   return prof_util_.profile(
-      sg, batch_size_, repl * sol.pipeline_num, sol.pipeline_num > 1);
+      sg, batch_size_, repl, sol.pipeline_num, sol.pipeline_num > 1);
 }
 
 AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
@@ -566,8 +568,8 @@ AllocSolution DPStaging::doRunDpComm(
             if (profile_by_acc) {
               // Just estimate time by accumulation
               step_prof = estimateProf(
-                  graph, b_prev, b - 1,
-                  (d - d_prev) * replica_num * pipeline_num, checkpointing);
+                  graph, b_prev, b - 1, (d - d_prev) * replica_num,
+                  pipeline_num, checkpointing);
 
               std::vector<std::shared_ptr<IRGraph>> ir_graphs;
               assert(graph.nodes.size() > b - 1);
@@ -601,7 +603,7 @@ AllocSolution DPStaging::doRunDpComm(
                   (step_in_comm + step_out_comm) * 2;
             } else {
               // merge graphs from j+1 to i (inclusive)
-              const auto step_graph = merge_helper.merge(b_prev, b - 1);
+              auto step_graph = merge_helper.merge(b_prev, b - 1);
               size_t step_in_comm = calcCommTime(
                   calcInputSize(step_graph) /
                   ((d - d_prev) * replica_num * pipeline_num));
@@ -610,10 +612,18 @@ AllocSolution DPStaging::doRunDpComm(
                   ((d - d_prev) * replica_num * pipeline_num));
               ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
 
+              spdlog::info("force_dist_matmul_={}", force_dist_matmul_);
+              if (force_dist_matmul_) {
+                //// under development
+                step_graph = replaceNodeOpNames(step_graph, getDistOpNameMap());
+                spdlog::info("mod for linear_dist {}", toString(*step_graph));
+                ////
+              }
+
               // run profiler for the merged graph
               step_prof = prof_util_.profile(
-                  step_graph, batch_size_,
-                  (d - d_prev) * replica_num * pipeline_num, checkpointing);
+                  step_graph, batch_size_, (d - d_prev) * replica_num,
+                  pipeline_num, checkpointing);
               step_mem = calcGraphMem(
                   step_graph, step_prof, batch_size_,
                   (d - d_prev) * replica_num, pipeline_num,
@@ -752,8 +762,8 @@ GraphProfile DPDryStaging::estimateSolutionGraph(
     const AllocSolution& sol, const MLGraph& graph, size_t g_idx) {
   int repl = sol.dev_nums.at(g_idx + 1) - sol.dev_nums.at(g_idx);
   return this->estimateProf(
-      graph, sol.boundaries.at(g_idx), sol.boundaries.at(g_idx + 1) - 1,
-      repl * sol.pipeline_num, sol.pipeline_num > 1);
+      graph, sol.boundaries.at(g_idx), sol.boundaries.at(g_idx + 1) - 1, repl,
+      sol.pipeline_num, sol.pipeline_num > 1);
 }
 
 Deployment DPDryStaging::partition() {
