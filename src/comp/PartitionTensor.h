@@ -21,7 +21,9 @@ std::unordered_map<std::string, std::string> getDistOpNameMap();
 
 std::unordered_map<std::string, std::pair<size_t, size_t>> getDistParams(
     const std::shared_ptr<IRGraph>& g);
-
+std::pair<std::shared_ptr<IRGraph>, std::unordered_map<std::string, int>>
+replaceWithDistOp(
+    const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks);
 } // namespace rannc
 
 #endif // PYRANNC_PARTITIONTENSOR_H

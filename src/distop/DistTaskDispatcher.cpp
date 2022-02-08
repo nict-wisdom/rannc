@@ -61,14 +61,23 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
               src_tag, RouteTypeDP::BROADCAST);
           createRouteCommunicator({bcast_route});
 
-          IValueMap input_vals;
+          IValueMap input_vals, constants;
           input_vals = scomm_.bcastIValueMap(input_vals, bcast_route);
+          constants = scomm_.bcastIValueMap(constants, bcast_route);
           nccl_.syncWithErrorCheck();
 
-          pybind11::gil_scoped_release no_gil;
-          sg_prof_->profile(
-              prof_input.ir_graphs, input_vals, prof_input.iteration,
-              prof_input.replica_num, prof_input.checkpointing);
+          sg_prof_->updateConstants(constants);
+
+          {
+            pybind11::gil_scoped_release no_gil;
+            sg_prof_->profile(
+                prof_input.ir_graphs, input_vals, prof_input.iteration,
+                prof_input.replica_num, prof_input.checkpointing);
+          }
+
+          for (const auto& it : constants) {
+            sg_prof_->removeConstant(it.first);
+          }
 
         } break;
         case DistTaskType::STOP:
@@ -90,8 +99,9 @@ at::Tensor DistTaskDispatcher::getParam(long param_id) {
 
 ProfilingResult DistTaskDispatcher::profile(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    const IValueMap& input_vals, int iteration, size_t replica_num,
-    bool checkpointing, const std::unordered_set<int>& target_ranks) {
+    const IValueMap& input_vals, const IValueMap& constants, int iteration,
+    size_t replica_num, bool checkpointing,
+    const std::unordered_set<int>& target_ranks) {
   int task_type_buf = static_cast<int>(DistTaskType::PROFILE);
   MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -119,8 +129,17 @@ ProfilingResult DistTaskDispatcher::profile(
   createRouteCommunicator({bcast_route});
 
   scomm_.bcastIValueMap(input_vals, bcast_route);
+  scomm_.bcastIValueMap(constants, bcast_route);
   nccl_.syncWithErrorCheck();
-  return sg_prof_->profile(ir_graphs, iteration, replica_num, checkpointing);
+
+  sg_prof_->updateConstants(constants);
+  ProfilingResult ret =
+      sg_prof_->profile(ir_graphs, iteration, replica_num, checkpointing);
+  for (const auto& it : constants) {
+    sg_prof_->removeConstant(it.first);
+  }
+
+  return ret;
 }
 
 void DistTaskDispatcher::stop() {

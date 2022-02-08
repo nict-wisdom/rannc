@@ -858,4 +858,19 @@ void GraphProfiler::save(const std::string& file) {
   out.write(reinterpret_cast<const char*>(&prof_data[0]), prof_data.size());
   out.close();
 }
+
+bool GraphProfiler::hasConstant(const IValueLocation& loc) const {
+  return contains(constants_, loc);
+}
+
+void GraphProfiler::updateConstants(const IValueMap& constants) {
+  for (const auto& it : constants) {
+    constants_[it.first] = it.second;
+  }
+}
+
+void GraphProfiler::removeConstant(const IValueLocation& loc) {
+  constants_.erase(loc);
+}
+
 } // namespace rannc

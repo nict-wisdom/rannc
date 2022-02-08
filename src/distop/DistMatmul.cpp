@@ -93,15 +93,17 @@ at::Tensor DistMatmul::run(const at::Tensor& x, const at::Tensor& y) {
 
 torch::Tensor DistLinearFunction::forward(
     torch::autograd::AutogradContext* ctx, torch::Tensor input,
-    torch::Tensor weight, c10::optional<torch::Tensor> bias) {
+    torch::Tensor weight, c10::optional<torch::Tensor> bias,
+    std::vector<int64_t> dist_ranks) {
   ctx->saved_data["input"] = input;
   ctx->saved_data["weight"] = weight;
   ctx->saved_data["bias"] = bias;
+  ctx->saved_data["ranks"] = dist_ranks;
 
   spdlog::info(
-      "input.size={} weight.size={} bias.size={}",
+      "input.size={} weight.size={} bias.size={} dist_ranks={}",
       join_as_str(getTensorDim(input)), join_as_str(getTensorDim(weight)),
-      join_as_str(getTensorDim(*bias)));
+      join_as_str(getTensorDim(*bias)), join_as_str(dist_ranks));
 
   at::Tensor out = torch::matmul(input, weight.t());
   if (bias) {
@@ -140,7 +142,7 @@ torch::autograd::tensor_list DistLinearFunction::backward(
   if (ctx->saved_data["bias"].isTensor()) {
     d_bias = grad_outputs.at(0);
   }
-  return {d_input, d_weight, d_bias};
+  return {d_input, d_weight, d_bias, at::Tensor()};
 }
 
 } // namespace rannc

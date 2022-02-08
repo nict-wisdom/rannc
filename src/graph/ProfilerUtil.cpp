@@ -96,6 +96,65 @@ const int ProfilerUtil::DEFALUT_ITERATION_NUM = 3;
 GraphProfile ProfilerUtil::profile(
     const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
     size_t pipeline_num, bool checkpointing) {
+  return doProfile(
+      g, batch_size, replica_num, pipeline_num, checkpointing,
+      [this](
+          const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
+              ir_graphs,
+          int iteration, size_t replica_num, size_t pipeline_num,
+          bool checkpointing) {
+        return this->profiler_->profile(
+            ir_graphs, iteration, replica_num * pipeline_num, checkpointing);
+      });
+}
+
+GraphProfile ProfilerUtil::profileDist(
+    const std::shared_ptr<IRGraph>& g,
+    const std::unordered_map<std::string, int>& dist_ranks, size_t batch_size,
+    size_t replica_num, size_t pipeline_num, bool checkpointing) {
+  return doProfile(
+      g, batch_size, replica_num, pipeline_num, checkpointing,
+      [this, &dist_ranks](
+          const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
+              ir_graphs,
+          int iteration, size_t replica_num, size_t pipeline_num,
+          bool checkpointing) {
+        spdlog::info("Profiling with dist_profile_=true");
+
+        IValueMap in_values;
+        const IValueMap& avail_vals = this->profiler_->getValues();
+
+        for (const auto& it : ir_graphs) {
+          for (const auto& in_name : getNonParamInputNames(it.second)) {
+            assert(contains(avail_vals, in_name));
+            in_values[in_name] =
+                toCUDAIfAvailable(avail_vals.at(in_name), true);
+          }
+        }
+
+        std::unordered_set<int> target_ranks;
+        for (int i = 0; i < replica_num; i++) {
+          target_ranks.insert(i);
+        }
+        DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+        spdlog::info("Starting dist profiling");
+        IValueMap constants;
+        for (const auto& it : dist_ranks) {
+          constants[it.first] = it.second;
+        }
+        return dtd.profile(
+            ir_graphs, in_values, constants, iteration,
+            replica_num * pipeline_num, checkpointing, target_ranks);
+      });
+}
+
+GraphProfile ProfilerUtil::doProfile(
+    const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
+    size_t pipeline_num, bool checkpointing,
+    const std::function<ProfilingResult(
+        const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
+            ir_graphs,
+        int, size_t, size_t, bool)>& f) {
   assert(replica_num > 0);
   assert(pipeline_num > 0);
   assert(g);
@@ -121,35 +180,9 @@ GraphProfile ProfilerUtil::profile(
   prof_in_v[g->getName()] = g;
 
   try {
-    ProfilingResult prof_v;
-    if (dist_profile_) {
-      spdlog::info("Profiling with dist_profile_={}", dist_profile_);
-
-      IValueMap in_values;
-      const IValueMap& avail_vals = profiler_->getValues();
-
-      for (const auto& it : prof_in_v) {
-        for (const auto& in_name : getNonParamInputNames(g)) {
-          assert(contains(avail_vals, in_name));
-          in_values[in_name] = toCUDAIfAvailable(avail_vals.at(in_name), true);
-        }
-      }
-
-      std::unordered_set<int> target_ranks;
-      for (int i = 0; i < replica_num; i++) {
-        target_ranks.insert(i);
-      }
-      DistTaskDispatcher& dtd = DistTaskDispatcher::get();
-      spdlog::info("Starting dist profiling");
-      prof_v = dtd.profile(
-          prof_in_v, in_values, DEFALUT_ITERATION_NUM,
-          replica_num * pipeline_num, checkpointing, target_ranks);
-      spdlog::info("Finished dist profiling");
-    } else {
-      prof_v = profiler_->profile(
-          prof_in_v, DEFALUT_ITERATION_NUM, replica_num * pipeline_num,
+    ProfilingResult prof_v =
+        f(prof_in_v, DEFALUT_ITERATION_NUM, replica_num, pipeline_num,
           checkpointing);
-    }
     assert(prof_v.node_profiles.size() == 1);
     profile_cache_[k] = prof_v.node_profiles.begin()->second;
   } catch (std::exception& e) {

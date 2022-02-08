@@ -24,7 +24,8 @@ class DistLinearFunction
  public:
   static torch::Tensor forward(
       torch::autograd::AutogradContext* ctx, torch::Tensor input,
-      torch::Tensor weight, c10::optional<torch::Tensor> bias);
+      torch::Tensor weight, c10::optional<torch::Tensor> bias,
+      std::vector<int64_t> dist_ranks);
 
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,

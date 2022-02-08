@@ -33,8 +33,9 @@ at::Tensor offloadingPostHook(
 
 at::Tensor matmulDist(
     const at::Tensor& input, const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias) {
-  return DistLinearFunction::apply(input, weight, bias);
+    const c10::optional<at::Tensor>& bias,
+    const std::vector<int64_t>& dist_ranks) {
+  return DistLinearFunction::apply(input, weight, bias, dist_ranks);
 }
 
 TORCH_LIBRARY(rannc, m) {
@@ -45,7 +46,7 @@ TORCH_LIBRARY(rannc, m) {
   //  m.def("linear_dist", matmulDist);
   m.def(
       TORCH_SELECTIVE_SCHEMA(
-          "rannc::linear_dist(Tensor input, Tensor weight, Tensor? bias) -> Tensor"),
+          "rannc::linear_dist(Tensor input, Tensor weight, Tensor? bias, int[] dist_ranks) -> Tensor"),
       matmulDist);
 }
 } // namespace rannc

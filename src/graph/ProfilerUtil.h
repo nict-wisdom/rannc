@@ -66,6 +66,10 @@ class ProfilerUtil {
   GraphProfile profile(
       const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
       size_t pipeline_num, bool checkpointing = false);
+  GraphProfile profileDist(
+      const std::shared_ptr<IRGraph>& g,
+      const std::unordered_map<std::string, int>& dist_ranks, size_t batch_size,
+      size_t replica_num, size_t pipeline_num, bool checkpointing);
 
   const MLProfileCache& getProfileCache() const {
     return profile_cache_;
@@ -78,6 +82,14 @@ class ProfilerUtil {
   static const long ERROR_VAL = LONG_MAX / 1024;
 
  private:
+  GraphProfile doProfile(
+      const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
+      size_t pipeline_num, bool checkpointing,
+      const std::function<ProfilingResult(
+          const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
+              ir_graphs,
+          int, size_t, size_t, bool)>& f);
+
   MLProfileCache profile_cache_;
   std::unordered_map<bool, std::unordered_map<std::string, size_t>>
       max_batch_size_cache_;

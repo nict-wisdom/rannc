@@ -962,22 +962,4 @@ size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g) {
 
   return input_size + output_size + ingrad_size + clone_input_size;
 }
-
-std::shared_ptr<IRGraph> replaceNodeOpNames(
-    const std::shared_ptr<IRGraph>& g,
-    const std::unordered_map<std::string, std::string>& name_map) {
-  std::vector<IRNode> new_nodes;
-
-  for (const auto& n : g->getNodes()) {
-    std::string new_name = contains(name_map, n.getName())
-        ? name_map.at(n.getName())
-        : n.getName();
-    new_nodes.emplace_back(new_name, n.getInputNames(), n.getOutputNames());
-  }
-
-  return std::make_shared<IRGraph>(
-      g->getName(), new_nodes, g->getValues(), g->getInputNames(),
-      g->getOutputNames());
-}
-
 } // namespace rannc

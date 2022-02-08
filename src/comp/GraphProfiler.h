@@ -124,6 +124,10 @@ class GraphProfiler {
   void load(const std::string& file);
   void save(const std::string& file);
 
+  bool hasConstant(const IValueLocation& loc) const;
+  void updateConstants(const IValueMap& constants);
+  void removeConstant(const IValueLocation& loc);
+
   const IValueMap& getValues() const {
     return values_;
   }

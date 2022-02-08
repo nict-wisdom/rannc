@@ -612,18 +612,25 @@ AllocSolution DPStaging::doRunDpComm(
                   ((d - d_prev) * replica_num * pipeline_num));
               ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
 
-              spdlog::info("force_dist_matmul_={}", force_dist_matmul_);
               if (force_dist_matmul_) {
                 //// under development
-                step_graph = replaceNodeOpNames(step_graph, getDistOpNameMap());
-                spdlog::info("mod for linear_dist {}", toString(*step_graph));
-                ////
-              }
+                std::vector<int> ranks;
+                for (int i = 0; i < (d - d_prev) * replica_num; i++) {
+                  ranks.push_back(i);
+                }
+                auto dist_graph = replaceWithDistOp(step_graph, ranks);
+                step_graph = dist_graph.first;
 
-              // run profiler for the merged graph
-              step_prof = prof_util_.profile(
-                  step_graph, batch_size_, (d - d_prev) * replica_num,
-                  pipeline_num, checkpointing);
+                step_prof = prof_util_.profileDist(
+                    step_graph, dist_graph.second, batch_size_,
+                    (d - d_prev) * replica_num, pipeline_num, checkpointing);
+                ////
+              } else {
+                // run profiler for the merged graph
+                step_prof = prof_util_.profile(
+                    step_graph, batch_size_, (d - d_prev) * replica_num,
+                    pipeline_num, checkpointing);
+              }
               step_mem = calcGraphMem(
                   step_graph, step_prof, batch_size_,
                   (d - d_prev) * replica_num, pipeline_num,

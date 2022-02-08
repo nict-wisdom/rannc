@@ -47,8 +47,9 @@ class DistTaskDispatcher {
   ProfilingResult profile(
       const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
           ir_graphs,
-      const IValueMap& input_vals, int iteration, size_t replica_num,
-      bool checkpointing, const std::unordered_set<int>& target_ranks);
+      const IValueMap& input_vals, const IValueMap& constants, int iteration,
+      size_t replica_num, bool checkpointing,
+      const std::unordered_set<int>& target_ranks);
 
   static DistTaskDispatcher& get() {
     static DistTaskDispatcher instance;
