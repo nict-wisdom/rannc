@@ -16,32 +16,6 @@ namespace rannc {
 
 enum class DistTaskType { STOP, GET_PARAM, PROFILE };
 
-struct DistProfilingInput {
-  std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
-  std::unordered_map<IValueLocation, IRType, IValueLocationHash> types;
-  int iteration;
-  size_t replica_num;
-  bool checkpointing;
-  TensorPartioningGraphInfo part_info;
-
-  DistProfilingInput() = default;
-
-  DistProfilingInput(
-      std::unordered_map<std::string, std::shared_ptr<IRGraph>> irGraph,
-      std::unordered_map<IValueLocation, IRType, IValueLocationHash> types,
-      int iteration, size_t replicaNum, bool checkpointing,
-      TensorPartioningGraphInfo part_info)
-      : ir_graphs(irGraph),
-        types(types),
-        iteration(iteration),
-        replica_num(replicaNum),
-        checkpointing(checkpointing),
-        part_info(part_info) {}
-
-  MSGPACK_DEFINE(
-      ir_graphs, types, iteration, replica_num, checkpointing, part_info);
-};
-
 class DistTaskDispatcher {
  public:
   void start(const std::shared_ptr<GraphProfiler>& sg_prof);

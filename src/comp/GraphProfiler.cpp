@@ -752,8 +752,9 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   size_t replica_num = dev_num_ * min_pipeline_num_;
   bool checkpointing = false;
 
-  ProfilingInput input{graphs, 1, replica_num, checkpointing};
-  auto ret = doProfile(input, values, trace_dim_names);
+  auto ret = doProfile(
+      {graphs, 1, replica_num, checkpointing, TensorPartioningGraphInfo()},
+      values, trace_dim_names);
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {

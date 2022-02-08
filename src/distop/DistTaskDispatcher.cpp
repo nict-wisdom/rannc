@@ -78,17 +78,12 @@ ProfilingResult DistTaskDispatcher::runProfiling(
     return ProfilingResult{};
   }
 
-  std::unordered_map<IValueLocation, IRType, IValueLocationHash> types;
-  for (const auto& it : input_vals) {
-    types[it.first] = toIRType(it.second);
-  }
-
   TagMap& tag_map = TagMap::get();
   int comm_tag = tag_map.getRankSetTag(target_ranks);
   MPI_Comm comm = scomm_.getCommunicator(comm_tag, target_ranks);
 
-  DistProfilingInput prof_input{ir_graphs,   types,         iteration,
-                                replica_num, checkpointing, part_info};
+  ProfilingInput prof_input{
+      ir_graphs, iteration, replica_num, checkpointing, part_info};
   prof_input = ocomm_.bcast(prof_input, 0, comm);
 
   int tag = tag_map.getRankSetTag(target_ranks);
@@ -108,10 +103,7 @@ ProfilingResult DistTaskDispatcher::runProfiling(
   scomm_.bcastIValueMap(constants, bcast_route);
 
   sg_prof_->updateConstants(constants);
-  ProfilingResult ret = sg_prof_->profile(
-      {prof_input.ir_graphs, prof_input.iteration, prof_input.replica_num,
-       prof_input.checkpointing},
-      input_vals);
+  ProfilingResult ret = sg_prof_->profile(prof_input, input_vals);
 
   for (const auto& it : constants) {
     sg_prof_->removeConstant(it.first);
@@ -140,4 +132,4 @@ void DistTaskDispatcher::stop() {
   }
 }
 
-}; // namespace rannc
+} // namespace rannc
