@@ -87,8 +87,8 @@ ProfilingResult DistTaskDispatcher::runProfiling(
   int comm_tag = tag_map.getRankSetTag(target_ranks);
   MPI_Comm comm = scomm_.getCommunicator(comm_tag, target_ranks);
 
-  ProfilingInput prof_input{ir_graphs,   types,         iteration,
-                            replica_num, checkpointing, part_info};
+  DistProfilingInput prof_input{ir_graphs,   types,         iteration,
+                                replica_num, checkpointing, part_info};
   prof_input = ocomm_.bcast(prof_input, 0, comm);
 
   int tag = tag_map.getRankSetTag(target_ranks);
@@ -109,8 +109,9 @@ ProfilingResult DistTaskDispatcher::runProfiling(
 
   sg_prof_->updateConstants(constants);
   ProfilingResult ret = sg_prof_->profile(
-      prof_input.ir_graphs, input_vals, prof_input.iteration,
-      prof_input.replica_num, prof_input.checkpointing);
+      {prof_input.ir_graphs, prof_input.iteration, prof_input.replica_num,
+       prof_input.checkpointing},
+      input_vals);
 
   for (const auto& it : constants) {
     sg_prof_->removeConstant(it.first);

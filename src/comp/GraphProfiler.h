@@ -35,6 +35,13 @@ struct GraphProfile {
   MSGPACK_DEFINE(name, fwd_time, bwd_time, max_allocated_mem, checkpointing);
 };
 
+struct ProfilingInput {
+  std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
+  int iteration;
+  size_t replica_num;
+  bool checkpointing;
+};
+
 struct ProfilingResult {
   std::unordered_map<std::string, GraphProfile> node_profiles;
   std::unordered_map<std::string, IRType> value_types;
@@ -111,15 +118,8 @@ class GraphProfiler {
   }
 
   ProfilingResult init(bool trace_dim_names);
-  ProfilingResult profile(
-      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-          ir_graphs,
-      int iteration, size_t replica_num = 1, bool checkpointing = false);
-  ProfilingResult profile(
-      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-          ir_graphs,
-      IValueMap values, int iteration, size_t replica_num = 1,
-      bool checkpointing = false);
+  ProfilingResult profile(const ProfilingInput& input);
+  ProfilingResult profile(const ProfilingInput& input, IValueMap values);
   void clear();
   void load(const std::string& file);
   void save(const std::string& file);
@@ -168,20 +168,15 @@ class GraphProfiler {
       const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs,
       int split_idx);
   ProfilingResult compute(
-      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-          ir_graphs,
-      int iteration, IValueMap& values, int split_index, bool checkpointing,
-      bool on_init);
+      const ProfilingInput& input, IValueMap& values, int split_index,
+      bool trace_dim_names);
   std::pair<IValueMap, GraphProfile> computeGraph(
       const std::shared_ptr<IRGraph>& subgraph, const IValueMap& graph_inputs,
       const std::unordered_map<std::string, at::Tensor>& graph_params,
       int iteration, IValueMap& values, int split_index, bool checkpointing,
-      bool on_init);
+      bool trace_dim_names);
   ProfilingResult doProfile(
-      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-          ir_graphs,
-      IValueMap& values, int iteration, size_t replica_num, bool checkpointing,
-      bool on_init);
+      const ProfilingInput& input, IValueMap& values, bool trace_dim_names);
   size_t setRequiresGrad(
       const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs);
   std::unordered_map<std::string, at::Tensor> getGraphParams(

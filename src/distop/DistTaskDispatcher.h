@@ -16,7 +16,7 @@ namespace rannc {
 
 enum class DistTaskType { STOP, GET_PARAM, PROFILE };
 
-struct ProfilingInput {
+struct DistProfilingInput {
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
   std::unordered_map<IValueLocation, IRType, IValueLocationHash> types;
   int iteration;
@@ -24,9 +24,9 @@ struct ProfilingInput {
   bool checkpointing;
   TensorPartioningGraphInfo part_info;
 
-  ProfilingInput() {}
+  DistProfilingInput() = default;
 
-  ProfilingInput(
+  DistProfilingInput(
       std::unordered_map<std::string, std::shared_ptr<IRGraph>> irGraph,
       std::unordered_map<IValueLocation, IRType, IValueLocationHash> types,
       int iteration, size_t replicaNum, bool checkpointing,

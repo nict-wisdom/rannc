@@ -336,8 +336,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 }
 
 ProfilingResult GraphProfiler::compute(
-    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    int iteration, IValueMap& values, int split_index, bool checkpointing,
+    const ProfilingInput& input, IValueMap& values, int split_index,
     bool trace_dim_names) {
   TimeCounter time_counter(true);
   ProfilingResult ret_profiles;
@@ -352,6 +351,7 @@ ProfilingResult GraphProfiler::compute(
   size_t prev_locs = 0;
   size_t infinite = 0;
 
+  const auto& ir_graphs = input.ir_graphs;
   while (graphs_done.size() < ir_graphs.size()) {
     for (const auto& it : ir_graphs) {
       const auto& id = it.first;
@@ -421,8 +421,8 @@ ProfilingResult GraphProfiler::compute(
         std::pair<IValueMap, GraphProfile> prof_results;
         try {
           prof_results = computeGraph(
-              subgraph, graph_inputs, graph_params, iteration, values,
-              split_index, checkpointing, trace_dim_names);
+              subgraph, graph_inputs, graph_params, input.iteration, values,
+              split_index, input.checkpointing, trace_dim_names);
           dimnames_set = true;
         } catch (std::runtime_error& e) {
           driver_.destroyModule(subgraph->getName());
@@ -457,8 +457,8 @@ ProfilingResult GraphProfiler::compute(
 
           // Try again without dim names
           prof_results = computeGraph(
-              subgraph, graph_inputs, graph_params, iteration, values,
-              split_index, checkpointing, trace_dim_names);
+              subgraph, graph_inputs, graph_params, input.iteration, values,
+              split_index, input.checkpointing, trace_dim_names);
 
           // Set dim names again on params
           for (const auto& it : graph_params) {
@@ -621,15 +621,14 @@ std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
 }
 
 ProfilingResult GraphProfiler::doProfile(
-    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    IValueMap& values, int iteration, size_t replica_num, bool checkpointing,
-    bool trace_dim_names) {
+    const ProfilingInput& input, IValueMap& values, bool trace_dim_names) {
+  const auto& ir_graphs = input.ir_graphs;
   for (const auto& it : ir_graphs) {
     for (const auto& in_name : it.second->getInputNames()) {
       IValueLocation loc{in_name};
       if (contains(values_, loc)) {
         const auto pad_in = splitBatchInIValue(
-            values_.at(loc), 1, batch_size_, replica_num, false);
+            values_.at(loc), 1, batch_size_, input.replica_num, false);
 
         const auto& paths = findPathsToTensorInIValue(pad_in);
         for (const auto& path : paths) {
@@ -651,9 +650,9 @@ ProfilingResult GraphProfiler::doProfile(
   }
 
   logger->trace(
-      "GraphProfiler::profile starting doCompute replica_num={}", replica_num);
-  ProfilingResult ret_profiles =
-      compute(ir_graphs, iteration, values, 0, checkpointing, trace_dim_names);
+      "GraphProfiler::profile starting doCompute replica_num={}",
+      input.replica_num);
+  ProfilingResult ret_profiles = compute(input, values, 0, trace_dim_names);
   logger->trace("GraphProfiler::profile finished doCompute");
 
   driver_.destroy();
@@ -665,27 +664,27 @@ ProfilingResult GraphProfiler::doProfile(
   return ret_profiles;
 }
 
-ProfilingResult GraphProfiler::profile(
-    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    int iteration, size_t replica_num, bool checkpointing) {
+ProfilingResult GraphProfiler::profile(const ProfilingInput& input) {
+  const auto& ir_graphs = input.ir_graphs;
+
   ProfileItemKey key{
-      ir_graphs, batch_size_, replica_num, iteration, checkpointing};
+      ir_graphs, batch_size_, input.replica_num, input.iteration,
+      input.checkpointing};
   if (profile_db_.hasRecord(key)) {
     logger->trace(
         "Cache hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_, replica_num, iteration,
-        checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_, input.replica_num,
+        input.iteration, input.checkpointing);
     return profile_db_.get(key);
   } else {
     logger->trace(
         "Cache NOT hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_, replica_num, iteration,
-        checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_, input.replica_num,
+        input.iteration, input.checkpointing);
   }
 
   IValueMap values; // temporal value
-  auto ret_profiles = doProfile(
-      ir_graphs, values, iteration, replica_num, checkpointing, false);
+  auto ret_profiles = doProfile(input, values, false);
 
   ProfileItem prof_item{key, ret_profiles};
   profile_db_.add(prof_item);
@@ -694,10 +693,8 @@ ProfilingResult GraphProfiler::profile(
 }
 
 ProfilingResult GraphProfiler::profile(
-    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    IValueMap values, int iteration, size_t replica_num, bool checkpointing) {
-  auto ret_profiles = doProfile(
-      ir_graphs, values, iteration, replica_num, checkpointing, false);
+    const ProfilingInput& input, IValueMap values) {
+  auto ret_profiles = doProfile(input, values, false);
   return ret_profiles;
 }
 
@@ -754,8 +751,9 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   IValueMap values; // temporal value
   size_t replica_num = dev_num_ * min_pipeline_num_;
   bool checkpointing = false;
-  auto ret =
-      doProfile(graphs, values, 1, replica_num, checkpointing, trace_dim_names);
+
+  ProfilingInput input{graphs, 1, replica_num, checkpointing};
+  auto ret = doProfile(input, values, trace_dim_names);
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {

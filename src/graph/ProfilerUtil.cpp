@@ -105,7 +105,7 @@ GraphProfile ProfilerUtil::profile(
           int iteration, size_t replica_num, size_t pipeline_num,
           bool checkpointing) {
         return this->profiler_->profile(
-            ir_graphs, iteration, replica_num * pipeline_num, checkpointing);
+            {ir_graphs, iteration, replica_num * pipeline_num, checkpointing});
       });
 }
 
