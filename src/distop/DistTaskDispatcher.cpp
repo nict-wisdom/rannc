@@ -42,11 +42,7 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
         case DistTaskType::PROFILE: {
           logger->trace("Received PROFILE");
           pybind11::gil_scoped_release no_gil;
-
-          runProfiling(
-              std::unordered_map<std::string, std::shared_ptr<IRGraph>>{},
-              IValueMap{}, TensorPartioningGraphInfo{}, 0, 0, false,
-              std::unordered_set<int>{});
+          runProfiling(ProfilingInput{}, IValueMap{});
         } break;
         case DistTaskType::STOP:
           logger->trace("Received STOP");
@@ -66,31 +62,22 @@ at::Tensor DistTaskDispatcher::getParam(long param_id) {
 }
 
 ProfilingResult DistTaskDispatcher::runProfiling(
-    std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs,
-    IValueMap input_vals, TensorPartioningGraphInfo part_info, int iteration,
-    size_t replica_num, bool checkpointing,
-    std::unordered_set<int> target_ranks) {
-  std::vector<int> target_ranks_vec = setToVector(target_ranks);
-  target_ranks_vec = ocomm_.bcast(target_ranks_vec);
-  target_ranks = vectorToSet(target_ranks_vec);
+    const ProfilingInput& input, IValueMap input_vals) {
+  ProfilingInput prof_input = input;
+  prof_input = ocomm_.bcast(prof_input);
 
-  if (!contains(target_ranks, mpi::getRank())) {
+  std::unordered_set<int> ranks = vectorToSet(prof_input.part_info.ranks);
+  if (!contains(ranks, mpi::getRank())) {
     return ProfilingResult{};
   }
 
   TagMap& tag_map = TagMap::get();
-  int comm_tag = tag_map.getRankSetTag(target_ranks);
-  MPI_Comm comm = scomm_.getCommunicator(comm_tag, target_ranks);
+  int tag = tag_map.getRankSetTag(ranks);
 
-  ProfilingInput prof_input{
-      ir_graphs, iteration, replica_num, checkpointing, part_info};
-  prof_input = ocomm_.bcast(prof_input, 0, comm);
-
-  int tag = tag_map.getRankSetTag(target_ranks);
   int src_tag = tag_map.getRankSetTag({0});
   RouteDP bcast_route(
-      IValueLocation("PROF_INPUTS"), {0}, target_ranks_vec, tag, src_tag,
-      RouteTypeDP::BROADCAST);
+      IValueLocation("PROF_INPUTS"), {0}, prof_input.part_info.ranks, tag,
+      src_tag, RouteTypeDP::BROADCAST);
   createRouteCommunicator({bcast_route});
   nccl_.syncWithErrorCheck();
 
@@ -112,16 +99,11 @@ ProfilingResult DistTaskDispatcher::runProfiling(
 }
 
 ProfilingResult DistTaskDispatcher::profile(
-    const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
-    const IValueMap& input_vals, const TensorPartioningGraphInfo& part_info,
-    int iteration, size_t replica_num, bool checkpointing,
-    const std::unordered_set<int>& target_ranks) {
+    const ProfilingInput& input, IValueMap input_vals) {
   int task_type_buf = static_cast<int>(DistTaskType::PROFILE);
   MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  return runProfiling(
-      ir_graphs, input_vals, part_info, iteration, replica_num, checkpointing,
-      target_ranks);
+  return runProfiling(input, input_vals);
 }
 
 void DistTaskDispatcher::stop() {

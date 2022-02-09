@@ -13,7 +13,9 @@ namespace rannc {
 
 class DistMatmul {
  public:
-  at::Tensor run(const at::Tensor& x, const at::Tensor& y);
+  at::Tensor run(
+      const at::Tensor& x, const at::Tensor& y,
+      const std::unordered_set<int>& ranks);
 
  private:
   at::Tensor out_buf_;

@@ -36,33 +36,18 @@ struct GraphProfile {
   MSGPACK_DEFINE(name, fwd_time, bwd_time, max_allocated_mem, checkpointing);
 };
 
-// struct ProfilingInput {
-//   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
-//   int iteration;
-//   size_t replica_num;
-//   bool checkpointing;
-// };
-
 struct ProfilingInput {
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
-  int iteration;
-  size_t replica_num;
-  bool checkpointing;
+  size_t batch_size = 0;
+  int iteration = 0;
+  size_t replica_num = 0;
+  size_t pipeline_num = 0;
+  bool checkpointing = false;
   TensorPartioningGraphInfo part_info;
 
-  ProfilingInput() = default;
-
-  ProfilingInput(
-      std::unordered_map<std::string, std::shared_ptr<IRGraph>> irGraph,
-      int iteration, size_t replicaNum, bool checkpointing,
-      TensorPartioningGraphInfo part_info)
-      : ir_graphs(irGraph),
-        iteration(iteration),
-        replica_num(replicaNum),
-        checkpointing(checkpointing),
-        part_info(part_info) {}
-
-  MSGPACK_DEFINE(ir_graphs, iteration, replica_num, checkpointing, part_info);
+  MSGPACK_DEFINE(
+      ir_graphs, batch_size, iteration, replica_num, pipeline_num,
+      checkpointing, part_info);
 };
 
 struct ProfilingResult {

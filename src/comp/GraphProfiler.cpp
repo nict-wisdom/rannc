@@ -374,11 +374,6 @@ ProfilingResult GraphProfiler::compute(
 
       bool graph_ready = isGraphReady(input_names, avail_locs);
 
-      //      spdlog::info("avail_locs num={}", avail_locs.size());
-      //      for (const auto& it: avail_locs) {
-      //        spdlog::info("loc={}", toString(it));
-      //      }
-
       if (graph_ready) {
         logger->debug(
             "GraphProfiler::compute starting graph {} ({}/{})", id,
@@ -409,6 +404,18 @@ ProfilingResult GraphProfiler::compute(
         const auto& subgraph =
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
         auto graph_params = paramsToCuda(getGraphParams(subgraph));
+
+        const TensorPartioningGraphInfo& part_info = input.part_info;
+        if (part_info.ranks.size() > 0) {
+          for (const auto& param_it : graph_params) {
+            if (contains(part_info.param_partitions, param_it.first)) {
+              const auto& partition =
+                  part_info.param_partitions.at(param_it.first);
+              graph_params[param_it.first] = sliceParam(
+                  param_it.first, param_it.second, part_info, mpi::getRank());
+            }
+          }
+        }
 
         if (trace_dim_names) {
           for (const auto& it : graph_params) {
@@ -626,9 +633,13 @@ ProfilingResult GraphProfiler::doProfile(
   for (const auto& it : ir_graphs) {
     for (const auto& in_name : it.second->getInputNames()) {
       IValueLocation loc{in_name};
-      if (contains(values_, loc)) {
+      if (contains(values_, loc) || contains(values, loc)) {
+        const auto in_val =
+            contains(values_, loc) ? values_.at(loc) : values.at(loc);
+
         const auto pad_in = splitBatchInIValue(
-            values_.at(loc), 1, batch_size_, input.replica_num, false);
+            in_val, 1, input.batch_size, input.replica_num * input.pipeline_num,
+            false);
 
         const auto& paths = findPathsToTensorInIValue(pad_in);
         for (const auto& path : paths) {
@@ -651,7 +662,7 @@ ProfilingResult GraphProfiler::doProfile(
 
   logger->trace(
       "GraphProfiler::profile starting doCompute replica_num={}",
-      input.replica_num);
+      input.replica_num * input.pipeline_num);
   ProfilingResult ret_profiles = compute(input, values, 0, trace_dim_names);
   logger->trace("GraphProfiler::profile finished doCompute");
 
@@ -668,19 +679,21 @@ ProfilingResult GraphProfiler::profile(const ProfilingInput& input) {
   const auto& ir_graphs = input.ir_graphs;
 
   ProfileItemKey key{
-      ir_graphs, batch_size_, input.replica_num, input.iteration,
-      input.checkpointing};
+      ir_graphs, batch_size_, input.replica_num * input.pipeline_num,
+      input.iteration, input.checkpointing};
   if (profile_db_.hasRecord(key)) {
     logger->trace(
         "Cache hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_, input.replica_num,
-        input.iteration, input.checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_,
+        input.replica_num * input.pipeline_num, input.iteration,
+        input.checkpointing);
     return profile_db_.get(key);
   } else {
     logger->trace(
         "Cache NOT hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_, input.replica_num,
-        input.iteration, input.checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_,
+        input.replica_num * input.pipeline_num, input.iteration,
+        input.checkpointing);
   }
 
   IValueMap values; // temporal value
@@ -749,12 +762,14 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   }
 
   IValueMap values; // temporal value
-  size_t replica_num = dev_num_ * min_pipeline_num_;
   bool checkpointing = false;
 
   auto ret = doProfile(
-      {graphs, 1, replica_num, checkpointing, TensorPartioningGraphInfo()},
+      {graphs, batch_size_, 1, static_cast<size_t>(dev_num_), min_pipeline_num_,
+       checkpointing, TensorPartioningGraphInfo()},
       values, trace_dim_names);
+
+  size_t replica_num = dev_num_ * min_pipeline_num_;
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {

@@ -3,10 +3,11 @@
 //
 
 #include "PartitionTensor.h"
+#include <torch/TorchUtil.h>
 
 namespace rannc {
 std::vector<DistOp> dist_ops = {
-    {"aten::linear", "rannc::linear_dist", {{1, 0}}}};
+    {"aten::linear", "rannc::linear_dist", {{1, 1}}}};
 
 std::unordered_map<std::string, std::string> getDistOpNameMap() {
   std::unordered_map<std::string, std::string> name_map;
@@ -43,6 +44,7 @@ TensorPartioningGraphInfo replaceWithDistOp(
   std::vector<IRNode> new_nodes;
   std::unordered_map<std::string, IRValue> new_values;
   std::unordered_map<std::string, int> dist_ranks;
+  std::unordered_map<std::string, std::vector<std::string>> rank_value_names;
 
   const std::unordered_map<std::string, IRValue>& vals = g->getValues();
   for (const auto& in_name : g->getInputNames()) {
@@ -84,8 +86,11 @@ TensorPartioningGraphInfo replaceWithDistOp(
       std::vector<std::string> input_names = n.getInputNames();
       input_names.push_back(int_list_val_name);
 
-      new_nodes.emplace_back(
-          name_map.at(n.getName()), input_names, n.getOutputNames());
+      IRNode new_node{
+          name_map.at(n.getName()), input_names, n.getOutputNames()};
+      new_nodes.push_back(new_node);
+
+      rank_value_names[new_node.getId()] = ranks_val_node_names;
     } else {
       new_nodes.emplace_back(
           n.getName(), n.getInputNames(), n.getOutputNames());
@@ -102,6 +107,35 @@ TensorPartioningGraphInfo replaceWithDistOp(
   std::unordered_map<std::string, std::pair<size_t, size_t>> param_part =
       getDistParams(ret_graph);
 
-  return TensorPartioningGraphInfo{ret_graph, param_part, dist_ranks};
+  return TensorPartioningGraphInfo{
+      ret_graph, ranks, param_part, dist_ranks, rank_value_names};
 }
+
+at::Tensor sliceParam(
+    const std::string& name, const at::Tensor& param,
+    const TensorPartioningGraphInfo& part_info, int my_rank) {
+  assert(contains(part_info.param_partitions, name));
+
+  const auto ranks = vectorToSet(part_info.ranks);
+  assert(contains(ranks, my_rank));
+
+  const auto& partition = part_info.param_partitions.at(name);
+  size_t arg_idx = partition.first;
+  size_t dim_idx = partition.second;
+
+  if (param.size(dim_idx) % part_info.ranks.size() != 0) {
+    std::stringstream ss;
+    ss << "Dimension " << dim_idx << " of " << name
+       << " is not divisible. shape=" << join_as_str(getTensorDim(param));
+    throw std::runtime_error(ss.str());
+  }
+
+  size_t segment_size = param.size(dim_idx) / part_info.ranks.size();
+  int local_rank = getLocalRank(vectorToSet(part_info.ranks), my_rank);
+
+  torch::NoGradGuard no_grad;
+  return param.slice(
+      dim_idx, segment_size * local_rank, segment_size * (local_rank + 1));
+}
+
 } // namespace rannc

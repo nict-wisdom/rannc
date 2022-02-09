@@ -85,10 +85,8 @@ class ProfilerUtil {
   GraphProfile doProfile(
       const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
       size_t pipeline_num, bool checkpointing,
-      const std::function<ProfilingResult(
-          const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-              ir_graphs,
-          int, size_t, size_t, bool)>& f);
+      const TensorPartioningGraphInfo& part_info,
+      const std::function<ProfilingResult(const ProfilingInput& input)>& f);
 
   MLProfileCache profile_cache_;
   std::unordered_map<bool, std::unordered_map<std::string, size_t>>

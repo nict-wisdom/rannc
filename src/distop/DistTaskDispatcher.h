@@ -22,12 +22,7 @@ class DistTaskDispatcher {
   void stop();
 
   at::Tensor getParam(long param_id);
-  ProfilingResult profile(
-      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>&
-          ir_graphs,
-      const IValueMap& input_vals, const TensorPartioningGraphInfo& part_info,
-      int iteration, size_t replica_num, bool checkpointing,
-      const std::unordered_set<int>& target_ranks);
+  ProfilingResult profile(const ProfilingInput& input, IValueMap input_vals);
 
   static DistTaskDispatcher& get() {
     static DistTaskDispatcher instance;
@@ -37,10 +32,7 @@ class DistTaskDispatcher {
  private:
   DistTaskDispatcher();
   ProfilingResult runProfiling(
-      std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs,
-      IValueMap input_vals, TensorPartioningGraphInfo part_info, int iteration,
-      size_t replica_num, bool checkpointing,
-      std::unordered_set<int> target_ranks);
+      const ProfilingInput& input, IValueMap input_vals);
 
   NCCLWrapper& nccl_;
   DistributedParamLocator& dpl_;

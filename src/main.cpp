@@ -438,7 +438,7 @@ PYBIND11_MODULE(_pyrannc, m) {
     at::Tensor ten2 = iv2.toTensor().cuda();
 
     DistMatmul dist_mm;
-    return dist_mm.run(ten1, ten2);
+    return dist_mm.run(ten1, ten2, mpi::getAllRanks());
   });
 
 #ifdef VERSION_INFO
