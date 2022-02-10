@@ -27,7 +27,7 @@ at::Tensor DistMatmul::run(
     const std::unordered_set<int>& ranks) {
   NCCLWrapper& nccl = NCCLWrapper::get();
   TagMap& tag_map = TagMap::get();
-  int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+  int tag = tag_map.getRankSetTag(ranks);
   nccl.createCommunicator(tag, ranks);
 
   /*
@@ -93,6 +93,61 @@ at::Tensor DistMatmul::run(
   return out_buf_;
 }
 
+at::Tensor DistMatmul::run_AG(
+    const at::Tensor& x, const at::Tensor& y,
+    const std::unordered_set<int>& ranks, bool part_y_column) {
+  torch::NoGradGuard no_grad;
+
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  TagMap& tag_map = TagMap::get();
+  int tag = tag_map.getRankSetTag(ranks);
+  nccl.createCommunicator(tag, ranks);
+
+  /*
+   * We assume both x and y are partitioned along 0-th dim
+   */
+  int np = ranks.size();
+  int my_rank = mpi::getRank();
+  assert(contains(ranks, my_rank));
+
+  std::vector<int64_t> x_dim = getTensorDim(x);
+  assert(x_dim.size() > 1);
+  std::vector<int64_t> y_dim = getTensorDim(y);
+  assert(y_dim.size() == 2);
+
+  at::Tensor ret;
+  if (part_y_column) {
+    std::vector<int64_t> gathered_y_buf_dim = {y_dim.at(1) * np, y_dim.at(0)};
+    at::Tensor gathered_y = torch::zeros(
+        gathered_y_buf_dim, makeTensorOptions(x.dtype().toScalarType(), false));
+    nccl.allgather(tag, {y.t().contiguous()}, {gathered_y});
+    ret = torch::matmul(x, gathered_y.t()).contiguous();
+  } else {
+    std::vector<int64_t> gathered_y_dim = {y_dim.at(0) * np, y_dim.at(1)};
+    at::Tensor gathered_y = torch::zeros(
+        gathered_y_dim, makeTensorOptions(x.dtype().toScalarType(), false));
+    spdlog::info("1: y={}", tensorToString(y));
+    nccl.allgather(tag, {y}, {gathered_y});
+    ret = torch::matmul(x, gathered_y);
+    spdlog::info(
+        "2: y={} gathered_y={}", tensorToString(y), tensorToString(gathered_y));
+  }
+  nccl.syncWithErrorCheck();
+  return ret;
+}
+
+at::Tensor DistMatmul::runRR_AG(
+    const at::Tensor& x, const at::Tensor& y,
+    const std::unordered_set<int>& ranks) {
+  return run_AG(x, y, ranks, false);
+}
+
+at::Tensor DistMatmul::runRC_AG(
+    const at::Tensor& x, const at::Tensor& y,
+    const std::unordered_set<int>& ranks) {
+  return run_AG(x, y, ranks, true);
+}
+
 torch::Tensor DistLinearFunction::forward(
     torch::autograd::AutogradContext* ctx, torch::Tensor input,
     torch::Tensor weight, c10::optional<torch::Tensor> bias,
@@ -114,7 +169,7 @@ torch::Tensor DistLinearFunction::forward(
 
   DistMatmul matmul;
   at::Tensor out =
-      matmul.run(input.contiguous(), weight.t().contiguous(), ranks);
+      matmul.runRR_AG(input.contiguous(), weight.t().contiguous(), ranks);
   if (bias) {
     out += *bias;
   }
@@ -142,11 +197,11 @@ torch::autograd::tensor_list DistLinearFunction::backward(
       join_as_str(getTensorDim(ctx->saved_data["weight"].toTensor())),
       join_as_str(getTensorDim(grad_outputs.at(0))), join_as_str(ranks));
 
-  DistMatmul matmul;
+  DistMatmul matmul1;
   //  at::Tensor d_input =
   //      torch::matmul(grad_outputs.at(0),
   //      ctx->saved_data["weight"].toTensor());
-  at::Tensor d_input = matmul.run(
+  at::Tensor d_input = matmul1.runRC_AG(
       grad_outputs.at(0).contiguous(),
       ctx->saved_data["weight"].toTensor().contiguous(), ranks);
 
@@ -156,7 +211,8 @@ torch::autograd::tensor_list DistLinearFunction::backward(
       join_as_str(getTensorDim(ctx->saved_data["input"].toTensor())));
   //  at::Tensor d_weight = torch::matmul(
   //      grad_outputs.at(0).t(), ctx->saved_data["input"].toTensor());
-  at::Tensor d_weight = matmul.run(
+  DistMatmul matmul2;
+  at::Tensor d_weight = matmul2.run(
       grad_outputs.at(0).t().contiguous(),
       ctx->saved_data["input"].toTensor().contiguous(), ranks);
 
