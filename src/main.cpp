@@ -428,18 +428,29 @@ PYBIND11_MODULE(_pyrannc, m) {
     spdlog::info(ss.str());
   });
 
-  m.def("matmul_dist", [](py::handle py_tensor1, py::handle py_tensor2) {
-    auto iv1 = torch::jit::_toTypeInferredIValue(py_tensor1);
-    assert(iv1.isTensor());
-    at::Tensor ten1 = iv1.toTensor().cuda();
+  m.def(
+      "matmul_dist",
+      [](py::handle py_tensor1, py::handle py_tensor2,
+         const std::string& type) {
+        auto iv1 = torch::jit::_toTypeInferredIValue(py_tensor1);
+        assert(iv1.isTensor());
+        at::Tensor ten1 = iv1.toTensor().cuda();
 
-    auto iv2 = torch::jit::_toTypeInferredIValue(py_tensor2);
-    assert(iv2.isTensor());
-    at::Tensor ten2 = iv2.toTensor().cuda();
+        auto iv2 = torch::jit::_toTypeInferredIValue(py_tensor2);
+        assert(iv2.isTensor());
+        at::Tensor ten2 = iv2.toTensor().cuda();
 
-    DistMatmul dist_mm;
-    return dist_mm.run(ten1, ten2, mpi::getAllRanks());
-  });
+        DistMatmul dist_mm;
+        if (type == "RR") {
+          return dist_mm.runRR_AG(ten1, ten2, mpi::getAllRanks());
+        } else if (type == "RC") {
+          return dist_mm.runRC_AG(ten1, ten2, mpi::getAllRanks());
+        } else if (type == "CR") {
+          return dist_mm.runCR(ten1, ten2, mpi::getAllRanks());
+        }
+        spdlog::info("No match: {}", type);
+        return at::Tensor();
+      });
 
 #ifdef VERSION_INFO
   m.attr("__version__") = VERSION_INFO;

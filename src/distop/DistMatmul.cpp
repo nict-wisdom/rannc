@@ -126,11 +126,8 @@ at::Tensor DistMatmul::run_AG(
     std::vector<int64_t> gathered_y_dim = {y_dim.at(0) * np, y_dim.at(1)};
     at::Tensor gathered_y = torch::zeros(
         gathered_y_dim, makeTensorOptions(x.dtype().toScalarType(), false));
-    spdlog::info("1: y={}", tensorToString(y));
     nccl.allgather(tag, {y}, {gathered_y});
     ret = torch::matmul(x, gathered_y);
-    spdlog::info(
-        "2: y={} gathered_y={}", tensorToString(y), tensorToString(gathered_y));
   }
   nccl.syncWithErrorCheck();
   return ret;
@@ -146,6 +143,45 @@ at::Tensor DistMatmul::runRC_AG(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
   return run_AG(x, y, ranks, true);
+}
+
+at::Tensor DistMatmul::runCR(
+    const at::Tensor& x, const at::Tensor& y,
+    const std::unordered_set<int>& ranks) {
+  torch::NoGradGuard no_grad;
+
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  TagMap& tag_map = TagMap::get();
+  int tag = tag_map.getRankSetTag(ranks);
+  nccl.createCommunicator(tag, ranks);
+
+  /*
+   * We assume both x and y are partitioned along 0-th dim
+   */
+  int np = ranks.size();
+  int my_rank = mpi::getRank();
+  assert(contains(ranks, my_rank));
+
+  std::vector<int64_t> x_dim = getTensorDim(x);
+  assert(x_dim.size() > 1);
+  std::vector<int64_t> y_dim = getTensorDim(y);
+  assert(y_dim.size() == 2);
+
+  at::Tensor z = torch::matmul(x, y);
+  at::Tensor out_buf = torch::zeros(
+      {x_dim.at(0) / np, y_dim.at(1)},
+      makeTensorOptions(x.dtype().toScalarType(), true));
+
+  int64_t step = x_dim.at(0) / np;
+  for (int i = 0; i < np; i++) {
+    const auto z_slice = z.slice(0, step * i, step * (i + 1));
+    nccl.reduce(tag, {z_slice}, {getLocalRank(ranks, i)});
+    if (getLocalRank(ranks, mpi::getRank()) == i) {
+      out_buf.copy_(z_slice);
+    }
+  }
+  nccl.syncWithErrorCheck();
+  return out_buf;
 }
 
 torch::Tensor DistLinearFunction::forward(

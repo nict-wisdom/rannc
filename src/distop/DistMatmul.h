@@ -22,6 +22,9 @@ class DistMatmul {
   at::Tensor runRC_AG(
       const at::Tensor& x, const at::Tensor& y,
       const std::unordered_set<int>& ranks);
+  at::Tensor runCR(
+      const at::Tensor& x, const at::Tensor& y,
+      const std::unordered_set<int>& ranks);
 
  private:
   at::Tensor run_AG(
