@@ -163,7 +163,7 @@ GraphProfile DPStaging::estimateProf(
   }
 
   return accProfileValues(
-      prof_util_, batch_size_, graphs, from, to, dev_num, pipeline_num,
+      prof_util_, conf_.batch_size, graphs, from, to, dev_num, pipeline_num,
       checkpointing);
 }
 
@@ -177,11 +177,8 @@ long estimateEval(
 }
 
 void DPStaging::dumpNodeProfiles(
-    const std::string& path, const MLGraph& graph, size_t dev_num,
-    size_t min_pipeline_num, size_t max_pipeline_num) {
+    const std::string& path, const MLGraph& graph) {
   int node_idx = 0;
-  int opt_param_factor =
-      config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
   nlohmann::ordered_json nodes_prof;
   nlohmann::json graphs;
 
@@ -195,27 +192,28 @@ void DPStaging::dumpNodeProfiles(
 
     std::vector<nlohmann::json> prof_dev;
 
-    for (int pipeline_num = std::max(1, (int)min_pipeline_num);
-         pipeline_num <= std::min((int)batch_size_, (int)max_pipeline_num);
+    for (int pipeline_num = std::max(1, (int)conf_.min_pipeline_num);
+         pipeline_num <=
+         std::min((int)conf_.batch_size, (int)conf_.max_pipeline_num);
          pipeline_num *= 2) {
-      for (size_t d = 1; d <= dev_num; d++) {
+      for (size_t d = 1; d <= conf_.dev_num; d++) {
         nlohmann::ordered_json prof_obj;
-        prof_obj["global_batch_size"] = batch_size_;
+        prof_obj["global_batch_size"] = conf_.batch_size;
         prof_obj["prof_batch_size"] =
-            size_t(ceil(batch_size_ / (double)(d * pipeline_num)));
+            size_t(ceil(conf_.batch_size / (double)(d * pipeline_num)));
         prof_obj["dev_num"] = d;
         prof_obj["pipeline_num"] = pipeline_num;
 
         const auto prof = prof_util_.profile(
-            node.graph, batch_size_, d, pipeline_num, pipeline_num > 1);
+            node.graph, conf_.batch_size, d, pipeline_num, pipeline_num > 1);
         prof_obj["fwd_time"] = prof.fwd_time;
         prof_obj["bwd_time"] = prof.bwd_time;
         prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
         prof_obj["checkpointing"] = prof.checkpointing;
-        prof_obj["zero"] = enable_zero_;
+        prof_obj["zero"] = conf_.enable_zero;
         prof_obj["opt_mem"] = getOptMemSize(
-            node.graph, opt_param_factor, use_amp_master_params_, enable_zero_,
-            d);
+            node.graph, conf_.opt_param_factor, conf_.use_amp_master_params,
+            conf_.enable_zero, d);
 
         prof_dev.push_back(prof_obj);
       }
@@ -234,7 +232,7 @@ void DPStaging::dumpNodeProfiles(
   }
 
   nlohmann::ordered_json dump_obj;
-  dump_obj["total_dev_num"] = dev_num;
+  dump_obj["total_dev_num"] = conf_.dev_num;
   dump_obj["node_profiles"] = nodes_prof;
   dump_obj["graphs"] = graphs;
   out << dump_obj.dump(4);
@@ -285,35 +283,33 @@ GraphProfile DPStaging::estimateSolutionGraph(
   assert(contains(sol.repl_nums, sg->getName()));
   int repl = sol.repl_nums.at(sg->getName());
   return prof_util_.profile(
-      sg, batch_size_, repl, sol.pipeline_num, sol.pipeline_num > 1);
+      sg, conf_.batch_size, repl, sol.pipeline_num, sol.pipeline_num > 1);
 }
 
-AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
+AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
   config::Config& config = config::Config::get();
 
   // Forcibly set pipeline num for debugging
-  if (cfg_pipeline_num_ != 0) {
-    min_pipeline_num_ = cfg_pipeline_num_;
-    max_pipeline_num_ = cfg_pipeline_num_;
+  if (conf_.cfg_pipeline_num != 0) {
+    conf_.min_pipeline_num = conf_.cfg_pipeline_num;
+    conf_.max_pipeline_num = conf_.cfg_pipeline_num;
   }
 
   logger->trace(
       "DPStaging::runDpComm starting: batch_size={} dev_num={} min_pipeline_num={}",
-      batch_size_, dev_num, min_pipeline_num_);
+      conf_.batch_size, conf_.dev_num, conf_.min_pipeline_num);
 
   const bool dp_search_all = config.getVal<bool>(config::DP_SEARCH_ALL);
 
-  int dev_per_node = std::min((int)dev_num, getCudaDeviceCount());
+  int dev_per_node = std::min((int)conf_.dev_num, getCudaDeviceCount());
 
-  if (dev_num % dev_per_node != 0) {
+  if (conf_.dev_num % dev_per_node != 0) {
     logger->warn("The numbers of devices may differ across nodes");
   }
-  int node_num_total = dev_num / dev_per_node;
+  int node_num_total = conf_.dev_num / dev_per_node;
 
   if (!dump_dp_node_profiles_.empty()) {
-    dumpNodeProfiles(
-        dump_dp_node_profiles_, graph, dev_num, min_pipeline_num_,
-        max_pipeline_num_);
+    dumpNodeProfiles(dump_dp_node_profiles_, graph);
   }
 
   std::vector<AllocSolution> pl_sols;
@@ -329,8 +325,8 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
 
     size_t stage_num_min, stage_num_max;
     // Forcibly set stage num for debugging
-    if (cfg_stage_num_ != 0) {
-      stage_num_min = stage_num_max = cfg_stage_num_;
+    if (conf_.cfg_stage_num != 0) {
+      stage_num_min = stage_num_max = conf_.cfg_stage_num;
     } else {
       stage_num_min = prev_stage_num_max + 1;
       stage_num_max = prev_stage_num_max = dev_per_node * node_num_used;
@@ -342,8 +338,9 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
 
     for (size_t stage_num = stage_num_min; stage_num <= stage_num_max;
          stage_num++) {
-      for (int pipeline_num = std::max(1, min_pipeline_num_);
-           pipeline_num <= std::min((int)batch_size_, max_pipeline_num_);
+      for (int pipeline_num = std::max(1, conf_.min_pipeline_num);
+           pipeline_num <=
+           std::min((int)conf_.batch_size, conf_.max_pipeline_num);
            pipeline_num *= 2) {
         bool checkpointing = pipeline_num > 1;
         int replica_num = node_num_total / node_num_used;
@@ -376,15 +373,7 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
     DPStagingCache cache;
     cache.graph = graph;
     cache.ml_profile_cache = prof_util_.getProfileCache();
-    cache.dev_num = dev_num;
-    cache.batch_size = batch_size_;
-    cache.dev_mem = dev_mem_;
-    cache.min_pipeline_num = min_pipeline_num_;
-    cache.max_pipeline_num = max_pipeline_num_;
-    cache.cfg_pipeline_num = cfg_pipeline_num_;
-    cache.cfg_stage_num = cfg_stage_num_;
-    cache.use_amp_master_params = use_amp_master_params_;
-    cache.enable_zero = enable_zero_;
+    cache.conf = conf_;
     cache.ir_graph = ir_graph_;
 
     logger->info("Saving DP cache to {}", dump_dp_cache_);
@@ -411,8 +400,9 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph, size_t dev_num) {
         estimateSolutionGraph(best_sol, graph, g_idx);
   }
   logger->info(displayGraphProfiles(
-      best_sol.graphs, batch_size_, best_sol.pipeline_num,
-      use_amp_master_params_, enable_zero_, best_sol.repl_nums, profiles));
+      best_sol.graphs, conf_.batch_size, best_sol.pipeline_num,
+      conf_.use_amp_master_params, conf_.enable_zero, best_sol.repl_nums,
+      profiles));
 
   return best_sol;
 }
@@ -514,12 +504,12 @@ AllocSolution DPStaging::doRunDpComm(
         for (size_t b_prev = (s - 1); b_prev < b_prev_limit; b_prev++) {
           for (size_t d_prev = (s - 1); d_prev < d_prev_limit; d_prev++) {
             size_t max_d =
-                ceil(batch_size_ / (double)(replica_num * pipeline_num));
+                ceil(conf_.batch_size / (double)(replica_num * pipeline_num));
             if (limit_dev_num_more_than_bs) {
               if (max_d < (d - d_prev)) {
                 logger->trace(
                     "Skip dev_num: stage_num={} s={} b={} d={} b_prev={} d_prev={} bs={} repl={} pl={}",
-                    stage_num, s, b, d, b_prev, d_prev, batch_size_,
+                    stage_num, s, b, d, b_prev, d_prev, conf_.batch_size,
                     replica_num, pipeline_num);
                 skip_small_bs = true;
                 continue;
@@ -530,7 +520,7 @@ AllocSolution DPStaging::doRunDpComm(
               if (!isPowerOfTwo(d - d_prev)) {
                 logger->trace(
                     "Skip pot: stage_num={} s={} b={} d={} b_prev={} d_prev={} bs={} repl={} pl={}",
-                    stage_num, s, b, d, b_prev, d_prev, batch_size_,
+                    stage_num, s, b, d, b_prev, d_prev, conf_.batch_size,
                     replica_num, pipeline_num);
                 skip_small_bs = true;
                 continue;
@@ -538,13 +528,14 @@ AllocSolution DPStaging::doRunDpComm(
             }
 
             double stage_bs =
-                batch_size_ / (double)(replica_num * pipeline_num);
+                conf_.batch_size / (double)(replica_num * pipeline_num);
             size_t repl_bs = ceil(stage_bs / (d - d_prev));
             if (repl_bs < min_pipeline_bs) {
               logger->trace(
                   "Skip 2: stage_num={} s={} b={} d={} b_prev={} d_prev={} bs={} repl={} pl={} stage_bs={} repl_bs={} min_pipeline_bs={}",
-                  stage_num, s, b, d, b_prev, d_prev, batch_size_, replica_num,
-                  pipeline_num, stage_bs, repl_bs, min_pipeline_bs);
+                  stage_num, s, b, d, b_prev, d_prev, conf_.batch_size,
+                  replica_num, pipeline_num, stage_bs, repl_bs,
+                  min_pipeline_bs);
 
               skip_small_bs = true;
               continue;
@@ -596,8 +587,8 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= (b - 1); i++) {
                 const auto& node = graph.nodes.at(i);
                 opt_mem += getOptMemSize(
-                    node.graph, opt_param_factor, use_amp_master_params_,
-                    enable_zero_, (d - d_prev) * replica_num);
+                    node.graph, opt_param_factor, conf_.use_amp_master_params,
+                    conf_.enable_zero, (d - d_prev) * replica_num);
               }
               step_mem = step_prof.max_allocated_mem + opt_mem +
                   (step_in_comm + step_out_comm) * 2;
@@ -612,7 +603,7 @@ AllocSolution DPStaging::doRunDpComm(
                   ((d - d_prev) * replica_num * pipeline_num));
               ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
 
-              if (force_dist_matmul_) {
+              if (conf_.force_dist_matmul) {
                 //// under development
                 std::vector<int> ranks;
                 for (int i = 0; i < (d - d_prev) * replica_num; i++) {
@@ -622,19 +613,19 @@ AllocSolution DPStaging::doRunDpComm(
                     replaceWithDistOp(step_graph, ranks);
                 step_graph = part_info.graph;
                 step_prof = prof_util_.profileDist(
-                    part_info, batch_size_, (d - d_prev) * replica_num,
+                    part_info, conf_.batch_size, (d - d_prev) * replica_num,
                     pipeline_num, checkpointing);
                 ////
               } else {
                 // run profiler for the merged graph
                 step_prof = prof_util_.profile(
-                    step_graph, batch_size_, (d - d_prev) * replica_num,
+                    step_graph, conf_.batch_size, (d - d_prev) * replica_num,
                     pipeline_num, checkpointing);
               }
               step_mem = calcGraphMem(
-                  step_graph, step_prof, batch_size_,
+                  step_graph, step_prof, conf_.batch_size,
                   (d - d_prev) * replica_num, pipeline_num,
-                  use_amp_master_params_, enable_zero_);
+                  conf_.use_amp_master_params, conf_.enable_zero);
               step_val = ::rannc::estimateEval(
                   step_prof, step_in_comm, step_out_comm,
                   table[s - 1][b_prev][d_prev].max_fwd,
@@ -642,7 +633,7 @@ AllocSolution DPStaging::doRunDpComm(
                   table[s - 1][b_prev][d_prev].max_allreduce);
             }
 
-            if (step_mem >= dev_mem_) {
+            if (step_mem >= conf_.dev_mem) {
               logger->trace(
                   "DPStaging::doRunDpComm: The required memory exceeded the limit. stage_num={} s={} b={} d={} b_prev={} d_prev={} mem={}",
                   stage_num, s, b, d, b_prev, d_prev, step_mem);
@@ -774,7 +765,7 @@ GraphProfile DPDryStaging::estimateSolutionGraph(
 }
 
 Deployment DPDryStaging::partition() {
-  const auto sol = DPStaging::runDpComm(graph_, dev_num_);
+  const auto sol = DPStaging::runDpComm(graph_);
   Partition new_part = createPartition(ir_graph_, sol.graphs);
 
   // graph names in new_part are different with those in sol.repl_nums
@@ -790,17 +781,17 @@ Deployment DPDryStaging::partition() {
   }
 
   const auto repl =
-      replicate(new_part, repl_nums, sol.pipeline_num, batch_size_);
+      replicate(new_part, repl_nums, sol.pipeline_num, conf_.batch_size);
   logger->trace("Partitioning finished: id={}", ir_graph_->getName());
 
   std::unordered_map<std::string, std::unordered_set<int>> alloc;
 
   if (config::Config::get().getVal<bool>(config::ALLOC_REPL_FLAT)) {
     logger->trace("searchAllocationFlat");
-    alloc = searchAllocationFlat(repl, dev_num_, dev_mem_);
+    alloc = searchAllocationFlat(repl, conf_.dev_num, conf_.dev_mem);
   } else {
     logger->trace("searchAllocationSimple");
-    alloc = searchAllocationSimple(repl, dev_num_, dev_mem_);
+    alloc = searchAllocationSimple(repl, conf_.dev_num, conf_.dev_mem);
   }
 
   if (alloc.empty()) {
@@ -811,7 +802,7 @@ Deployment DPDryStaging::partition() {
     logger->info(
         " Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
   }
-  Deployment deployment = createDeployment(repl, alloc, dev_num_);
+  Deployment deployment = createDeployment(repl, alloc, conf_.dev_num);
   deployment.pipeline_num = sol.pipeline_num;
   deployment.checkpointing = sol.checkpointing;
   logger->trace("Created deployment finished");

@@ -35,14 +35,12 @@ Deployment MetaDecomposer::decompose(
   switch (type_map.at(name)) {
     case DecomposerType::FAIR_WEIGHT: {
       FairWeightDecomposer decomposer(
-          sg_prof_, worker_num_, batch_size_, dev_mem_);
+          sg_prof_, conf_.dev_num, conf_.batch_size, conf_.dev_mem);
       deployment = decomposer.decompose(ir_graph);
       break;
     }
     case DecomposerType::ML_PART: {
-      MLPartDecomposer decomposer(
-          sg_prof_, worker_num_, batch_size_, node_profiles_, dev_mem_,
-          use_amp_master_params_, enable_zero_, offload_params_);
+      MLPartDecomposer decomposer(sg_prof_, conf_);
       deployment = decomposer.decompose(ir_graph);
       break;
     }

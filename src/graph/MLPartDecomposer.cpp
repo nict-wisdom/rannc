@@ -13,40 +13,34 @@ Deployment MLPartDecomposer::decompose(
   logger->trace("MLPartDecomposer::decompose starting");
 
   config::Config& conf = config::Config::get();
-  if (dev_mem_ > 0) {
+  if (conf_.dev_mem > 0) {
     const auto mem_limit = conf.getVal<int>(config::MEM_LIMIT_GB);
     if (mem_limit > 0) {
-      dev_mem_ =
-          std::min(dev_mem_, (size_t)(mem_limit * 1024L * 1024L * 1024L));
+      conf_.dev_mem =
+          std::min(conf_.dev_mem, (size_t)(mem_limit * 1024L * 1024L * 1024L));
     }
     const auto mem_margin = conf.getVal<float>(config::MEM_MARGIN);
-    dev_mem_ *= (1 - mem_margin);
-    logger->info("Available device memory: {}", dev_mem_);
+    conf_.dev_mem *= (1 - mem_margin);
+    logger->info("Available device memory: {}", conf_.dev_mem);
   } else {
     logger->warn(
         "No CUDA device found on workers. Assuming (almost) unlimited host memory when assigning subgraphs.");
-    dev_mem_ = 2 * 1024L * 1024L * 1024L * 1024L; // 2TB
+    conf_.dev_mem = 2 * 1024L * 1024L * 1024L * 1024L; // 2TB
   }
 
   logger->info(
       "Starting model partitioning ... (this may take a very long time)");
 
-  const int max_pipeline = conf.getVal<int>(config::MAX_PIPELINE);
-  const int min_pipeline_bs = conf.getVal<int>(config::MIN_PIPELINE_BS);
   const bool coarsen_by_time = conf.getVal<bool>(config::COARSEN_BY_TIME);
-  MLPartitioner partitioner(
-      sg_prof_, worker_num_, dev_mem_, max_pipeline, min_pipeline_bs,
-      use_amp_master_params_, coarsen_by_time, enable_zero_, worker_num_);
+  MLPartitioner partitioner(sg_prof_, conf_, coarsen_by_time);
   MLGraph part_graph = partitioner.partition(ir_graph);
 
   ///////////
   logger->trace(
       "Starting DP: id={} #nodes={}", ir_graph->getName(),
       part_graph.nodes.size());
-  DPStaging dp(
-      sg_prof_, ir_graph, batch_size_, dev_mem_, use_amp_master_params_,
-      enable_zero_, conf.getVal<bool>(config::FORCE_DIST_MATMUL));
-  AllocSolution sol = dp.runDpComm(part_graph, worker_num_);
+  DPStaging dp(sg_prof_, ir_graph, conf_);
+  AllocSolution sol = dp.runDpComm(part_graph);
   logger->trace("Finished DP: id={}", ir_graph->getName());
 
   Partition new_part = createPartition(ir_graph, sol.graphs);
@@ -64,17 +58,17 @@ Deployment MLPartDecomposer::decompose(
   }
 
   const auto repl =
-      replicate(new_part, repl_nums, sol.pipeline_num, batch_size_);
+      replicate(new_part, repl_nums, sol.pipeline_num, conf_.batch_size);
   logger->trace("Partitioning finished: id={}", ir_graph->getName());
 
   std::unordered_map<std::string, std::unordered_set<int>> alloc;
 
   if (config::Config::get().getVal<bool>(config::ALLOC_REPL_FLAT)) {
     logger->trace("searchAllocationFlat");
-    alloc = searchAllocationFlat(repl, worker_num_, dev_mem_);
+    alloc = searchAllocationFlat(repl, conf_.dev_num, conf_.dev_mem);
   } else {
     logger->trace("searchAllocationSimple");
-    alloc = searchAllocationSimple(repl, worker_num_, dev_mem_);
+    alloc = searchAllocationSimple(repl, conf_.dev_num, conf_.dev_mem);
   }
 
   if (alloc.empty()) {
@@ -85,10 +79,10 @@ Deployment MLPartDecomposer::decompose(
     logger->info(
         " Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
   }
-  Deployment deployment = createDeployment(repl, alloc, worker_num_);
+  Deployment deployment = createDeployment(repl, alloc, conf_.dev_num);
   deployment.pipeline_num = sol.pipeline_num;
   deployment.checkpointing = sol.checkpointing;
-  deployment.offload_params = offload_params_;
+  deployment.offload_params = conf_.offload_params;
   logger->trace("MLPartDecomposer::decompose finished");
 
   return deployment;

@@ -376,7 +376,7 @@ PYBIND11_MODULE(_pyrannc, m) {
     const auto deployment_file =
         config::Config::get().getVal<std::string>(config::DEPLOYMENT_FILE);
     spdlog::info("Saving deployment state to {}", deployment_file);
-    save(deployment_file, deployment, cache.dev_num, cache.dev_mem);
+    save(deployment_file, deployment, cache.conf.dev_num, cache.conf.dev_mem);
   });
 
   m.def("show_deployment", [](const std::string& path, int64_t batch_size) {

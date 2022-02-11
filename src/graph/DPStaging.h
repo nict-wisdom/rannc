@@ -11,7 +11,7 @@
 namespace rannc {
 class GraphMergeHelper {
  public:
-  GraphMergeHelper(MLGraph graph);
+  explicit GraphMergeHelper(MLGraph graph);
   std::shared_ptr<IRGraph> merge(size_t from, size_t to);
 
  private:
@@ -25,26 +25,17 @@ class DPStaging {
  public:
   DPStaging(
       std::shared_ptr<GraphProfiler> profiler,
-      std::shared_ptr<IRGraph> ir_graph, size_t batch_size, size_t dev_mem,
-      bool use_amp_master_params, bool enable_zero, bool force_dist_matmul)
-      : prof_util_(std::move(profiler), force_dist_matmul),
-        ir_graph_(ir_graph),
-        batch_size_(batch_size),
-        dev_mem_(dev_mem),
-        use_amp_master_params_(use_amp_master_params),
-        enable_zero_(enable_zero),
-        force_dist_matmul_(force_dist_matmul) {
+      std::shared_ptr<IRGraph> ir_graph, PartitioningConf conf)
+      : prof_util_(std::move(profiler), conf.force_dist_matmul),
+        ir_graph_(std::move(ir_graph)),
+        conf_(conf) {
     config::Config& config = config::Config::get();
     dump_dp_node_profiles_ =
         config.getVal<std::string>(config::DUMP_DP_NODE_PROFILES);
     dump_dp_cache_ = config.getVal<std::string>(config::DUMP_DP_CACHE);
-    min_pipeline_num_ = config.getVal<int>(config::MIN_PIPELINE);
-    max_pipeline_num_ = config.getVal<int>(config::MAX_PIPELINE);
-    cfg_pipeline_num_ = config.getVal<int>(config::PIPELINE_NUM);
-    cfg_stage_num_ = config.getVal<int>(config::PARTITION_NUM);
   }
 
-  AllocSolution runDpComm(const MLGraph& graph, size_t dev_num);
+  AllocSolution runDpComm(const MLGraph& graph);
 
  protected:
   AllocSolution doRunDpComm(
@@ -58,23 +49,10 @@ class DPStaging {
       const MLGraph& graph, size_t from, size_t to, size_t dev_num,
       size_t pipeline_num, bool checkpointing);
 
-  void dumpNodeProfiles(
-      const std::string& path, const MLGraph& graph, size_t dev_num,
-      size_t min_pipeline_num, size_t max_pipeline_num);
+  void dumpNodeProfiles(const std::string& path, const MLGraph& graph);
 
   ProfilerUtil prof_util_;
-  size_t batch_size_;
-  size_t dev_mem_;
-  int min_pipeline_num_;
-  int max_pipeline_num_;
-  int cfg_pipeline_num_;
-  size_t cfg_stage_num_;
-
-  bool use_amp_master_params_;
-  bool enable_zero_;
-  bool force_dist_matmul_;
-
-  GraphMergeCache graph_merge_cache_;
+  PartitioningConf conf_;
 
   std::string dump_dp_node_profiles_;
   std::string dump_dp_cache_;
@@ -86,41 +64,21 @@ class DPStaging {
 struct DPStagingCache {
   MLGraph graph;
   MLProfileCache ml_profile_cache;
-  size_t dev_num;
-  size_t batch_size;
-  size_t dev_mem;
-  int min_pipeline_num;
-  int max_pipeline_num;
-  int cfg_pipeline_num;
-  size_t cfg_stage_num;
-  bool use_amp_master_params;
-  bool enable_zero;
   std::shared_ptr<IRGraph> ir_graph;
+  PartitioningConf conf;
 
-  MSGPACK_DEFINE(
-      graph, ml_profile_cache, dev_num, batch_size, dev_mem, min_pipeline_num,
-      max_pipeline_num, cfg_pipeline_num, cfg_stage_num, use_amp_master_params,
-      enable_zero, ir_graph);
+  MSGPACK_DEFINE(graph, ml_profile_cache, ir_graph, conf);
 };
 
 class DPDryStaging : public DPStaging {
  public:
   DPDryStaging(const DPStagingCache& cache)
       : graph_(cache.graph),
-        dev_num_(cache.dev_num),
-        batch_size_(cache.batch_size),
-        ir_graph_(cache.ir_graph),
+        conf_(cache.conf),
         DPStaging(
             std::shared_ptr<GraphProfiler>(nullptr), cache.ir_graph,
-            cache.batch_size, cache.dev_mem, cache.use_amp_master_params,
-            cache.enable_zero, false) {
+            cache.conf) {
     prof_util_.setProfileCache(cache.ml_profile_cache);
-
-    min_pipeline_num_ = cache.min_pipeline_num;
-    max_pipeline_num_ = cache.max_pipeline_num;
-    cfg_pipeline_num_ = cache.cfg_pipeline_num;
-    cfg_stage_num_ = cache.cfg_stage_num;
-
     dump_dp_node_profiles_.clear();
     dump_dp_cache_.clear();
   }
@@ -128,14 +86,13 @@ class DPDryStaging : public DPStaging {
   Deployment partition();
 
  protected:
-  virtual GraphProfile estimateSolutionGraph(
-      const AllocSolution& sol, const MLGraph& graph, size_t g_idx);
+  GraphProfile estimateSolutionGraph(
+      const AllocSolution& sol, const MLGraph& graph, size_t g_idx) override;
 
  private:
   MLGraph graph_;
-  size_t batch_size_;
   std::shared_ptr<IRGraph> ir_graph_;
-  size_t dev_num_;
+  PartitioningConf conf_;
 };
 } // namespace rannc
 

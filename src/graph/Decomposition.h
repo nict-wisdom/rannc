@@ -554,6 +554,34 @@ struct AllocSolution {
   MSGPACK_DEFINE(
       graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums);
 };
+
+struct PartitioningConf {
+  int dev_num;
+  size_t batch_size;
+  size_t dev_mem;
+  int opt_param_factor;
+  bool use_amp_master_params;
+  bool enable_zero;
+  bool offload_params;
+  bool force_dist_matmul;
+  int min_pipeline_num;
+  int max_pipeline_num;
+  int min_partition_num;
+  int max_partition_num;
+  int cfg_pipeline_num;
+  size_t cfg_stage_num;
+
+  MSGPACK_DEFINE(
+      dev_num, batch_size, dev_mem, opt_param_factor, use_amp_master_params,
+      enable_zero, offload_params, force_dist_matmul, min_pipeline_num,
+      max_pipeline_num, min_partition_num, max_partition_num, cfg_pipeline_num,
+      cfg_stage_num);
+};
+
+PartitioningConf makePartitioningConf(
+    int dev_num, size_t batch_size, size_t dev_mem, bool use_amp_master_params,
+    bool enable_zero);
+
 } // namespace rannc
 
 #endif // PYRANNC_DECOMPOSITION_H

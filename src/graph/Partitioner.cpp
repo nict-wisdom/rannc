@@ -24,7 +24,8 @@ long MLPartitioner::eval(const GraphProfile& prof) {
 }
 
 GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
-  return prof_util_.profile(g, batch_size_, dev_num_, max_pipeline_num_);
+  return prof_util_.profile(
+      g, batch_size_, conf_.dev_num, conf_.max_pipeline_num);
 }
 
 std::vector<MLVertex> MLPartitioner::sortNodesByEval(
@@ -100,7 +101,8 @@ MLGraph MLPartitioner::mergeAdjacents(
 
       const auto cut_values = getCutValues(v, adj);
       long cut_size = getSize(cut_values);
-      long comm_time = calcCommTime(cut_size / (dev_num_ * max_pipeline_num_));
+      long comm_time =
+          calcCommTime(cut_size / (conf_.dev_num * conf_.max_pipeline_num));
 
       long eval_v = 0, eval_adj = 0, eval_merged = 0;
 
@@ -124,8 +126,9 @@ MLGraph MLPartitioner::mergeAdjacents(
       } else {
         const auto& prof_merged = profile(merged.graph);
         if (!fitToMem(
-                merged.graph, prof_merged, dev_mem_, use_amp_master_params_,
-                enable_zero_, max_repl_num_)) {
+                merged.graph, prof_merged, conf_.dev_mem,
+                conf_.use_amp_master_params, conf_.enable_zero,
+                max_repl_num_)) {
           //                    spdlog::info("v={} adj={}: merged graph does not
           //                    fit to mem. mem={}", v.id, adj.id,
           //                    prof_merged.max_allocated_mem);
@@ -634,26 +637,27 @@ MLGraph MLPartitioner::adjustBoundaries(const MLGraph& ml_graph) {
 
       long eval_src = eval(profile(src_node.graph));
       long eval_tgt = eval(profile(tgt_node.graph));
-      long eval_comm =
-          calcCommTime(calcEdgeSize(edge) / (dev_num_ * max_pipeline_num_));
+      long eval_comm = calcCommTime(
+          calcEdgeSize(edge) / (conf_.dev_num * conf_.max_pipeline_num));
 
       const auto prof_moved_src = profile(moved_result.src_node.graph);
       long eval_moved_src = eval(prof_moved_src);
       if (!fitToMem(
-              moved_result.src_node.graph, prof_moved_src, dev_mem_,
-              use_amp_master_params_, enable_zero_, max_repl_num_)) {
+              moved_result.src_node.graph, prof_moved_src, conf_.dev_mem,
+              conf_.use_amp_master_params, conf_.enable_zero, max_repl_num_)) {
         continue;
       }
 
       const auto prof_moved_tgt = profile(moved_result.tgt_node.graph);
       long eval_moved_tgt = eval(prof_moved_tgt);
       if (!fitToMem(
-              moved_result.tgt_node.graph, prof_moved_tgt, dev_mem_,
-              use_amp_master_params_, enable_zero_, max_repl_num_)) {
+              moved_result.tgt_node.graph, prof_moved_tgt, conf_.dev_mem,
+              conf_.use_amp_master_params, conf_.enable_zero, max_repl_num_)) {
         continue;
       }
       long eval_moved_comm = calcCommTime(
-          calcEdgeSize(moved_result.edge) / (dev_num_ * max_pipeline_num_));
+          calcEdgeSize(moved_result.edge) /
+          (conf_.dev_num * conf_.max_pipeline_num));
 
       long imprv = (eval_src + eval_tgt + eval_comm) -
           (eval_moved_src + eval_moved_tgt + eval_moved_comm);
@@ -745,8 +749,8 @@ MLGraph MLPartitioner::mergeSmall(
           merge(preceding, min_node, merged_graph.nodes, merged_graph.edges);
       const auto prof = profile(merged.graph);
       if (!fitToMem(
-              merged.graph, prof, dev_mem_, use_amp_master_params_,
-              enable_zero_, max_repl_num_)) {
+              merged.graph, prof, conf_.dev_mem, conf_.use_amp_master_params,
+              conf_.enable_zero, max_repl_num_)) {
         break;
       }
       min_adj_eval = eval(prof);
@@ -761,8 +765,8 @@ MLGraph MLPartitioner::mergeSmall(
           merge(min_node, following, merged_graph.nodes, merged_graph.edges);
       const auto prof = profile(merged_fol.graph);
       if (!fitToMem(
-              merged_fol.graph, prof, dev_mem_, use_amp_master_params_,
-              enable_zero_, max_repl_num_)) {
+              merged_fol.graph, prof, conf_.dev_mem,
+              conf_.use_amp_master_params, conf_.enable_zero, max_repl_num_)) {
         break;
       }
       long val_following = eval(prof);
@@ -870,9 +874,7 @@ MLGraph MLPartitioner::partition(const std::shared_ptr<IRGraph>& ir_graph) {
   }
 
   logger->trace("Coarsening graph: id={}", ir_graph->getName());
-  int min_partition_num =
-      config::Config::get().getVal<int>(config::MIN_PARTITON_NUM);
-  MLGraph graph = coarsen(ml_graph, min_partition_num);
+  MLGraph graph = coarsen(ml_graph, conf_.min_partition_num);
 
   bool do_uncoarsening =
       config::Config::get().getVal<bool>(config::DO_UNCOARSENING);
@@ -883,8 +885,6 @@ MLGraph MLPartitioner::partition(const std::shared_ptr<IRGraph>& ir_graph) {
 
   graph = sortMLGraph(graph);
 
-  int max_partition_num =
-      config::Config::get().getVal<int>(config::MAX_PARTITON_NUM);
-  return mergeSmall(graph, max_partition_num);
+  return mergeSmall(graph, conf_.max_partition_num);
 }
 } // namespace rannc

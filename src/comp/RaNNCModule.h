@@ -96,6 +96,13 @@ class RaNNCModule {
   bool load_deployment_;
   bool save_deployment_;
   std::string deployment_file_;
+  int dry_run_np_;
+  bool load_profile_;
+  std::string graph_profile_file_;
+  bool use_named_tensors_;
+  std::string decomp_name_;
+  bool save_profile_;
+  bool verify_partitioning_;
 
   bool checkpointing_enabled_ = false;
   bool use_amp_master_params_;

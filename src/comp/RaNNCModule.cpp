@@ -109,11 +109,17 @@ RaNNCModule::RaNNCModule(
   load_deployment_ = conf.getVal<bool>(config::LOAD_DEPLOYMENT);
   save_deployment_ = conf.getVal<bool>(config::SAVE_DEPLOYMENT);
   deployment_file_ = conf.getVal<std::string>(config::DEPLOYMENT_FILE);
+  bool consolidate_grads = conf.getVal<bool>(config::CONSOLIDATE_GRADS);
+  dry_run_np_ = conf.getVal<int>(config::PARTITIONING_DRY_RUN_NP);
+  load_profile_ = conf.getVal<bool>(config::LOAD_GRAPH_PROFILE);
+  graph_profile_file_ = conf.getVal<std::string>(config::GRAPH_PROFILE_FILE);
+  use_named_tensors_ = conf.getVal<bool>(config::USE_NAMED_TENSORS);
+  decomp_name_ = conf.getVal<std::string>(config::DECOMPOSER);
+  save_profile_ = conf.getVal<bool>(config::SAVE_GRAPH_PROFILE);
+  verify_partitioning_ = conf.getVal<bool>(config::VERIFY_PARTITIONING);
 
   param_storage_ = master_->getParamStorage();
   param_storage_->useAmpMasterParams(id_, use_amp_master_params_);
-  bool consolidate_grads = conf.getVal<bool>(config::CONSOLIDATE_GRADS);
-
   param_storage_->setConsolidate(consolidate_grads);
   param_storage_->setAllreduceAmpMasterParams(allreduce_amp_master_param);
   master_->registerModule(id_, this);
@@ -167,11 +173,14 @@ std::vector<long> RaNNCModule::init(
       ? scomm.allReduceSumBatchSize(local_batch_size)
       : local_batch_size;
 
-  config::Config& conf = config::Config::get();
-  int dry_run_np = conf.getVal<int>(config::PARTITIONING_DRY_RUN_NP);
-  if (dry_run_np > 0) {
-    batch_size = local_batch_size * dry_run_np;
+  if (dry_run_np_ > 0) {
+    batch_size = local_batch_size * dry_run_np_;
   }
+
+  const auto dev_info = ::rannc::getCudaDeviceInfo(getCurrentCudaDeviceId());
+  PartitioningConf pconf = makePartitioningConf(
+      mpi::getSize(), batch_size, dev_info.total_mem, use_amp_master_params_,
+      enable_zero_);
 
   if (mpi::isMaster()) {
     logger->info("Tracing model ...");
@@ -197,7 +206,6 @@ std::vector<long> RaNNCModule::init(
     logger->info("Converting torch model to IR ...");
   }
   ir_graph_ = fromTorch(id_, graph, args.size());
-
 
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;
@@ -228,31 +236,26 @@ std::vector<long> RaNNCModule::init(
   func_storage_ = std::make_shared<FunctionStorage>();
   func_storage_->deploy(graph);
 
-  const int min_pipeline = conf.getVal<int>(config::MIN_PIPELINE);
   std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
       param_storage_, ir_graph_, non_param_inputs, graph_params,
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
-      min_pipeline, offload_params_);
+      pconf.min_pipeline_num, offload_params_);
 
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
   dtd.start(sg_prof);
   if (mpi::isMaster()) {
     sg_prof->setCacheParamValues(true);
 
-    bool load_profile = conf.getVal<bool>(config::LOAD_GRAPH_PROFILE);
-    std::string graph_profile_file =
-        conf.getVal<std::string>(config::GRAPH_PROFILE_FILE);
-    if (load_profile) {
-      logger->info("Loading graph profiles from {}", graph_profile_file);
-      sg_prof->load(graph_profile_file);
+    if (load_profile_) {
+      logger->info("Loading graph profiles from {}", graph_profile_file_);
+      sg_prof->load(graph_profile_file_);
     }
 
     logger->info("Running profiler ...");
     pybind11::gil_scoped_release no_gil;
     ProfilingResult prof_results;
     try {
-      bool use_named_tensors = conf.getVal<bool>(config::USE_NAMED_TENSORS);
-      prof_results = sg_prof->init(use_named_tensors);
+      prof_results = sg_prof->init(use_named_tensors_);
     } catch (std::exception& e) {
       std::stringstream ss;
       ss << "Failed to profile graph."
@@ -279,7 +282,6 @@ std::vector<long> RaNNCModule::init(
       }
     }
 
-    const auto dev_info = ::rannc::getCudaDeviceInfo(getCurrentCudaDeviceId());
     if (load_deployment_) {
       logger->info("Loading deployment state from {}", deployment_file_);
       deployment_ =
@@ -314,19 +316,15 @@ std::vector<long> RaNNCModule::init(
       }
     } else {
       int np = mpi::getSize();
-      if (dry_run_np > 0) {
-        np = dry_run_np;
+      if (dry_run_np_ > 0) {
+        np = dry_run_np_;
         logger->info(
             "Starting dry run of partitioning ... (np={} batch_size={})",
-            dry_run_np, batch_size);
+            dry_run_np_, batch_size);
       }
 
-      MetaDecomposer decomposer(
-          sg_prof, np, batch_size, prof_results.node_profiles,
-          dev_info.total_mem, use_amp_master_params_, enable_zero_,
-          offload_params_);
-      const auto decomp_name = conf.getVal<std::string>(config::DECOMPOSER);
-      deployment_ = decomposer.decompose(decomp_name, ir_graph_);
+      MetaDecomposer decomposer(sg_prof, pconf);
+      deployment_ = decomposer.decompose(decomp_name_, ir_graph_);
 
       if (save_deployment_) {
         logger->info("Saving deployment state to {}", deployment_file_);
@@ -361,13 +359,12 @@ std::vector<long> RaNNCModule::init(
     verifyDeployment(deployment_);
     logger->info("Routes verification passed.");
 
-    bool save_profile = conf.getVal<bool>(config::SAVE_GRAPH_PROFILE);
-    if (save_profile) {
-      logger->info("Saving graph profiles to {}", graph_profile_file);
-      sg_prof->save(graph_profile_file);
+    if (save_profile_) {
+      logger->info("Saving graph profiles to {}", graph_profile_file_);
+      sg_prof->save(graph_profile_file_);
     }
 
-    if (conf.getVal<bool>(config::VERIFY_PARTITIONING)) {
+    if (verify_partitioning_) {
       if (distributed) {
         logger->warn(
             "Verification was disabled because zero param distribution is enabled.");
@@ -387,7 +384,7 @@ std::vector<long> RaNNCModule::init(
   dtd.stop();
   MPI_Barrier(MPI_COMM_WORLD);
 
-  if (dry_run_np > 0) {
+  if (dry_run_np_ > 0) {
     if (mpi::getRank() == 0) {
       logger->info("The dry run for partitioning finished. Exiting ...");
     }

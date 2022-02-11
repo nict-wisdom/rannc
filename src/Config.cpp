@@ -38,10 +38,9 @@ const char OPT_PARAM_FACTOR[] = "opt_param_factor";
 const char AUTO_PARALLEL[] = "auto_parallel";
 const char P2P_COMM[] = "p2p_comm";
 const char DECOMPOSER[] = "decomposer";
-const char USE_AMP_MASTER_PARAM[] = "use_amp_master_param";
 const char MEM_LIMIT_GB[] = "mem_limit_gb";
-const char MIN_PARTITON_NUM[] = "min_partition_num";
-const char MAX_PARTITON_NUM[] = "max_partition_num";
+const char MIN_PARTITION_NUM[] = "min_partition_num";
+const char MAX_PARTITION_NUM[] = "max_partition_num";
 const char MEM_MARGIN[] = "mem_margin";
 const char MAX_MP_NUM[] = "max_mp_num";
 const char DO_UNCOARSENING[] = "do_uncoarsening";
@@ -143,10 +142,9 @@ Config::Config() {
       makeConfigItem(AUTO_PARALLEL, false),
       makeConfigItem(P2P_COMM, true),
       makeConfigItem(DECOMPOSER, std::string("ml_part")),
-      makeConfigItem(USE_AMP_MASTER_PARAM, false),
       makeConfigItem(MEM_LIMIT_GB, 0),
-      makeConfigItem(MIN_PARTITON_NUM, 5),
-      makeConfigItem(MAX_PARTITON_NUM, 10),
+      makeConfigItem(MIN_PARTITION_NUM, 5),
+      makeConfigItem(MAX_PARTITION_NUM, 32),
       makeConfigItem(MEM_MARGIN, 0.1f),
       makeConfigItem(MAX_MP_NUM, 8),
       makeConfigItem(DO_UNCOARSENING, false),
