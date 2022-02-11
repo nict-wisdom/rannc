@@ -22,6 +22,9 @@ at::TensorOptions makeTensorOptions(at::ScalarType dtype, bool requires_grad) {
   return options;
 }
 
+const std::shared_ptr<spdlog::logger> DistLinearFunction::logger =
+    getLogger("DistLinearFunction");
+
 at::Tensor DistMatmul::run(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
@@ -193,7 +196,9 @@ torch::Tensor DistLinearFunction::forward(
   ctx->saved_data["bias"] = bias;
   ctx->saved_data["ranks"] = dist_ranks;
 
-  spdlog::info(
+  logger->trace("DistLinearFunction forward starting");
+
+  logger->trace(
       "input.size={} weight.size={} bias.size={} dist_ranks={}",
       join_as_str(getTensorDim(input)), join_as_str(getTensorDim(weight)),
       join_as_str(getTensorDim(*bias)), join_as_str(dist_ranks));
@@ -210,7 +215,7 @@ torch::Tensor DistLinearFunction::forward(
     out += *bias;
   }
 
-  spdlog::info("DistLinearFunction forward");
+  logger->trace("DistLinearFunction forward finished");
 
   return out;
 }
@@ -218,8 +223,9 @@ torch::Tensor DistLinearFunction::forward(
 torch::autograd::tensor_list DistLinearFunction::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-  spdlog::info(
-      "DistLinearFunction backward. #grad_outputs={}", grad_outputs.size());
+  logger->trace(
+      "DistLinearFunction backward starting. #grad_outputs={}",
+      grad_outputs.size());
 
   assert(grad_outputs.size() == 1);
 
@@ -228,27 +234,22 @@ torch::autograd::tensor_list DistLinearFunction::backward(
     ranks.insert(r);
   }
 
-  spdlog::info(
+  logger->trace(
       "backward weight.size={} og.size={} ranks={}",
       join_as_str(getTensorDim(ctx->saved_data["weight"].toTensor())),
       join_as_str(getTensorDim(grad_outputs.at(0))), join_as_str(ranks));
 
   DistMatmul matmul1;
-  //  at::Tensor d_input =
-  //      torch::matmul(grad_outputs.at(0),
-  //      ctx->saved_data["weight"].toTensor());
   at::Tensor d_input = matmul1.runRC_AG(
       grad_outputs.at(0).contiguous(),
       ctx->saved_data["weight"].toTensor().contiguous(), ranks);
 
-  spdlog::info(
+  logger->trace(
       "backward og.size={} input.size={} ",
       join_as_str(getTensorDim(grad_outputs.at(0))),
       join_as_str(getTensorDim(ctx->saved_data["input"].toTensor())));
-  //  at::Tensor d_weight = torch::matmul(
-  //      grad_outputs.at(0).t(), ctx->saved_data["input"].toTensor());
   DistMatmul matmul2;
-  at::Tensor d_weight = matmul2.run(
+  at::Tensor d_weight = matmul2.runCR(
       grad_outputs.at(0).t().contiguous(),
       ctx->saved_data["input"].toTensor().contiguous(), ranks);
 
@@ -257,6 +258,11 @@ torch::autograd::tensor_list DistLinearFunction::backward(
   if (ctx->saved_data["bias"].isTensor()) {
     d_bias = grad_outputs.at(0);
   }
+
+  logger->trace(
+      "DistLinearFunction backward finished. #grad_outputs={}",
+      grad_outputs.size());
+
   return {d_input, d_weight, d_bias, at::Tensor()};
 }
 

@@ -45,6 +45,9 @@ class DistLinearFunction
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs);
+
+ private:
+  static const std::shared_ptr<spdlog::logger> logger;
 };
 } // namespace rannc
 
