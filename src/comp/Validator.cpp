@@ -77,7 +77,7 @@ IValueMap compute(
     const std::unordered_map<std::string, torch::jit::IValue>& params,
     const IValueMap& const_vals,
     const std::shared_ptr<rannc::FunctionStorage>& functions,
-    bool offload_params) {
+    const DriverExecConf& conf) {
   std::unordered_map<std::string, at::Tensor> graph_params =
       graphParamTensors(graph, params);
 
@@ -91,10 +91,10 @@ IValueMap compute(
         it.second.to(torch::Device(torch::kCUDA), false, true).detach();
   }
 
-  TorchDriver driver(offload_params);
+  TorchDriver driver;
   driver.createModule(
       graph->getName(), graph->getName(), graph, const_vals, functions,
-      params_gpu);
+      params_gpu, conf);
 
   const auto out = driver.forward(graph->getName(), inputs_gpu, 0);
   driver.destroy();
@@ -190,7 +190,7 @@ bool Validator::validate(
 
     sg_output_vals[sg_name] = compute(
         sg_inputs, sg, param_inputs, const_vals_no_do, functions,
-        deployment.offload_params);
+        toDriverExecConf(deployment));
 
     for (const auto& r : deployment.fwd_out_routes) {
       if (r.source_graph == sg_name) {

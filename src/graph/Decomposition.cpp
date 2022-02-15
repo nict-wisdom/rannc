@@ -1601,7 +1601,7 @@ std::ostream& operator<<(std::ostream& os, const Deployment& deployment) {
 
 PartitioningConf makePartitioningConf(
     int dev_num, size_t batch_size, size_t dev_mem, bool use_amp_master_params,
-    bool enable_zero) {
+    bool enable_zero, bool offload_params) {
   config::Config& conf = config::Config::get();
 
   PartitioningConf part_conf;
@@ -1611,7 +1611,7 @@ PartitioningConf makePartitioningConf(
   part_conf.opt_param_factor = conf.getVal<int>(config::OPT_PARAM_FACTOR);
   part_conf.use_amp_master_params = use_amp_master_params;
   part_conf.enable_zero = enable_zero;
-  part_conf.offload_params = conf.getVal<bool>(config::OFFLOAD_PARAMS);
+  part_conf.offload_params = offload_params;
   part_conf.force_dist_matmul = conf.getVal<bool>(config::FORCE_DIST_MATMUL);
   part_conf.min_pipeline_num = conf.getVal<int>(config::MIN_PIPELINE);
   part_conf.max_pipeline_num = conf.getVal<int>(config::MAX_PIPELINE);

@@ -67,7 +67,8 @@ torch::jit::IValue GraphConnector::distributeOutput(
     torch::jit::IValue send_value;
     if (contains(sg_values, r.location)) {
       const auto event_key = getFuncKey(
-          "GraphConnector", "driver_output_to_cuda", id_, tgt_split, false);
+          "GraphConnector", "driver_output_to_cuda", deployment_.id, tgt_split,
+          false);
       recordStart(event_key);
       send_value = toCUDAIfAvailable(sg_values.at(r.location), true, false);
       recordEnd(event_key);
@@ -154,51 +155,51 @@ std::vector<RouteDP> sortSendRoutes(
   return sortRoutes(recv_routes, graph_order);
 }
 
-void GraphConnector::deployGraph(const Deployment& deployment) {
-  assert(deployment.pipeline_num <= 1 || deployment.checkpointing);
+void GraphConnector::deployGraph() {
+  assert(deployment_.pipeline_num <= 1 || deployment_.checkpointing);
 
-  graphs_ = getGraphsOnRank(deployment, mpi::getRank());
+  graphs_ = getGraphsOnRank(deployment_, mpi::getRank());
 
-  for (const auto& sg_name : deployment.fwd_graph_order) {
+  for (const auto& sg_name : deployment_.fwd_graph_order) {
     if (contains(keys(graphs_), sg_name)) {
       fwd_sorted_graph_ids_.push_back(sg_name);
     }
   }
-  for (const auto& sg_name : deployment.bwd_graph_order) {
+  for (const auto& sg_name : deployment_.bwd_graph_order) {
     if (contains(keys(graphs_), sg_name)) {
       bwd_sorted_graph_ids_.push_back(sg_name);
     }
   }
 
   assert(
-      deployment.fwd_graph_order.size() == deployment.bwd_graph_order.size());
-  for (size_t i = 0; i < deployment.fwd_graph_order.size(); i++) {
-    fwd_graph_order_[deployment.fwd_graph_order.at(i)] = i;
-    bwd_graph_order_[deployment.bwd_graph_order.at(i)] = i;
+      deployment_.fwd_graph_order.size() == deployment_.bwd_graph_order.size());
+  for (size_t i = 0; i < deployment_.fwd_graph_order.size(); i++) {
+    fwd_graph_order_[deployment_.fwd_graph_order.at(i)] = i;
+    bwd_graph_order_[deployment_.bwd_graph_order.at(i)] = i;
   }
 
-  for (const auto& sg_name : deployment.fwd_graph_order) {
+  for (const auto& sg_name : deployment_.fwd_graph_order) {
     if (!contains(graphs_, sg_name)) {
       continue;
     }
     fwd_recv_routes_[sg_name] =
-        sortRecvRoutes(deployment.fwd_routes, sg_name, fwd_graph_order_);
+        sortRecvRoutes(deployment_.fwd_routes, sg_name, fwd_graph_order_);
     fwd_send_routes_[sg_name] =
-        sortSendRoutes(deployment.fwd_routes, sg_name, fwd_graph_order_);
+        sortSendRoutes(deployment_.fwd_routes, sg_name, fwd_graph_order_);
 
     for (const auto& r : fwd_recv_routes_[sg_name]) {
       fwd_inc_edges_count_[r.dest_graph][r.location]++;
     }
   }
 
-  for (const auto& sg_name : deployment.bwd_graph_order) {
+  for (const auto& sg_name : deployment_.bwd_graph_order) {
     if (!contains(graphs_, sg_name)) {
       continue;
     }
     bwd_recv_routes_[sg_name] =
-        sortRecvRoutes(deployment.bwd_routes, sg_name, bwd_graph_order_);
+        sortRecvRoutes(deployment_.bwd_routes, sg_name, bwd_graph_order_);
     bwd_send_routes_[sg_name] =
-        sortSendRoutes(deployment.bwd_routes, sg_name, bwd_graph_order_);
+        sortSendRoutes(deployment_.bwd_routes, sg_name, bwd_graph_order_);
 
     for (const auto& r : bwd_recv_routes_[sg_name]) {
       bwd_inc_edges_count_[r.dest_graph][r.location]++;
@@ -220,23 +221,23 @@ void GraphConnector::deployGraph(const Deployment& deployment) {
     std::unordered_map<std::string, at::Tensor> param_tensors;
     for (const auto& irp : ir_params) {
       param_tensors[irp.getName()] =
-          param_storage_->getParamTensor(id_, irp.getName());
+          param_storage_->getParamTensor(deployment_.id, irp.getName());
     }
     logger->trace("GraphConnector::deployGraph received params");
 
     const std::string& sg_name = subgraph->getName();
     driver_.createModule(
-        sg_name, deployment.id, subgraph, constants, this->functions_,
-        param_tensors);
+        sg_name, deployment_.id, subgraph, constants, this->functions_,
+        param_tensors, toDriverExecConf(deployment_));
 
-    checkpointing_[sg_name] = deployment.checkpointing;
-    assert(contains(deployment.allocation, sg_name));
-    allocation_[sg_name] = deployment.allocation.at(sg_name);
+    checkpointing_[sg_name] = deployment_.checkpointing;
+    assert(contains(deployment_.allocation, sg_name));
+    allocation_[sg_name] = deployment_.allocation.at(sg_name);
   }
 
-  pipeline_num_ = deployment.pipeline_num;
-  max_fwd_delay_ = getMaxDelay(deployment.fwd_routes, fwd_graph_order_);
-  max_bwd_delay_ = getMaxDelay(deployment.bwd_routes, bwd_graph_order_);
+  pipeline_num_ = deployment_.pipeline_num;
+  max_fwd_delay_ = getMaxDelay(deployment_.fwd_routes, fwd_graph_order_);
+  max_bwd_delay_ = getMaxDelay(deployment_.bwd_routes, bwd_graph_order_);
 }
 
 void GraphConnector::runDriver(
@@ -275,8 +276,8 @@ void GraphConnector::runDriver(
       for (const auto& it_out : driver_out) {
         if (!contains(sg_values, it_out.first)) {
           const auto event_key = getFuncKey(
-              "GraphConnector", "driver_output_to_cpu", id_, split_index,
-              false);
+              "GraphConnector", "driver_output_to_cpu", deployment_.id,
+              split_index, false);
           recordStart(event_key);
           sg_values[it_out.first] = toCPU(it_out.second, true, true);
           recordEnd(event_key);

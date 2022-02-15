@@ -163,8 +163,9 @@ GraphProfile DPStaging::estimateProf(
   }
 
   return accProfileValues(
-      prof_util_, conf_.batch_size, graphs, from, to, dev_num, pipeline_num,
-      checkpointing);
+      prof_util_, conf_.batch_size, DEFALUT_ITERATION_NUM, graphs, from, to,
+      dev_num, pipeline_num, checkpointing, conf_.offload_params,
+      conf_.force_dist_matmul);
 }
 
 long estimateEval(
@@ -175,6 +176,8 @@ long estimateEval(
   long max_bwd_val = std::max(step_prof.bwd_time + step_comm, prev_bwd_max);
   return max_fwd_val + max_bwd_val;
 }
+
+const int DPStaging::DEFALUT_ITERATION_NUM = 3;
 
 void DPStaging::dumpNodeProfiles(
     const std::string& path, const MLGraph& graph) {
@@ -204,8 +207,17 @@ void DPStaging::dumpNodeProfiles(
         prof_obj["dev_num"] = d;
         prof_obj["pipeline_num"] = pipeline_num;
 
-        const auto prof = prof_util_.profile(
-            node.graph, conf_.batch_size, d, pipeline_num, pipeline_num > 1);
+        ProfilingInput in{
+            {{node.graph->getName(), node.graph}},
+            conf_.batch_size,
+            DEFALUT_ITERATION_NUM,
+            d,
+            static_cast<size_t>(pipeline_num),
+            pipeline_num > 1,
+            conf_.offload_params,
+            conf_.force_dist_matmul,
+            TensorPartioningGraphInfo{}};
+        const auto prof = prof_util_.profile(in);
         prof_obj["fwd_time"] = prof.fwd_time;
         prof_obj["bwd_time"] = prof.bwd_time;
         prof_obj["max_allocated_mem"] = prof.max_allocated_mem;
@@ -281,9 +293,18 @@ GraphProfile DPStaging::estimateSolutionGraph(
     const AllocSolution& sol, const MLGraph& graph, size_t g_idx) {
   const auto& sg = sol.graphs.at(g_idx);
   assert(contains(sol.repl_nums, sg->getName()));
-  int repl = sol.repl_nums.at(sg->getName());
-  return prof_util_.profile(
-      sg, conf_.batch_size, repl, sol.pipeline_num, sol.pipeline_num > 1);
+
+  ProfilingInput in{
+      {{sg->getName(), sg}},
+      conf_.batch_size,
+      DEFALUT_ITERATION_NUM,
+      static_cast<size_t>(sol.repl_nums.at(sg->getName())),
+      static_cast<size_t>(sol.pipeline_num),
+      sol.pipeline_num > 1,
+      conf_.offload_params,
+      conf_.force_dist_matmul,
+      TensorPartioningGraphInfo{}};
+  return prof_util_.profile(in);
 }
 
 AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
@@ -612,15 +633,32 @@ AllocSolution DPStaging::doRunDpComm(
                 TensorPartioningGraphInfo part_info =
                     replaceWithDistOp(step_graph, ranks);
                 step_graph = part_info.graph;
-                step_prof = prof_util_.profileDist(
-                    part_info, conf_.batch_size, (d - d_prev) * replica_num,
-                    pipeline_num, checkpointing);
+
+                ProfilingInput in{
+                    {{step_graph->getName(), step_graph}},
+                    conf_.batch_size,
+                    DEFALUT_ITERATION_NUM,
+                    (d - d_prev) * replica_num,
+                    static_cast<size_t>(pipeline_num),
+                    checkpointing,
+                    conf_.offload_params,
+                    conf_.force_dist_matmul,
+                    part_info};
+                step_prof = prof_util_.profileDist(in);
                 ////
               } else {
                 // run profiler for the merged graph
-                step_prof = prof_util_.profile(
-                    step_graph, conf_.batch_size, (d - d_prev) * replica_num,
-                    pipeline_num, checkpointing);
+                ProfilingInput in{
+                    {{step_graph->getName(), step_graph}},
+                    conf_.batch_size,
+                    DEFALUT_ITERATION_NUM,
+                    (d - d_prev) * replica_num,
+                    static_cast<size_t>(pipeline_num),
+                    checkpointing,
+                    conf_.offload_params,
+                    conf_.force_dist_matmul,
+                    TensorPartioningGraphInfo{}};
+                step_prof = prof_util_.profile(in);
               }
               step_mem = calcGraphMem(
                   step_graph, step_prof, conf_.batch_size,

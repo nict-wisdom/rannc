@@ -26,19 +26,19 @@ class GraphLauncher {
   GraphLauncher(
       std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
-      std::shared_ptr<FunctionStorage> function_storage, int pipeline_num,
-      bool gather_inputs, bool offload_params)
+      std::shared_ptr<FunctionStorage> function_storage, Deployment deployment,
+      bool gather_inputs)
       : param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
         function_storage_(std::move(function_storage)),
-        pipeline_num_(pipeline_num),
+        deployment_(std::move(deployment)),
         gather_inputs_(gather_inputs) {
     enable_profiling_ = config::Config::get().getVal<bool>(config::PROFILING);
 
     time_counter_.enable(enable_profiling_);
   }
 
-  void deployGraph(const Deployment& decomp);
+  void deployGraph();
   void undeployGraph(const std::string& id);
   torch::jit::IValue forward(const std::string& id, const IValueMap& inputs);
   IValueMap backward(const std::string& id, const IValueMap& inputs);
@@ -69,7 +69,6 @@ class GraphLauncher {
   TimeCounter time_counter_;
   bool enable_profiling_;
   bool gather_inputs_;
-  int pipeline_num_;
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("GraphLauncher");
 };

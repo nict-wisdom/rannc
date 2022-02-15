@@ -92,69 +92,62 @@ GraphProfile makeErrorProfile() {
   return p;
 }
 
-const int ProfilerUtil::DEFALUT_ITERATION_NUM = 3;
-
-GraphProfile ProfilerUtil::profile(
-    const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-    size_t pipeline_num, bool checkpointing) {
-  return doProfile(
-      g, batch_size, replica_num, pipeline_num, checkpointing,
-      TensorPartioningGraphInfo{}, [this](const ProfilingInput& input) {
-        return this->profiler_->profile(input);
-      });
+GraphProfile ProfilerUtil::profile(const ProfilingInput& in) {
+  return doProfile(in, [this](const ProfilingInput& input) {
+    return this->profiler_->profile(input);
+  });
 }
 
-GraphProfile ProfilerUtil::profileDist(
-    const TensorPartioningGraphInfo& part_info, size_t batch_size,
-    size_t replica_num, size_t pipeline_num, bool checkpointing) {
-  return doProfile(
-      part_info.graph, batch_size, replica_num, pipeline_num, checkpointing,
-      part_info, [this](const ProfilingInput& input) {
-        spdlog::info("Profiling with dist_profile_=true");
+GraphProfile ProfilerUtil::profileDist(const ProfilingInput& in) {
+  return doProfile(in, [this](const ProfilingInput& input) {
+    spdlog::info("Profiling with dist_profile_=true");
 
-        IValueMap in_values;
-        const IValueMap& avail_vals = this->profiler_->getValues();
+    IValueMap in_values;
+    const IValueMap& avail_vals = this->profiler_->getValues();
 
-        for (const auto& it : input.ir_graphs) {
-          for (const auto& in_name : getNonParamInputNames(it.second)) {
-            assert(contains(avail_vals, in_name));
-            in_values[in_name] =
-                toCUDAIfAvailable(avail_vals.at(in_name), true);
-          }
-        }
+    for (const auto& it : input.ir_graphs) {
+      for (const auto& in_name : getNonParamInputNames(it.second)) {
+        assert(contains(avail_vals, in_name));
+        in_values[in_name] = toCUDAIfAvailable(avail_vals.at(in_name), true);
+      }
+    }
 
-        std::unordered_set<int> target_ranks;
-        for (int i = 0; i < input.replica_num; i++) {
-          target_ranks.insert(i);
-        }
-        DistTaskDispatcher& dtd = DistTaskDispatcher::get();
-        spdlog::info("Starting dist profiling");
+    std::unordered_set<int> target_ranks;
+    for (int i = 0; i < input.replica_num; i++) {
+      target_ranks.insert(i);
+    }
+    DistTaskDispatcher& dtd = DistTaskDispatcher::get();
+    spdlog::info("Starting dist profiling");
 
-        return dtd.profile(input, in_values);
-      });
+    return dtd.profile(input, in_values);
+  });
 }
 
 GraphProfile ProfilerUtil::doProfile(
-    const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-    size_t pipeline_num, bool checkpointing,
-    const TensorPartioningGraphInfo& part_info,
+    //    const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t
+    //    replica_num, size_t pipeline_num, bool checkpointing, const
+    //    TensorPartioningGraphInfo& part_info,
+    const ProfilingInput& in,
     const std::function<ProfilingResult(const ProfilingInput& input)>& f) {
-  assert(replica_num > 0);
-  assert(pipeline_num > 0);
+  assert(in.replica_num > 0);
+  assert(in.pipeline_num > 0);
+  assert(in.ir_graphs.size() == 1);
+
+  const std::shared_ptr<IRGraph>& g = (*in.ir_graphs.begin()).second;
   assert(g);
 
-  size_t bs = ceil(batch_size / (double)(replica_num * pipeline_num));
+  size_t bs = ceil(in.batch_size / (double)(in.replica_num * in.pipeline_num));
 
-  const MLProfileKey k{g->getName(), bs, checkpointing};
+  const MLProfileKey k{g->getName(), bs, in.checkpointing};
   if (contains(profile_cache_, k)) {
     return profile_cache_.at(k);
   }
 
-  if (!contains(max_batch_size_cache_[checkpointing], g->getName())) {
-    max_batch_size_cache_[checkpointing][g->getName()] = SIZE_MAX;
+  if (!contains(max_batch_size_cache_[in.checkpointing], g->getName())) {
+    max_batch_size_cache_[in.checkpointing][g->getName()] = SIZE_MAX;
   }
 
-  size_t max_bs = max_batch_size_cache_[checkpointing][g->getName()];
+  size_t max_bs = max_batch_size_cache_[in.checkpointing][g->getName()];
   if (max_bs < bs) {
     profile_cache_[k] = makeErrorProfile();
     return profile_cache_.at(k);
@@ -164,9 +157,7 @@ GraphProfile ProfilerUtil::doProfile(
   prof_in_v[g->getName()] = g;
 
   try {
-    ProfilingResult prof_v =
-        f({prof_in_v, batch_size, DEFALUT_ITERATION_NUM, replica_num,
-           pipeline_num, checkpointing, part_info});
+    ProfilingResult prof_v = f(in);
     assert(prof_v.node_profiles.size() == 1);
     profile_cache_[k] = prof_v.node_profiles.begin()->second;
   } catch (std::exception& e) {
@@ -176,13 +167,14 @@ GraphProfile ProfilerUtil::doProfile(
     if (pos1 == std::string::npos && pos2 == std::string::npos) {
       spdlog::error(
           "Failed to profile graph: {} batch_size={} replica_num={} pipeline_num={} {}",
-          g->getName(), batch_size, replica_num, pipeline_num, e.what());
+          g->getName(), in.batch_size, in.replica_num, in.pipeline_num,
+          e.what());
       throw std::runtime_error("Failed to profile graph: " + toString(*g));
     } else {
       profile_cache_[k] = makeErrorProfile();
 
-      if (max_batch_size_cache_[checkpointing][g->getName()] >= bs) {
-        max_batch_size_cache_[checkpointing][g->getName()] = bs - 1;
+      if (max_batch_size_cache_[in.checkpointing][g->getName()] >= bs) {
+        max_batch_size_cache_[in.checkpointing][g->getName()] = bs - 1;
       }
       profiler_->clear();
       emptyCache();
@@ -193,9 +185,10 @@ GraphProfile ProfilerUtil::doProfile(
 }
 
 GraphProfile accProfileValues(
-    ProfilerUtil& prof_util, size_t batch_size,
+    ProfilerUtil& prof_util, size_t batch_size, int iteration,
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, size_t pipeline_num, bool checkpointing) {
+    size_t dev_num, size_t pipeline_num, bool checkpointing,
+    bool offload_params, bool force_dist_matmul) {
   assert(from <= to);
   assert(to < graphs.size());
 
@@ -204,7 +197,15 @@ GraphProfile accProfileValues(
   for (size_t i = from; i <= to; i++) {
     const auto& graph = graphs.at(i);
     const auto prof = prof_util.profile(
-        graph, batch_size, dev_num, pipeline_num, checkpointing);
+        {{{graph->getName(), graph}},
+         batch_size,
+         iteration,
+         dev_num,
+         pipeline_num,
+         checkpointing,
+         offload_params,
+         force_dist_matmul,
+         TensorPartioningGraphInfo{}});
 
     prof_sum.fwd_time += prof.fwd_time;
     prof_sum.bwd_time += prof.bwd_time;

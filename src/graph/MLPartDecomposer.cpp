@@ -80,9 +80,24 @@ Deployment MLPartDecomposer::decompose(
         " Assigned subgraph {} to rank{}", it.first, join_as_str(it.second));
   }
   Deployment deployment = createDeployment(repl, alloc, conf_.dev_num);
+
   deployment.pipeline_num = sol.pipeline_num;
   deployment.checkpointing = sol.checkpointing;
   deployment.offload_params = conf_.offload_params;
+  deployment.force_dist_matmul = conf_.force_dist_matmul;
+
+  if (deployment.force_dist_matmul) {
+    std::unordered_map<std::string, std::shared_ptr<IRGraph>> mod_subgraphs;
+    for (const auto& it : deployment.subgraphs) {
+      assert(contains(deployment.allocation, it.first));
+      const auto& ranks = deployment.allocation.at(it.first);
+      TensorPartioningGraphInfo part_info =
+          replaceWithDistOp(it.second, setToVector(ranks));
+      mod_subgraphs[it.first] = part_info.graph;
+    }
+    deployment.subgraphs = mod_subgraphs;
+  }
+
   logger->trace("MLPartDecomposer::decompose finished");
 
   return deployment;

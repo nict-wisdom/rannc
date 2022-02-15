@@ -64,7 +64,6 @@ extern const char SYNC_ALLREDUCE[];
 extern const char DUMP_DP_NODE_PROFILES[];
 extern const char DUMP_DP_CACHE[];
 extern const char PARTITIONING_DRY_RUN_NP[];
-extern const char OFFLOAD_PARAMS[];
 extern const char USE_MPI_TO_GATHER_DIST_PARAMS[];
 extern const char RUN_WATCHDOG[];
 extern const char WATCHDOG_LOCKFILE_DIR[];

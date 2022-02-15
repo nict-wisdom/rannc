@@ -71,16 +71,6 @@ IValueMap GraphLauncher::alignBatch(
   return pad_input;
 }
 
-
-std::unordered_map<std::string, IValueMap> toCPU(
-    const std::unordered_map<std::string, IValueMap>& inputs, bool detach) {
-  std::unordered_map<std::string, IValueMap> ret;
-  for (const auto& it : inputs) {
-    ret[it.first] = toCPU(it.second, detach);
-  }
-  return ret;
-}
-
 std::unordered_map<std::string, IValueMap> toCUDAIfAvailable(
     const std::unordered_map<std::string, IValueMap>& inputs, bool detach) {
   std::unordered_map<std::string, IValueMap> ret;
@@ -90,27 +80,24 @@ std::unordered_map<std::string, IValueMap> toCUDAIfAvailable(
   return ret;
 }
 
-void GraphLauncher::deployGraph(const Deployment& deployment) {
+void GraphLauncher::deployGraph() {
   logger->trace("GraphLauncher::deployGraph starting");
 
-  deployment_ = deployment;
-
-  driver_[deployment.id] = std::make_shared<GraphConnector>(
-      deployment.id, param_storage_, value_storage_, this->function_storage_,
-      deployment.offload_params);
-  driver_[deployment.id]->deployGraph(deployment);
+  driver_[deployment_.id] = std::make_shared<GraphConnector>(
+      param_storage_, value_storage_, this->function_storage_, deployment_);
+  driver_[deployment_.id]->deployGraph();
 
   TagMap& tag_map = TagMap::get();
   tag_map.sync();
 
   deployment_.fwd_in_routes =
-      rewriteInRoute(deployment.fwd_in_routes, gather_inputs_);
+      rewriteInRoute(deployment_.fwd_in_routes, gather_inputs_);
   deployment_.fwd_out_routes =
-      rewriteOutRoute(deployment.fwd_out_routes, gather_inputs_);
+      rewriteOutRoute(deployment_.fwd_out_routes, gather_inputs_);
   deployment_.bwd_in_routes =
-      rewriteInRoute(deployment.bwd_in_routes, gather_inputs_);
+      rewriteInRoute(deployment_.bwd_in_routes, gather_inputs_);
   deployment_.bwd_out_routes =
-      rewriteOutRoute(deployment.bwd_out_routes, gather_inputs_);
+      rewriteOutRoute(deployment_.bwd_out_routes, gather_inputs_);
 
   createRouteCommunicator(deployment_.fwd_in_routes);
   createRouteCommunicator(deployment_.fwd_routes);
@@ -153,9 +140,10 @@ IValueMap GraphLauncher::compute(
 
   SComm& scomm = SComm::get();
 
-  int actual_pipeline_num =
-      pipeline_num_ > batch_size ? batch_size : pipeline_num_;
-  scomm.setPipeline(pipeline_num_, batch_size, is_bwd);
+  int actual_pipeline_num = deployment_.pipeline_num > batch_size
+      ? batch_size
+      : deployment_.pipeline_num;
+  scomm.setPipeline(deployment_.pipeline_num, batch_size, is_bwd);
 
   // Routes from/to subgraphs
   std::unordered_map<

@@ -19,6 +19,7 @@
 
 #include <comm/MPIUtil.h>
 #include <comm/SComm.h>
+#include <distop/PartitionTensor.h>
 #include <graph/ir.h>
 
 namespace rannc {
@@ -167,6 +168,7 @@ struct Deployment {
   int pipeline_num;
   bool checkpointing;
   bool offload_params;
+  bool force_dist_matmul;
 
   friend std::ostream& operator<<(
       std::ostream& os, const Deployment& deployment);
@@ -175,7 +177,7 @@ struct Deployment {
       id, graph, subgraphs, allocation, fwd_routes, fwd_in_routes,
       fwd_out_routes, fwd_graph_order, bwd_routes, bwd_in_routes,
       bwd_out_routes, bwd_graph_order, pipeline_num, checkpointing,
-      offload_params);
+      offload_params, force_dist_matmul);
 };
 
 void verifyDeployment(const Deployment& deployment);
@@ -580,7 +582,7 @@ struct PartitioningConf {
 
 PartitioningConf makePartitioningConf(
     int dev_num, size_t batch_size, size_t dev_mem, bool use_amp_master_params,
-    bool enable_zero);
+    bool enable_zero, bool offload_params);
 
 } // namespace rannc
 

@@ -77,6 +77,8 @@ class MLPartitioner {
   bool coarsen_by_time_;
   int max_repl_num_;
 
+  static const int DEFALUT_ITERATION_NUM;
+
   const std::shared_ptr<spdlog::logger> logger = getLogger("MLPartitioner");
 };
 } // namespace rannc

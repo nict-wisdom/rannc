@@ -23,14 +23,13 @@ class FunctionStorage;
 class GraphConnector {
  public:
   GraphConnector(
-      std::string id, std::shared_ptr<ParamStorage> param_storage,
+      std::shared_ptr<ParamStorage> param_storage,
       std::shared_ptr<GraphValueStorage> value_storage,
-      std::shared_ptr<FunctionStorage> functions, bool offload_params)
-      : id_(std::move(id)),
-        param_storage_(std::move(param_storage)),
+      std::shared_ptr<FunctionStorage> functions, Deployment deployment)
+      : param_storage_(std::move(param_storage)),
         value_storage_(std::move(value_storage)),
-        functions_(functions),
-        driver_(offload_params) {
+        functions_(std::move(functions)),
+        deployment_(deployment) {
     enable_profiling_ = config::Config::get().getVal<bool>(config::PROFILING);
     time_counter_.enable(enable_profiling_);
 
@@ -47,7 +46,7 @@ class GraphConnector {
     }
   }
 
-  void deployGraph(const Deployment& deployment);
+  void deployGraph();
   std::unordered_map<std::string, IValueMap> forward(
       const std::string& id,
       const std::unordered_map<std::string, IValueMap>& inputs, int split_index,
@@ -60,7 +59,7 @@ class GraphConnector {
   void enableDropout(const std::string& id, bool enable);
 
  private:
-  const std::string id_;
+  Deployment deployment_;
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs_;
 
   std::shared_ptr<ParamStorage> param_storage_;

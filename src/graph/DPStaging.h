@@ -26,7 +26,7 @@ class DPStaging {
   DPStaging(
       std::shared_ptr<GraphProfiler> profiler,
       std::shared_ptr<IRGraph> ir_graph, PartitioningConf conf)
-      : prof_util_(std::move(profiler), conf.force_dist_matmul),
+      : prof_util_(std::move(profiler)),
         ir_graph_(std::move(ir_graph)),
         conf_(conf) {
     config::Config& config = config::Config::get();
@@ -57,6 +57,8 @@ class DPStaging {
   std::string dump_dp_node_profiles_;
   std::string dump_dp_cache_;
   std::shared_ptr<IRGraph> ir_graph_;
+
+  static const int DEFALUT_ITERATION_NUM;
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("DPStaging");
 };

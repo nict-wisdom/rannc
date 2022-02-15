@@ -43,11 +43,13 @@ struct ProfilingInput {
   size_t replica_num = 0;
   size_t pipeline_num = 0;
   bool checkpointing = false;
+  bool offload_params = false;
+  bool force_dist_matmul = false;
   TensorPartioningGraphInfo part_info;
 
   MSGPACK_DEFINE(
       ir_graphs, batch_size, iteration, replica_num, pipeline_num,
-      checkpointing, part_info);
+      checkpointing, offload_params, force_dist_matmul, part_info);
 };
 
 struct ProfilingResult {
@@ -107,7 +109,7 @@ class GraphProfiler {
       std::unordered_map<std::string, torch::jit::IValue> non_param_inputs,
       std::unordered_map<std::string, long> graph_params, IValueMap constants,
       std::shared_ptr<FunctionStorage> functions, size_t batch_size,
-      int dev_num, size_t min_pipeline_num, bool offload_params)
+      int dev_num, size_t min_pipeline_num)
       : param_storage_(std::move(param_storage)),
         base_graph_(std::move(base_graph)),
         non_param_inputs_(std::move(non_param_inputs)),
@@ -116,8 +118,7 @@ class GraphProfiler {
         functions_(std::move(functions)),
         batch_size_(batch_size),
         dev_num_(dev_num),
-        min_pipeline_num_(min_pipeline_num),
-        driver_(offload_params) {
+        min_pipeline_num_(min_pipeline_num) {
     cache_param_values_ = false;
   }
 
@@ -181,8 +182,8 @@ class GraphProfiler {
   std::pair<IValueMap, GraphProfile> computeGraph(
       const std::shared_ptr<IRGraph>& subgraph, const IValueMap& graph_inputs,
       const std::unordered_map<std::string, at::Tensor>& graph_params,
-      int iteration, IValueMap& values, int split_index, bool checkpointing,
-      bool trace_dim_names);
+      int iteration, IValueMap& values, int split_index, bool trace_dim_names,
+      const DriverExecConf& conf);
   ProfilingResult doProfile(
       const ProfilingInput& input, IValueMap& values, bool trace_dim_names);
   size_t setRequiresGrad(

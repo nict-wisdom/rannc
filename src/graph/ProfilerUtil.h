@@ -60,16 +60,10 @@ using MLProfileCache =
 class ProfilerUtil {
  public:
   ProfilerUtil(std::shared_ptr<GraphProfiler> profiler)
-      : profiler_(std::move(profiler)), dist_profile_(false){};
-  ProfilerUtil(std::shared_ptr<GraphProfiler> profiler, bool dist_profile)
-      : profiler_(std::move(profiler)), dist_profile_(dist_profile){};
+      : profiler_(std::move(profiler)){};
 
-  GraphProfile profile(
-      const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-      size_t pipeline_num, bool checkpointing = false);
-  GraphProfile profileDist(
-      const TensorPartioningGraphInfo& part_info, size_t batch_size,
-      size_t replica_num, size_t pipeline_num, bool checkpointing);
+  GraphProfile profile(const ProfilingInput& in);
+  GraphProfile profileDist(const ProfilingInput& in);
 
   const MLProfileCache& getProfileCache() const {
     return profile_cache_;
@@ -83,24 +77,20 @@ class ProfilerUtil {
 
  private:
   GraphProfile doProfile(
-      const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t replica_num,
-      size_t pipeline_num, bool checkpointing,
-      const TensorPartioningGraphInfo& part_info,
+      const ProfilingInput& in,
       const std::function<ProfilingResult(const ProfilingInput& input)>& f);
 
   MLProfileCache profile_cache_;
   std::unordered_map<bool, std::unordered_map<std::string, size_t>>
       max_batch_size_cache_;
   std::shared_ptr<GraphProfiler> profiler_;
-  bool dist_profile_;
-
-  static const int DEFALUT_ITERATION_NUM;
 };
 
 GraphProfile accProfileValues(
-    ProfilerUtil& prof_util, size_t batch_size,
+    ProfilerUtil& prof_util, size_t batch_size, int iteration,
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, size_t pipeline_num, bool checkpointing);
+    size_t dev_num, size_t pipeline_num, bool checkpointing,
+    bool offload_params, bool force_dist_matmul);
 
 std::string displayGraphProfiles(
     const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t batch_size,

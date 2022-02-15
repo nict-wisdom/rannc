@@ -68,7 +68,6 @@ const char SYNC_ALLREDUCE[] = "sync_allreduce";
 const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
 const char DUMP_DP_CACHE[] = "dump_dp_cache";
 const char PARTITIONING_DRY_RUN_NP[] = "partitioning_dry_run_np";
-const char OFFLOAD_PARAMS[] = "offload_params";
 const char USE_MPI_TO_GATHER_DIST_PARAMS[] = "use_mpi_to_gather_dist_params";
 const char RUN_WATCHDOG[] = "run_watchdog";
 const char WATCHDOG_LOCKFILE_DIR[] = "watchdog_lockfile_dir";
@@ -174,7 +173,6 @@ Config::Config() {
       makeConfigItem(DUMP_DP_NODE_PROFILES, std::string("")),
       makeConfigItem(DUMP_DP_CACHE, std::string("")),
       makeConfigItem(PARTITIONING_DRY_RUN_NP, 0),
-      makeConfigItem(OFFLOAD_PARAMS, false),
       makeConfigItem(USE_MPI_TO_GATHER_DIST_PARAMS, false),
       makeConfigItem(RUN_WATCHDOG, false),
       makeConfigItem(WATCHDOG_LOCKFILE_DIR, std::string("")),

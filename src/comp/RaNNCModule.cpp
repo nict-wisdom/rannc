@@ -180,7 +180,7 @@ std::vector<long> RaNNCModule::init(
   const auto dev_info = ::rannc::getCudaDeviceInfo(getCurrentCudaDeviceId());
   PartitioningConf pconf = makePartitioningConf(
       mpi::getSize(), batch_size, dev_info.total_mem, use_amp_master_params_,
-      enable_zero_);
+      enable_zero_, offload_params_);
 
   if (mpi::isMaster()) {
     logger->info("Tracing model ...");
@@ -239,7 +239,7 @@ std::vector<long> RaNNCModule::init(
   std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
       param_storage_, ir_graph_, non_param_inputs, graph_params,
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
-      pconf.min_pipeline_num, offload_params_);
+      pconf.min_pipeline_num);
 
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
   dtd.start(sg_prof);
@@ -299,9 +299,21 @@ std::vector<long> RaNNCModule::init(
 
         graphs.push_back(g);
         repl_nums[it] = repl_num;
-        profiles[it] = prof_util.profile(
-            g, batch_size, repl_num * deployment_.pipeline_num,
-            deployment_.checkpointing);
+        ProfilingInput prof_in{
+            {{g->getName(), g}},
+            batch_size,
+            3,
+            repl_num,
+            deployment_.pipeline_num,
+            deployment_.checkpointing,
+            pconf.offload_params,
+            pconf.force_dist_matmul,
+            TensorPartioningGraphInfo{}};
+        profiles[it] = prof_util.profile(prof_in);
+
+        //        profiles[it] = prof_util.profile(
+        //            g, batch_size, repl_num * deployment_.pipeline_num,
+        //            deployment_.checkpointing);
       }
       logger->info(displayGraphProfiles(
           graphs, batch_size, deployment_.pipeline_num, use_amp_master_params_,
@@ -405,10 +417,10 @@ std::vector<long> RaNNCModule::init(
   param_storage_->deploy(deployment_, graph_params, enable_zero_);
 
   driver_ = std::make_shared<GraphLauncher>(
-      param_storage_, value_storage_, func_storage_, deployment_.pipeline_num,
-      gather_inputs, offload_params_);
+      param_storage_, value_storage_, func_storage_, deployment_,
+      gather_inputs);
   logger->debug("Calling driver->deployGraph");
-  driver_->deployGraph(deployment_);
+  driver_->deployGraph();
   logger->debug("Finished calling driver->deployGraph");
 
   // List params unused in graphs on this rank

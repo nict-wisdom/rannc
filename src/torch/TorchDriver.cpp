@@ -19,6 +19,11 @@
 
 namespace rannc {
 
+DriverExecConf toDriverExecConf(const Deployment& d) {
+  return {
+      d.pipeline_num, d.checkpointing, d.offload_params, d.force_dist_matmul};
+}
+
 const torch::jit::IValue matchIValue(
     const IValueMap& ival_map, const IValueLocation& loc) {
   IValueLocation key_loc{loc.value_name};
@@ -373,10 +378,21 @@ void TorchDriver::createModule(
     const std::string& id, const std::string& model_id,
     const std::shared_ptr<rannc::IRGraph>& irGraph, const IValueMap& constants,
     const std::shared_ptr<FunctionStorage>& functions,
-    const std::unordered_map<std::string, at::Tensor>& parameters) {
+    const std::unordered_map<std::string, at::Tensor>& parameters,
+    const DriverExecConf& conf) {
   logger->trace("TorchDriver::createModule starting");
 
   time_counter_.start("TorchDriver::createModule");
+
+  //  if (conf_.force_dist_matmul) {
+  //    std::unordered_map<std::string, std::shared_ptr<IRGraph>>
+  //    dist_subgraphs; for (const auto& it: deployment.subgraphs) {
+  //      assert(contains(deployment.allocation, it.first));
+  //      TensorPartioningGraphInfo part_info =
+  //          replaceWithDistOp(it.second, deployment.allocation.at(it.first));
+  //      dist_subgraphs[it.first] = part_info.
+  //    }
+  //  }
 
   subgraph_ids_[model_id].push_back(id);
 
@@ -394,7 +410,7 @@ void TorchDriver::createModule(
         insertValueHook(clone_input_ir_graphs_[id], constants_[id]);
   }
 
-  if (offload_params_) {
+  if (conf.offload_params) {
     OffloadedParamMap& param_map = OffloadedParamMap::get();
 
     for (auto& it : param_tensors_[id]) {

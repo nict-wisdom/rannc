@@ -11,6 +11,7 @@
 #include <comp/TimeCounter.h>
 #include <Config.h>
 #include <graph/ConvertGraph.h>
+#include <graph/Decomposition.h>
 #include <Logging.h>
 #include <torch/TorchUtil.h>
 
@@ -21,9 +22,28 @@ namespace rannc {
 //
 class FunctionStorage;
 
+struct DriverExecConf {
+  DriverExecConf() = default;
+
+  DriverExecConf(
+      int pipelineNum, bool checkpointing, bool offloadParams,
+      bool forceDistMatmul)
+      : pipeline_num(pipelineNum),
+        checkpointing(checkpointing),
+        offload_params(offloadParams),
+        force_dist_matmul(forceDistMatmul) {}
+
+  int pipeline_num;
+  bool checkpointing;
+  bool offload_params;
+  bool force_dist_matmul;
+};
+
+DriverExecConf toDriverExecConf(const Deployment& d);
+
 class TorchDriver {
  public:
-  TorchDriver(bool offload_params) : offload_params_(offload_params) {
+  TorchDriver() {
     config::Config& config = config::Config::get();
     enable_profiling_ = config.getVal<bool>(config::PROFILING);
     time_counter_.enable(enable_profiling_);
@@ -56,7 +76,8 @@ class TorchDriver {
       const std::shared_ptr<rannc::IRGraph>& ir_graph,
       const IValueMap& constants,
       const std::shared_ptr<FunctionStorage>& functions,
-      const std::unordered_map<std::string, at::Tensor>& parameters);
+      const std::unordered_map<std::string, at::Tensor>& parameters,
+      const DriverExecConf& conf);
 
   /**
    * Computes forward propagation.
@@ -141,6 +162,7 @@ class TorchDriver {
   std::unordered_map<std::string, IValueMap> constants_;
   std::unordered_map<std::string, std::shared_ptr<FunctionStorage>>
       func_storages_;
+  std::unordered_map<std::string, DriverExecConf> exec_conf_;
 
   int last_split_idx_ = INT32_MAX;
 
@@ -148,7 +170,6 @@ class TorchDriver {
   bool enable_profiling_;
   bool display_comm_values_;
   bool display_act_values_;
-  bool offload_params_;
 
   // for debugging
   size_t fwd_count_ = 0;

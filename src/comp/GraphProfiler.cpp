@@ -238,8 +238,8 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
     const std::shared_ptr<IRGraph>& subgraph,
     const IValueMap& graph_inputs_with_names,
     const std::unordered_map<std::string, at::Tensor>& graph_params,
-    int iteration, IValueMap& values, int split_index, bool checkpointing,
-    bool trace_dim_names) {
+    int iteration, IValueMap& values, int split_index, bool trace_dim_names,
+    const DriverExecConf& conf) {
   emptyCache();
 
   ProfilingResult ret_profiles;
@@ -248,7 +248,8 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   std::string fwd_time_key = getFwdTimeKey(id);
   std::string bwd_time_key = getBwdTimeKey(id);
 
-  driver_.createModule(id, id, subgraph, constants_, functions_, graph_params);
+  driver_.createModule(
+      id, id, subgraph, constants_, functions_, graph_params, conf);
 
   // clear grads
   long param_size = 0;
@@ -267,7 +268,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
     driver_out.clear();
 
     auto& driver = driver_;
-    if (checkpointing) {
+    if (conf.checkpointing) {
       // Run forward enabling grad to judge whether bwd is required or not
       driver_out = driver.forward(id, graph_inputs, split_index);
       bool run_bwd = setRequiresGrad(subgraph, driver_out) > 0;
@@ -330,7 +331,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 
   GraphProfile prof{
       id, time_counter.get<std::chrono::microseconds>(fwd_time_key), bwd_time,
-      total_mem, checkpointing};
+      total_mem, conf.checkpointing};
 
   return {driver_out, prof};
 }
@@ -426,10 +427,14 @@ ProfilingResult GraphProfiler::compute(
 
         bool dimnames_set = false;
         std::pair<IValueMap, GraphProfile> prof_results;
+
+        DriverExecConf conf{
+            static_cast<int>(input.pipeline_num), input.checkpointing,
+            input.offload_params, input.force_dist_matmul};
         try {
           prof_results = computeGraph(
               subgraph, graph_inputs, graph_params, input.iteration, values,
-              split_index, input.checkpointing, trace_dim_names);
+              split_index, trace_dim_names, conf);
           dimnames_set = true;
         } catch (std::runtime_error& e) {
           driver_.destroyModule(subgraph->getName());
@@ -465,7 +470,7 @@ ProfilingResult GraphProfiler::compute(
           // Try again without dim names
           prof_results = computeGraph(
               subgraph, graph_inputs, graph_params, input.iteration, values,
-              split_index, input.checkpointing, trace_dim_names);
+              split_index, trace_dim_names, conf);
 
           // Set dim names again on params
           for (const auto& it : graph_params) {
@@ -766,7 +771,7 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
 
   auto ret = doProfile(
       {graphs, batch_size_, 1, static_cast<size_t>(dev_num_), min_pipeline_num_,
-       checkpointing, TensorPartioningGraphInfo()},
+       checkpointing, false, false, TensorPartioningGraphInfo()},
       values, trace_dim_names);
 
   size_t replica_num = dev_num_ * min_pipeline_num_;

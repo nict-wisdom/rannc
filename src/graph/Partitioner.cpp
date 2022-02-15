@@ -16,6 +16,8 @@ long getSize(const std::vector<IRValue>& vals) {
   return size;
 }
 
+const int MLPartitioner::DEFALUT_ITERATION_NUM = 3;
+
 long MLPartitioner::eval(const GraphProfile& prof) {
   if (coarsen_by_time_) {
     return prof.fwd_time + prof.bwd_time;
@@ -24,8 +26,17 @@ long MLPartitioner::eval(const GraphProfile& prof) {
 }
 
 GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
-  return prof_util_.profile(
-      g, batch_size_, conf_.dev_num, conf_.max_pipeline_num);
+  ProfilingInput in{
+      {{g->getName(), g}},
+      batch_size_,
+      DEFALUT_ITERATION_NUM,
+      static_cast<size_t>(conf_.dev_num),
+      static_cast<size_t>(conf_.max_pipeline_num),
+      conf_.max_pipeline_num > 1,
+      conf_.offload_params,
+      conf_.force_dist_matmul,
+      TensorPartioningGraphInfo{}};
+  return prof_util_.profile(in);
 }
 
 std::vector<MLVertex> MLPartitioner::sortNodesByEval(
