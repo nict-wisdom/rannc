@@ -37,4 +37,10 @@ void GraphValueStorage::deploy(
     }
   }
 }
+
+void GraphValueStorage::add(
+    const IValueLocation& loc, const torch::jit::IValue& val) {
+  values_[loc] = val;
+}
+
 } // namespace rannc

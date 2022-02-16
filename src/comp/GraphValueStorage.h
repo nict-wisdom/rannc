@@ -15,6 +15,7 @@ class GraphValueStorage {
  public:
   void deploy(const std::shared_ptr<torch::jit::Graph>& graph);
   const torch::jit::IValue& getValue(const IValueLocation& loc) const;
+  void add(const IValueLocation& loc, const torch::jit::IValue& val);
 
   const IValueMap& getValues() const {
     return values_;

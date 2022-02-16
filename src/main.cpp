@@ -441,12 +441,12 @@ PYBIND11_MODULE(_pyrannc, m) {
         at::Tensor ten2 = iv2.toTensor().cuda();
 
         DistMatmul dist_mm;
-        if (type == "RR") {
-          return dist_mm.runRR_AG(ten1, ten2, mpi::getAllRanks());
-        } else if (type == "RC") {
-          return dist_mm.runRC_AG(ten1, ten2, mpi::getAllRanks());
-        } else if (type == "CR") {
-          return dist_mm.runCR(ten1, ten2, mpi::getAllRanks());
+        if (type == "RRR") {
+          return dist_mm.runRRR_AG(ten1, ten2, mpi::getAllRanks());
+        } else if (type == "RCR") {
+          return dist_mm.runRCR_AG(ten1, ten2, mpi::getAllRanks());
+        } else if (type == "CRC") {
+          return dist_mm.runCRC(ten1, ten2, mpi::getAllRanks());
         }
         spdlog::info("No match: {}", type);
         return at::Tensor();

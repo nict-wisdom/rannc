@@ -136,19 +136,19 @@ at::Tensor DistMatmul::run_AG(
   return ret;
 }
 
-at::Tensor DistMatmul::runRR_AG(
+at::Tensor DistMatmul::runRRR_AG(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
   return run_AG(x, y, ranks, false);
 }
 
-at::Tensor DistMatmul::runRC_AG(
+at::Tensor DistMatmul::runRCR_AG(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
   return run_AG(x, y, ranks, true);
 }
 
-at::Tensor DistMatmul::runCR(
+at::Tensor DistMatmul::runCRC(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
   torch::NoGradGuard no_grad;
@@ -172,17 +172,18 @@ at::Tensor DistMatmul::runCR(
 
   at::Tensor z = torch::matmul(x, y);
   at::Tensor out_buf = torch::zeros(
-      {x_dim.at(0) / np, y_dim.at(1)},
+      {x_dim.at(0), y_dim.at(1) / np},
       makeTensorOptions(x.dtype().toScalarType(), true));
 
-  int64_t step = x_dim.at(0) / np;
+  int64_t step = y_dim.at(1) / np;
   for (int i = 0; i < np; i++) {
-    const auto z_slice = z.slice(0, step * i, step * (i + 1));
+    const auto z_slice = z.slice(1, step * i, step * (i + 1)).contiguous();
     nccl.reduce(tag, {z_slice}, {getLocalRank(ranks, i)});
     if (getLocalRank(ranks, mpi::getRank()) == i) {
       out_buf.copy_(z_slice);
     }
   }
+
   nccl.syncWithErrorCheck();
   return out_buf;
 }
@@ -210,7 +211,7 @@ torch::Tensor DistLinearFunction::forward(
 
   DistMatmul matmul;
   at::Tensor out =
-      matmul.runRR_AG(input.contiguous(), weight.t().contiguous(), ranks);
+      matmul.runRRR_AG(input.contiguous(), weight.t().contiguous(), ranks);
   if (bias) {
     out += *bias;
   }
@@ -240,7 +241,7 @@ torch::autograd::tensor_list DistLinearFunction::backward(
       join_as_str(getTensorDim(grad_outputs.at(0))), join_as_str(ranks));
 
   DistMatmul matmul1;
-  at::Tensor d_input = matmul1.runRC_AG(
+  at::Tensor d_input = matmul1.runRCR_AG(
       grad_outputs.at(0).contiguous(),
       ctx->saved_data["weight"].toTensor().contiguous(), ranks);
 
@@ -249,7 +250,7 @@ torch::autograd::tensor_list DistLinearFunction::backward(
       join_as_str(getTensorDim(grad_outputs.at(0))),
       join_as_str(getTensorDim(ctx->saved_data["input"].toTensor())));
   DistMatmul matmul2;
-  at::Tensor d_weight = matmul2.runCR(
+  at::Tensor d_weight = matmul2.runCRC(
       grad_outputs.at(0).t().contiguous(),
       ctx->saved_data["input"].toTensor().contiguous(), ranks);
 

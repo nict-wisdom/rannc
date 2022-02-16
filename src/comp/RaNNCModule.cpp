@@ -301,19 +301,15 @@ std::vector<long> RaNNCModule::init(
         repl_nums[it] = repl_num;
         ProfilingInput prof_in{
             {{g->getName(), g}},
-            batch_size,
+            static_cast<size_t>(batch_size),
             3,
-            repl_num,
-            deployment_.pipeline_num,
+            static_cast<size_t>(repl_num),
+            static_cast<size_t>(deployment_.pipeline_num),
             deployment_.checkpointing,
             pconf.offload_params,
             pconf.force_dist_matmul,
             TensorPartioningGraphInfo{}};
         profiles[it] = prof_util.profile(prof_in);
-
-        //        profiles[it] = prof_util.profile(
-        //            g, batch_size, repl_num * deployment_.pipeline_num,
-        //            deployment_.checkpointing);
       }
       logger->info(displayGraphProfiles(
           graphs, batch_size, deployment_.pipeline_num, use_amp_master_params_,
@@ -411,10 +407,33 @@ std::vector<long> RaNNCModule::init(
   ir_graph_ = deployment_.graph;
   checkpointing_enabled_ = deployment_.checkpointing;
 
+  ParamPartitionMap param_partitions;
+  if (deployment_.force_dist_matmul) {
+    std::unordered_map<std::string, std::shared_ptr<IRGraph>> mod_subgraphs;
+    for (const auto& it : deployment_.subgraphs) {
+      assert(contains(deployment_.allocation, it.first));
+      const auto& ranks = deployment_.allocation.at(it.first);
+      TensorPartioningGraphInfo part_info =
+          replaceWithDistOp(it.second, setToVector(ranks));
+      mod_subgraphs[it.first] = part_info.graph;
+
+      for (const auto& r_it : part_info.rank_values) {
+        value_storage_->add(r_it.first, r_it.second);
+      }
+
+      for (const auto& pp_it : part_info.param_partitions) {
+        param_partitions[pp_it.first] = pp_it.second;
+      }
+    }
+    deployment_.subgraphs = mod_subgraphs;
+  }
+
   if (mpi::getRank() == 0) {
     logger->debug("Deploying parameters ...");
   }
-  param_storage_->deploy(deployment_, graph_params, enable_zero_);
+
+  param_storage_->deploy(
+      deployment_, graph_params, enable_zero_, param_partitions);
 
   driver_ = std::make_shared<GraphLauncher>(
       param_storage_, value_storage_, func_storage_, deployment_,

@@ -762,8 +762,8 @@ void ParamStorage::useParam(
 
 void ParamStorage::deploy(
     const Deployment& decomp,
-    const std::unordered_map<std::string, long>& graph_params,
-    bool enable_zero) {
+    const std::unordered_map<std::string, long>& graph_params, bool enable_zero,
+    const ParamPartitionMap& param_partitions) {
   logger->trace("ParamStorage::deploy starting: graph_id={}", decomp.id);
 
   auto& graph_id = decomp.id;
@@ -790,6 +790,8 @@ void ParamStorage::deploy(
   auto& tag_map = TagMap::get();
   tag_map.sync();
 
+  // param id -> (arg index, dim index)
+  std::unordered_map<long, std::pair<size_t, size_t>> partitions;
   std::unordered_map<
       PairKey<std::string, int>, std::unordered_set<std::string>,
       PairHash<std::string, int>>
@@ -816,6 +818,10 @@ void ParamStorage::deploy(
 
       if (contains(param_ranks, mpi::getRank())) {
         my_param_ranks_[graph_id][param_id] = param_ranks;
+      }
+
+      if (contains(param_partitions, param_name)) {
+        partitions[param_id] = param_partitions.at(param_name);
       }
     }
   }
@@ -867,9 +873,9 @@ void ParamStorage::deploy(
     if (distributed(param_id)) {
       DistributedParamLocator& zpl = DistributedParamLocator::get();
       at::Tensor& param_tensor = params_.at(param_id);
-      at::Tensor zero_param_tensor = zpl.load(param_id);
+      at::Tensor gathered_param = zpl.load(param_id);
       if (contains(param_ranks, mpi::getRank())) {
-        param_tensor.set_data(zero_param_tensor);
+        param_tensor.set_data(gathered_param);
       } else {
         param_tensor.set_data(torch::zeros({1}));
       }
@@ -886,6 +892,27 @@ void ParamStorage::deploy(
         logger->debug(
             "Synchronized {} {}/{}", param_name, i, sorted_param_ids.size());
       }
+    }
+
+    if (contains(partitions, param_id)) {
+      assert(contains(id_to_name, param_id));
+      assert(contains(params_, param_id));
+      const auto& param_name = id_to_name.at(param_id);
+      const auto& param = params_.at(param_id);
+
+      at::NoGradGuard no_grad;
+      spdlog::info(
+          "Slicing tensor 1 {} {} {} ranks={}", param_id, param_name,
+          join_as_str(getTensorDim(param)), join_as_str(param_ranks));
+      const auto sliced = sliceParam(
+          param_name, param, param_ranks, mpi::getRank(), param_partitions);
+      spdlog::info(
+          "Slicing tensor 2 {} {} {}", param_id, param_name,
+          join_as_str(getTensorDim(sliced)));
+      param.set_data(sliced);
+      spdlog::info(
+          "Slicing tensor 3 {} {} {}", param_id, param_name,
+          join_as_str(getTensorDim(param)));
     }
 
     graph_grouped_params[comm_tag].push_back(param_id);

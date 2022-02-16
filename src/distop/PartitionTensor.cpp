@@ -17,14 +17,13 @@ std::unordered_map<std::string, std::string> getDistOpNameMap() {
   return name_map;
 }
 
-std::unordered_map<std::string, std::pair<size_t, size_t>> getDistParams(
-    const std::shared_ptr<IRGraph>& g) {
+ParamPartitionMap getDistParams(const std::shared_ptr<IRGraph>& g) {
   std::unordered_map<std::string, DistOp> dist_op_map;
   for (const auto& op : dist_ops) {
     dist_op_map[op.dist_name] = op;
   }
 
-  std::unordered_map<std::string, std::pair<size_t, size_t>> ret;
+  ParamPartitionMap ret;
 
   for (const auto& node : g->getNodes()) {
     if (contains(dist_op_map, node.getName())) {
@@ -104,8 +103,7 @@ TensorPartioningGraphInfo replaceWithDistOp(
       g->getName(), new_nodes, new_values, g->getInputNames(),
       g->getOutputNames());
 
-  std::unordered_map<std::string, std::pair<size_t, size_t>> param_part =
-      getDistParams(ret_graph);
+  ParamPartitionMap param_part = getDistParams(ret_graph);
 
   return TensorPartioningGraphInfo{
       ret_graph, ranks, param_part, dist_ranks, rank_value_names};
@@ -113,29 +111,26 @@ TensorPartioningGraphInfo replaceWithDistOp(
 
 at::Tensor sliceParam(
     const std::string& name, const at::Tensor& param,
-    const TensorPartioningGraphInfo& part_info, int my_rank) {
-  assert(contains(part_info.param_partitions, name));
-
-  const auto ranks = vectorToSet(part_info.ranks);
+    const std::unordered_set<int>& ranks, int my_rank,
+    const ParamPartitionMap& param_partitions) {
   assert(contains(ranks, my_rank));
 
-  const auto& partition = part_info.param_partitions.at(name);
+  const auto& partition = param_partitions.at(name);
   size_t arg_idx = partition.first;
   size_t dim_idx = partition.second;
 
-  if (param.size(dim_idx) % part_info.ranks.size() != 0) {
+  if (param.size(dim_idx) % ranks.size() != 0) {
     std::stringstream ss;
     ss << "Dimension " << dim_idx << " of " << name
        << " is not divisible. shape=" << join_as_str(getTensorDim(param));
     throw std::runtime_error(ss.str());
   }
 
-  size_t segment_size = param.size(dim_idx) / part_info.ranks.size();
-  int local_rank = getLocalRank(vectorToSet(part_info.ranks), my_rank);
+  size_t segment_size = param.size(dim_idx) / ranks.size();
+  int local_rank = getLocalRank(ranks, my_rank);
 
   torch::NoGradGuard no_grad;
   return param.slice(
       dim_idx, segment_size * local_rank, segment_size * (local_rank + 1));
 }
-
 } // namespace rannc

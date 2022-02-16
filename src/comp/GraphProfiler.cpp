@@ -413,7 +413,8 @@ ProfilingResult GraphProfiler::compute(
               const auto& partition =
                   part_info.param_partitions.at(param_it.first);
               graph_params[param_it.first] = sliceParam(
-                  param_it.first, param_it.second, part_info, mpi::getRank());
+                  param_it.first, param_it.second, vectorToSet(part_info.ranks),
+                  mpi::getRank(), part_info.param_partitions);
             }
           }
         }

@@ -70,7 +70,7 @@ class ParamStorage {
   void deploy(
       const Deployment& decomp,
       const std::unordered_map<std::string, long>& graph_params,
-      bool enable_zero);
+      bool enable_zero, const ParamPartitionMap& param_partitions);
   void useParam(
       const std::string& graph_id, const std::string& name, long param_id);
 

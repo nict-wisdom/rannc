@@ -19,14 +19,16 @@ struct DistOp {
 
 std::unordered_map<std::string, std::string> getDistOpNameMap();
 
-std::unordered_map<std::string, std::pair<size_t, size_t>> getDistParams(
-    const std::shared_ptr<IRGraph>& g);
+using ParamPartitionMap =
+    std::unordered_map<std::string, std::pair<size_t, size_t>>;
+
+ParamPartitionMap getDistParams(const std::shared_ptr<IRGraph>& g);
 
 struct TensorPartioningGraphInfo {
   std::shared_ptr<IRGraph> graph;
   std::vector<int> ranks;
   // param name -> (arg index, dim index)
-  std::unordered_map<std::string, std::pair<size_t, size_t>> param_partitions;
+  ParamPartitionMap param_partitions;
   // value name -> rank
   std::unordered_map<std::string, int> rank_values;
   // node id -> [val names]
@@ -40,7 +42,8 @@ TensorPartioningGraphInfo replaceWithDistOp(
 
 at::Tensor sliceParam(
     const std::string& name, const at::Tensor& param,
-    const TensorPartioningGraphInfo& part_info, int my_rank);
+    const std::unordered_set<int>& ranks, int my_rank,
+    const ParamPartitionMap& partition);
 } // namespace rannc
 
 #endif // PYRANNC_PARTITIONTENSOR_H
