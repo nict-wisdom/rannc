@@ -144,6 +144,7 @@ class ParamStorage {
   std::unordered_set<long> buffer_ids_;
   std::unordered_set<long> dist_ids_;
   std::unordered_map<long, std::unordered_set<int>> ranks_;
+  std::unordered_map<long, std::unordered_set<int>> sliced_param_ranks_;
 
   // For param sharing
   // Ranks of params in a graph deployed on this rank

@@ -341,6 +341,10 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
 
         grads.reserve(param_ids.size());
         for (long pid : param_ids) {
+          if (!contains(sliced_param_ranks_, pid)) {
+            continue;
+          }
+
           auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
               ? getAmpMasterParamTensor(pid)
               : getParamTensor(pid);
@@ -901,18 +905,11 @@ void ParamStorage::deploy(
       const auto& param = params_.at(param_id);
 
       at::NoGradGuard no_grad;
-      spdlog::info(
-          "Slicing tensor 1 {} {} {} ranks={}", param_id, param_name,
-          join_as_str(getTensorDim(param)), join_as_str(param_ranks));
       const auto sliced = sliceParam(
           param_name, param, param_ranks, mpi::getRank(), param_partitions);
-      spdlog::info(
-          "Slicing tensor 2 {} {} {}", param_id, param_name,
-          join_as_str(getTensorDim(sliced)));
       param.set_data(sliced);
-      spdlog::info(
-          "Slicing tensor 3 {} {} {}", param_id, param_name,
-          join_as_str(getTensorDim(param)));
+
+      sliced_param_ranks_[param_id] = param_ranks;
     }
 
     graph_grouped_params[comm_tag].push_back(param_id);
