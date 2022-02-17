@@ -348,6 +348,16 @@ PYBIND11_MODULE(_pyrannc, m) {
             return self.getLocalParamSegment(param_id);
           })
       .def(
+          "get_param",
+          [](RaNNCModule& self, long param_id, long amp_master_param) {
+            return self.getParam(param_id, amp_master_param);
+          })
+      .def(
+          "get_param_grad",
+          [](RaNNCModule& self, long param_id, long amp_master_param) {
+            return self.getParamGrad(param_id, amp_master_param);
+          })
+      .def(
           "load_deployment",
           [](RaNNCModule& self, const std::string& file) {
             self.setLoadDeployment(true);

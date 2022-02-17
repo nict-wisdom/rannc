@@ -62,6 +62,8 @@ class RaNNCModule {
   void syncParamZero(bool grad);
   at::Tensor getLocalParamSegment(long param_id);
   std::tuple<int64_t, int64_t> getLocalParamRange(long param_id);
+  at::Tensor getParam(long param_id, bool amp_master_param);
+  at::Tensor getParamGrad(long param_id, bool amp_master_param);
 
   void saveDeployment(const std::string& deployment_file);
 
@@ -89,7 +91,6 @@ class RaNNCModule {
   std::shared_ptr<ParamStorage> param_storage_;
   std::shared_ptr<GraphValueStorage> value_storage_;
   std::shared_ptr<FunctionStorage> func_storage_;
-  std::shared_ptr<DistributedGradLocator> zero_grad_locator_;
   std::vector<long> param_ids_on_rank_;
 
   Deployment deployment_;
@@ -120,6 +121,10 @@ class RaNNCModule {
       const std::vector<IValueLocation>& ordered_inputs);
   void doRegisterParams(
       const std::vector<py::tuple>& py_params, bool is_buffer);
+  at::Tensor doGetParam(
+      long param_id, bool amp_master_param,
+      const std::function<at::Tensor(const at::Tensor&)>& f,
+      const std::function<at::Tensor(long)>& g);
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("RaNNCModule");
 };

@@ -226,6 +226,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         self.enable_zero = enable_zero
         self.offload_params = offload_params
 
+        self.name_to_param = {n: p for n, p in self.model.named_parameters()}
+        self.name_to_pid = {n: id(p) for n, p in self.model.named_parameters()}
+
         super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_params, enable_zero,
                                           check_unused_values, offload_params)
 
@@ -235,9 +238,6 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         _check_input_tensors(args)
 
         if not self.ready:
-            self.name_to_param = {n: p for n, p in self.model.named_parameters()}
-            self.name_to_pid = {n: id(p) for n, p in self.model.named_parameters()}
-
             parameters = [(n, p) for n, p in self.model.named_parameters()]
             buffers = [(n, p) for n, p in self.model.named_buffers()]
             self.var_lookup_fn = _create_interpreter_name_lookup_fn(0)
@@ -430,6 +430,22 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         Sets zeros to  gradients of model parameters.
         """
         super().zero_grad()
+
+    def get_param(self, name, amp_master_param=False):
+        if name not in self.name_to_pid or name not in self.name_to_param:
+            raise RuntimeError("No parameter found: {}".format(name))
+
+        if self.ready:
+            return super().get_param(self.name_to_pid[name], amp_master_param)
+        return self.name_to_param[name]
+
+    def get_param_grad(self, name, amp_master_param=False):
+        if name not in self.name_to_pid or name not in self.name_to_param:
+            raise RuntimeError("No parameter found: {}".format(name))
+
+        if self.ready:
+            return super().get_param_grad(self.name_to_pid[name], amp_master_param)
+        return self.name_to_param[name].grad
 
     def save_deployment(self, file):
         r"""

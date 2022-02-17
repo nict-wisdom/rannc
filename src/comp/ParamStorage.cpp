@@ -341,7 +341,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
 
         grads.reserve(param_ids.size());
         for (long pid : param_ids) {
-          if (!contains(sliced_param_ranks_, pid)) {
+          if (contains(sliced_param_ranks_, pid)) {
             continue;
           }
 

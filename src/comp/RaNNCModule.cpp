@@ -583,6 +583,38 @@ std::tuple<int64_t, int64_t> RaNNCModule::getLocalParamRange(long param_id) {
   return param_storage_->getLocalParamRange(param_id);
 }
 
+at::Tensor RaNNCModule::doGetParam(
+    long param_id, bool amp_master_param,
+    const std::function<at::Tensor(const at::Tensor&)>& f,
+    const std::function<at::Tensor(long)>& g) {
+  if (amp_master_param) {
+    at::Tensor param = f(param_storage_->getAmpMasterParamTensor(param_id));
+
+    bool zero = param_storage_->zeroEnabled(id_);
+    if (zero) {
+      return param_storage_->gatherTensorZero(param, param_id);
+    }
+    return param;
+  }
+  return g(param_id);
+}
+
+at::Tensor RaNNCModule::getParam(long param_id, bool amp_master_param) {
+  return doGetParam(
+      param_id, amp_master_param, [](const at::Tensor& p) { return p; },
+      [this](long param_id) {
+        return this->param_storage_->syncParam(param_id);
+      });
+}
+
+at::Tensor RaNNCModule::getParamGrad(long param_id, bool amp_master_param) {
+  return doGetParam(
+      param_id, amp_master_param, [](const at::Tensor& p) { return p.grad(); },
+      [this](long param_id) {
+        return this->param_storage_->syncParamGrad(param_id);
+      });
+}
+
 void RaNNCModule::destroy() {
   if (driver_) {
     driver_->undeployGraph(id_);

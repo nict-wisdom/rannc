@@ -13,10 +13,9 @@ except ImportError:
     print("Failed to import apex. Tests with FP16 will fail.")
 import pyrannc
 
-
 RELATIVE_TOLERANCE = 1e-2
 ABSOLUTE_TOLERANCE = 0
-LOSS_SCALE = 2**10
+LOSS_SCALE = 2 ** 10
 MAX_NORM = 1.0
 
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -35,7 +34,10 @@ def get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset
         get_dataset = get_dataset_default
     ds_x, ds_tgt = get_dataset(DATASET_SIZE, input_dim, output_dim)
     ds = torch.utils.data.TensorDataset(ds_x, ds_tgt)
-    sampler = torch.utils.data.distributed.DistributedSampler(ds, num_replicas=pyrannc.get_world_size(), rank=pyrannc.get_rank(), shuffle=False) if gather_inputs else torch.utils.data.SequentialSampler(ds)
+    sampler = torch.utils.data.distributed.DistributedSampler(ds, num_replicas=pyrannc.get_world_size(),
+                                                              rank=pyrannc.get_rank(),
+                                                              shuffle=False) if gather_inputs else torch.utils.data.SequentialSampler(
+        ds)
     data_loader = torch.utils.data.DataLoader(ds, batch_size=batch_size_per_proc, sampler=sampler)
     return data_loader
 
@@ -46,7 +48,7 @@ def compare_tensors(v1, v2, rtol, atol):
 
 
 def compare_dist_params(model_exp, model_act, rtol, atol):
-    if hasattr(model_exp, "module"): # ddp model
+    if hasattr(model_exp, "module"):  # ddp model
         model_exp = model_exp.module
 
     expected_params = {n: p for n, p in model_exp.named_parameters()}
@@ -61,39 +63,35 @@ def compare_dist_params(model_exp, model_act, rtol, atol):
         compare_tensors(v_a, v_e, rtol, atol)
 
 
-def do_compare_params(model_exp, model_act, f, rtol, atol, fp16, zero, opt_exp, opt_act):
-    if hasattr(model_exp, "module"): # ddp model
-        model_exp = model_exp.module
-
-    expected_params = {n: p for n, p in model_exp.named_parameters()}
-    actual_params = {n: p for n, p in model_act.named_parameters()}
-
-    if zero:
-        zero_ranges = {n: opt_act.param_zero_range[id(p)] for n, p in model_act.named_parameters()}
-
-    if fp16:
-        expected_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)}
-        actual_master_params = {n: p for n, p in pyrannc.amp.named_master_params(model_act, opt_act, zero)}
-
-        for n, rp in actual_master_params.items():
-            p = expected_master_params[n]
-            v_a = f(rp).flatten() if zero else f(rp)
-            v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
-            compare_tensors(v_a, v_e, rtol, atol)
-    else:
-        for n, rp in actual_params.items():
-            p = expected_params[n]
-            v_a = f(rp).flatten()[zero_ranges[n]] if zero else f(rp)
-            v_e = f(p).flatten()[zero_ranges[n]] if zero else f(p)
-            compare_tensors(v_a, v_e, rtol, atol)
+def do_compare_params(model_exp, model_act, expected_params, actual_params, rtol, atol, fp16, zero, opt_exp, opt_act):
+    for n, rp in actual_params.items():
+        p = expected_params[n]
+        compare_tensors(rp, p, rtol, atol)
 
 
 def compare_params(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
-    do_compare_params(model_exp, model_act, lambda p: p, rtol, atol, fp16, zero, opt_exp, opt_act)
+    if hasattr(model_exp, "module"):  # ddp model
+        model_exp = model_exp.module
+
+    expected_params = {n: p for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)} if fp16 else {name: p for
+                                                                                                           name, p in
+                                                                                                           model_exp.named_parameters()}
+    actual_params = {n: model_act.get_param(n, fp16) for n, _ in model_act.named_parameters()}
+    do_compare_params(model_exp, model_act, expected_params, actual_params,
+                      rtol, atol, fp16, zero, opt_exp, opt_act)
 
 
 def compare_grads(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=None, opt_act=None):
-    do_compare_params(model_exp, model_act, lambda p: p.grad, rtol, atol, fp16, zero, opt_exp, opt_act)
+    if hasattr(model_exp, "module"):  # ddp model
+        model_exp = model_exp.module
+
+    expected_grads = {n: p.grad for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)} if fp16 else {n: p.grad
+                                                                                                               for n, p
+                                                                                                               in
+                                                                                                               model_exp.named_parameters()}
+    actual_grads = {n: model_act.get_param_grad(n, fp16) for n, _ in model_act.named_parameters()}
+    do_compare_params(model_exp, model_act, expected_grads, actual_grads,
+                      rtol, atol, fp16, zero, opt_exp, opt_act)
 
 
 def reset_running_stats(model):
@@ -149,8 +147,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         opt = optim.Adam(model.parameters(), lr=lr)
         if use_amp:
             model, opt = amp.initialize(model, opt, opt_level="O2",
-                                              max_loss_scale=LOSS_SCALE,
-                                              min_loss_scale=1)
+                                        max_loss_scale=LOSS_SCALE,
+                                        min_loss_scale=1)
         if preprocess:
             preprocess(model)
 
@@ -225,7 +223,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         with torch.random.fork_rng(devices=[device]):
             if run_update or (not has_param):
                 p_out = fwd(ddp_model, x, tgt)
-            else: # delay allreduce by ddp
+            else:  # delay allreduce by ddp
                 with ddp_model.no_sync():
                     p_out = fwd(ddp_model, x, tgt)
             agg_out = aggregate(p_out)
@@ -265,7 +263,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         if gather_inputs or pyrannc.get_rank() == 0:
             if enable_zero:
                 rmodel._sync_orig_params()
-            compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
+            compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt,
+                           opt_act=r_opt)
 
     if gather_inputs or pyrannc.get_rank() == 0:
         compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
@@ -294,8 +293,8 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     if use_amp:
         ld_model = ld_model.to(device)
         ld_model, ld_opt = amp.initialize(ld_model, ld_opt, opt_level="O2",
-                                       max_loss_scale=2.**4,
-                                       min_loss_scale=1)
+                                          max_loss_scale=2. ** 4,
+                                          min_loss_scale=1)
 
     ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=use_amp, **module_args)
 
@@ -329,7 +328,6 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                     compare_tensors(ldv, pv, rtol, atol)
                 else:
                     np.testing.assert_(ldv == pv)
-
 
     r_opt.load_state_dict(global_opt_state_dict, from_global=True)
 
