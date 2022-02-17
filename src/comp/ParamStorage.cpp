@@ -288,6 +288,10 @@ at::Tensor ParamStorage::getAmpMasterParamTensor(long param_id) const {
   return amp_master_params_.at(param_id);
 }
 
+bool ParamStorage::hasParam(long param_id) const {
+  return contains(params_, param_id);
+}
+
 bool ParamStorage::hasAmpMasterParam(long param_id) const {
   return contains(amp_master_params_, param_id);
 }

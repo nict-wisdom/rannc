@@ -59,6 +59,7 @@ class ParamStorage {
       const std::string& graph_id, const std::string& name) const;
   at::Tensor getParamTensor(long param_id) const;
   at::Tensor getAmpMasterParamTensor(long param_id) const;
+  bool hasParam(long param_id) const;
   bool hasAmpMasterParam(long param_id) const;
   bool distributed(long param_id) const;
   bool zeroEnabled(const std::string& graph_id) const;

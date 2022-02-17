@@ -846,7 +846,9 @@ void GraphProfiler::clear() {
     long pid = graph_params_.at(v.getName());
 
     if (!param_storage_->distributed(pid)) {
-      getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
+      if (param_storage_->hasAmpMasterParam(pid)) {
+        getMutableGradRef(param_storage_->getParamTensor(pid)) = at::Tensor();
+      }
     }
   }
 }
