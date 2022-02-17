@@ -593,6 +593,12 @@ at::Tensor RaNNCModule::doGetParam(
       at::Tensor param;
       if (param_storage_->hasAmpMasterParam(param_id)) {
         param = f(param_storage_->getAmpMasterParamTensor(param_id));
+      } else {
+        at::TensorOptions options;
+        options = options.dtype(c10::ScalarType::Float)
+                      .requires_grad(false)
+                      .device(c10::Device(c10::DeviceType::CUDA));
+        param = torch::empty({}, options);
       }
       return param_storage_->gatherTensorZero(param, param_id);
     }
