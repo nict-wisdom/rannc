@@ -588,13 +588,15 @@ at::Tensor RaNNCModule::doGetParam(
     const std::function<at::Tensor(const at::Tensor&)>& f,
     const std::function<at::Tensor(long)>& g) {
   if (amp_master_param) {
-    at::Tensor param = f(param_storage_->getAmpMasterParamTensor(param_id));
-
     bool zero = param_storage_->zeroEnabled(id_);
     if (zero) {
+      at::Tensor param;
+      if (param_storage_->hasAmpMasterParam(param_id)) {
+        param = f(param_storage_->getAmpMasterParamTensor(param_id));
+      }
       return param_storage_->gatherTensorZero(param, param_id);
     }
-    return param;
+    return f(param_storage_->getAmpMasterParamTensor(param_id));
   }
   return g(param_id);
 }
