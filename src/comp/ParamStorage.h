@@ -95,8 +95,10 @@ class ParamStorage {
       const std::string& graph_id, double max_grad_norm, bool use_amp_master);
   double calcGradGlobalL2Norm(const std::string& graph_id, bool use_amp_master);
 
-  at::Tensor syncParam(long param_id);
-  at::Tensor syncParamGrad(long param_id);
+  at::Tensor syncParam(long param_id, bool amp_master_param);
+  at::Tensor syncParamGrad(long param_id, bool amp_master_param);
+  at::Tensor gatherParamZero(long param_id, bool amp_master_param);
+  at::Tensor gatherParamGradZero(long param_id, bool amp_master_param);
 
   IRType getParamType(long param_id);
   IRType getParamType(const std::string& graph_id, const std::string& name);
@@ -133,7 +135,8 @@ class ParamStorage {
   virtual void doReleaseParam(long param_id);
   void doScaleGrads(
       const std::string& graph_id, bool unscale, bool amp_master_grads);
-  at::Tensor doSyncParam(long param_id, bool grad);
+  at::Tensor doSyncParam(long param_id, bool grad, bool amp_master_param);
+  at::Tensor doGatherParamZero(long param_id, bool grad, bool amp_master_param);
   void consolidateGrads(const std::string& graph_id);
   std::vector<int> sortCommTags(const std::string& graph_id);
 

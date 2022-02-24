@@ -564,11 +564,11 @@ void RaNNCModule::setGradFn(
 }
 
 at::Tensor RaNNCModule::syncParam(long param_id) {
-  return param_storage_->syncParam(param_id);
+  return param_storage_->syncParam(param_id, false);
 }
 
 at::Tensor RaNNCModule::syncParamGrad(long param_id) {
-  return param_storage_->syncParamGrad(param_id);
+  return param_storage_->syncParamGrad(param_id, false);
 }
 
 void RaNNCModule::syncParamZero(bool grad) {
@@ -584,43 +584,29 @@ std::tuple<int64_t, int64_t> RaNNCModule::getLocalParamRange(long param_id) {
 }
 
 at::Tensor RaNNCModule::doGetParam(
-    long param_id, bool amp_master_param,
-    const std::function<at::Tensor(const at::Tensor&)>& f,
-    const std::function<at::Tensor(long)>& g) {
-  if (amp_master_param) {
-    bool zero = param_storage_->zeroEnabled(id_);
-    if (zero) {
-      at::Tensor param;
-      if (param_storage_->hasAmpMasterParam(param_id)) {
-        param = f(param_storage_->getAmpMasterParamTensor(param_id));
-      } else {
-        at::TensorOptions options;
-        options = options.dtype(c10::ScalarType::Float)
-                      .requires_grad(false)
-                      .device(c10::Device(c10::DeviceType::CUDA));
-        param = torch::empty({}, options);
-      }
-      return param_storage_->gatherTensorZero(param, param_id);
+    long param_id, bool grad, bool amp_master_param) {
+  bool zero = param_storage_->zeroEnabled(id_);
+  if (zero && amp_master_param) {
+    if (grad) {
+      return param_storage_->gatherParamGradZero(param_id, amp_master_param);
+    } else {
+      return param_storage_->gatherParamZero(param_id, amp_master_param);
     }
-    return f(param_storage_->getAmpMasterParamTensor(param_id));
+  } else {
+    if (grad) {
+      return param_storage_->syncParamGrad(param_id, amp_master_param);
+    } else {
+      return param_storage_->syncParam(param_id, amp_master_param);
+    }
   }
-  return g(param_id);
 }
 
 at::Tensor RaNNCModule::getParam(long param_id, bool amp_master_param) {
-  return doGetParam(
-      param_id, amp_master_param, [](const at::Tensor& p) { return p; },
-      [this](long param_id) {
-        return this->param_storage_->syncParam(param_id);
-      });
+  return doGetParam(param_id, false, amp_master_param);
 }
 
 at::Tensor RaNNCModule::getParamGrad(long param_id, bool amp_master_param) {
-  return doGetParam(
-      param_id, amp_master_param, [](const at::Tensor& p) { return p.grad(); },
-      [this](long param_id) {
-        return this->param_storage_->syncParamGrad(param_id);
-      });
+  return doGetParam(param_id, true, amp_master_param);
 }
 
 void RaNNCModule::destroy() {

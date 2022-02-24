@@ -1009,37 +1009,13 @@ long ParamStorage::localToGlobal(long local_param_id) {
   throw std::invalid_argument(ss.str());
 }
 
-at::Tensor ParamStorage::syncParam(long param_id) {
-  return doSyncParam(param_id, false);
-}
-
-at::Tensor ParamStorage::syncParamGrad(long param_id) {
-  return doSyncParam(param_id, true);
-}
-
-at::Tensor ParamStorage::doSyncParam(long param_id, bool grad) {
-  // check if param exists
-  if (!contains(ranks_, param_id)) {
-    logger->debug("Ranks of param {} is not set.", param_id);
-    return at::Tensor();
-  }
-
-  assert(contains(ranks_, param_id));
-  auto param_ranks = setToVector(ranks_.at(param_id));
-  std::sort(param_ranks.begin(), param_ranks.end());
-  int root = param_ranks.front();
-
-  at::Tensor param;
-  IRType ir_type;
-  if (contains(param_ranks, mpi::getRank())) {
-    param = params_.at(param_id);
-    ir_type = toIRType(param);
-  }
+at::Tensor bcastParam(const at::Tensor& param, int root, bool grad) {
   ObjectComm& ocomm = ObjectComm::get();
+  auto ir_type = toIRType(param);
   const auto sync_ir_type = ocomm.bcast(ir_type, root);
 
   at::Tensor buf;
-  if (contains(param_ranks, mpi::getRank())) {
+  if (param.defined()) {
     if (grad) {
       if (param.grad().defined()) {
         buf = param.grad().detach().clone();
@@ -1062,6 +1038,83 @@ at::Tensor ParamStorage::doSyncParam(long param_id, bool grad) {
   assert(iv_buf.isTensor());
   syncWithErrorCheck();
   return iv_buf.toTensor();
+}
+
+at::Tensor ParamStorage::doSyncParam(
+    long param_id, bool grad, bool amp_master_param) {
+  // check if param exists on any of ranks
+  if (!contains(ranks_, param_id)) {
+    logger->debug("Ranks of param {} is not set.", param_id);
+    return at::Tensor();
+  }
+
+  assert(contains(ranks_, param_id));
+  auto param_ranks = setToVector(ranks_.at(param_id));
+  std::sort(param_ranks.begin(), param_ranks.end());
+  int root = param_ranks.front();
+
+  at::Tensor param;
+  IRType ir_type;
+  if (contains(param_ranks, mpi::getRank())) {
+    if (amp_master_param) {
+      assert(hasAmpMasterParam(param_id));
+      param = getAmpMasterParamTensor(param_id);
+    } else {
+      param = params_.at(param_id);
+    }
+  }
+
+  return bcastParam(param, root, grad);
+}
+
+at::Tensor ParamStorage::syncParam(long param_id, bool amp_master_param) {
+  return doSyncParam(param_id, false, amp_master_param);
+}
+
+at::Tensor ParamStorage::syncParamGrad(long param_id, bool amp_master_param) {
+  return doSyncParam(param_id, true, amp_master_param);
+}
+
+at::Tensor ParamStorage::gatherParamZero(long param_id, bool amp_master_param) {
+  return doGatherParamZero(param_id, false, amp_master_param);
+}
+
+at::Tensor ParamStorage::gatherParamGradZero(
+    long param_id, bool amp_master_param) {
+  return doGatherParamZero(param_id, true, amp_master_param);
+}
+
+at::Tensor ParamStorage::doGatherParamZero(
+    long param_id, bool grad, bool amp_master_param) {
+  // Currently we only distribute amp master params/grads and optimizer states.
+  assert(amp_master_param);
+  assert(contains(ranks_, param_id));
+
+  IRType ir_type;
+  at::Tensor param;
+  if (contains(ranks_.at(param_id), mpi::getRank())) {
+    at::Tensor param_part;
+    assert(hasAmpMasterParam(param_id));
+    param_part = getAmpMasterParamTensor(param_id);
+
+    at::Tensor buf;
+    if (grad) {
+      if (param_part.grad().defined()) {
+        buf = param_part.grad().detach().clone();
+      } else {
+        buf = torch::zeros_like(param_part).cuda();
+      }
+    } else {
+      buf = param_part.detach().clone();
+    }
+
+    param = gatherTensorZero(buf, param_id).cuda();
+  }
+
+  auto param_ranks = setToVector(ranks_.at(param_id));
+  std::sort(param_ranks.begin(), param_ranks.end());
+  int root = param_ranks.front();
+  return bcastParam(param, root, false);
 }
 
 void ParamStorage::useAmpMasterParams(

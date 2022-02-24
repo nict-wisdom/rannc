@@ -75,7 +75,7 @@ def compare_params(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=N
 
     expected_params = {n: p for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)} if fp16 \
         else {n: p for n, p in model_exp.named_parameters()}
-    actual_params = {n: model_act.get_param(n, fp16) for n, _ in model_act.named_parameters()}
+    actual_params = {n: model_act.get_param(n, fp16) for n in sorted(model_act.name_to_param.keys())}
     do_compare_params(expected_params, actual_params, rtol, atol)
 
 
@@ -85,7 +85,7 @@ def compare_grads(model_exp, model_act, rtol, atol, fp16, zero=False, opt_exp=No
 
     expected_grads = {n: p.grad for n, p in pyrannc.amp.named_master_params(model_exp, opt_exp)} if fp16 \
         else {n: p.grad for n, p in model_exp.named_parameters()}
-    actual_grads = {n: model_act.get_param_grad(n, fp16) for n, _ in model_act.named_parameters()}
+    actual_grads = {n: model_act.get_param_grad(n, fp16) for n in sorted(model_act.name_to_param.keys())}
     do_compare_params(expected_grads, actual_grads, rtol, atol)
 
 
@@ -223,14 +223,11 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                     p_out = fwd(ddp_model, x, tgt)
             agg_out = aggregate(p_out)
 
-        print("Fwd starting")
         r_out = fwd(rmodel, convert_dtype(x, dtype), convert_dtype(tgt, dtype))
-        print("Fwd finished")
 
         # Verify the equality of outputs
         if gather_inputs or pyrannc.get_rank() == 0:
             compare_tensors(r_out, agg_out, rtol, atol)
-        print("Fwd outputs matched")
 
         # Create test target
         if has_param:
@@ -248,22 +245,19 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             rmodel.clip_grad_norm(MAX_NORM)
 
             if run_update:
-                if gather_inputs or pyrannc.get_rank() == 0:
-                    if enable_zero:
-                        rmodel._sync_orig_params(sync_grad=True)
-                    compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
+                if enable_zero:
+                    rmodel._sync_orig_params(sync_grad=True)
+                compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
                 opt.step()
                 r_opt.step()
                 opt.zero_grad()
                 r_opt.zero_grad()
 
-        if gather_inputs or pyrannc.get_rank() == 0:
-            if enable_zero:
-                rmodel._sync_orig_params()
-            compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt,
-                           opt_act=r_opt)
-        print("Gradients matched")
+        if enable_zero:
+            rmodel._sync_orig_params()
+        compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt,
+                       opt_act=r_opt)
 
     if gather_inputs or pyrannc.get_rank() == 0:
         compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)

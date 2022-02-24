@@ -121,10 +121,7 @@ class RaNNCModule {
       const std::vector<IValueLocation>& ordered_inputs);
   void doRegisterParams(
       const std::vector<py::tuple>& py_params, bool is_buffer);
-  at::Tensor doGetParam(
-      long param_id, bool amp_master_param,
-      const std::function<at::Tensor(const at::Tensor&)>& f,
-      const std::function<at::Tensor(long)>& g);
+  at::Tensor doGetParam(long param_id, bool grad, bool amp_master_param);
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("RaNNCModule");
 };

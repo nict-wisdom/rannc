@@ -357,9 +357,6 @@ IValueMap GraphLauncher::compute(
 
 torch::jit::IValue GraphLauncher::forward(
     const std::string& id, const IValueMap& inputs) {
-  //        spdlog::info("GraphLauncher::forward starting id={} rng_state={}",
-  //        id,
-  //                     toString(getRngState()));
   const auto event_key = getFuncKey("GraphLauncher", "forward", id, 0, false);
   recordStart(event_key);
 
