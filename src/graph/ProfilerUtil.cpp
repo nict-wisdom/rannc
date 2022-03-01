@@ -100,8 +100,6 @@ GraphProfile ProfilerUtil::profile(const ProfilingInput& in) {
 
 GraphProfile ProfilerUtil::profileDist(const ProfilingInput& in) {
   return doProfile(in, [this](const ProfilingInput& input) {
-    spdlog::info("Profiling with dist_profile_=true");
-
     IValueMap in_values;
     const IValueMap& avail_vals = this->profiler_->getValues();
 
@@ -117,16 +115,11 @@ GraphProfile ProfilerUtil::profileDist(const ProfilingInput& in) {
       target_ranks.insert(i);
     }
     DistTaskDispatcher& dtd = DistTaskDispatcher::get();
-    spdlog::info("Starting dist profiling");
-
     return dtd.profile(input, in_values);
   });
 }
 
 GraphProfile ProfilerUtil::doProfile(
-    //    const std::shared_ptr<IRGraph>& g, size_t batch_size, size_t
-    //    replica_num, size_t pipeline_num, bool checkpointing, const
-    //    TensorPartioningGraphInfo& part_info,
     const ProfilingInput& in,
     const std::function<ProfilingResult(const ProfilingInput& input)>& f) {
   assert(in.replica_num > 0);
