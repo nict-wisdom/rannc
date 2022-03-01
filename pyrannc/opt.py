@@ -136,6 +136,8 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_ze
                 if enable_zero:
                     if pyrannc.get_rank() in ranks:
                         v = _pyrannc.gather_tensor_zero(v, pid).cpu()
+                elif _pyrannc.tensor_sliced(pid):
+                    v = _pyrannc.gather_tensor_sliced(v, pid).cpu()
                 v = tensor_coll.bcast(v, param_root).cpu()
             else:
                 v = comm_utils.bcast_obj(v, param_root)

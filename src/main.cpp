@@ -127,6 +127,21 @@ PYBIND11_MODULE(_pyrannc, m) {
     return param_storage->gatherTensorZero(ten, param_id);
   });
 
+  m.def("tensor_sliced", [](long param_id) {
+    auto r = RaNNCFactory::get();
+    auto param_storage = r->getParamStorage();
+    return param_storage->sliced(param_id);
+  });
+
+  m.def("gather_tensor_sliced", [](py::handle py_tensor, long param_id) {
+    auto r = RaNNCFactory::get();
+    auto param_storage = r->getParamStorage();
+    auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
+    assert(iv.isTensor());
+    const auto ten = iv.toTensor().cuda();
+    return param_storage->gatherTensorSliced(ten, param_id);
+  });
+
   m.def(
       "keep_graph", [](bool keep) { return TorchDriver::setKeepGraph(keep); });
 

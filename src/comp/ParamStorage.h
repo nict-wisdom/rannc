@@ -11,6 +11,7 @@
 #include <graph/Decomposition.h>
 #include <Logging.h>
 #include "DistributedGradLocator.h"
+#include "SlicedParamLocator.h"
 
 namespace rannc {
 
@@ -62,10 +63,12 @@ class ParamStorage {
   bool hasParam(long param_id) const;
   bool hasAmpMasterParam(long param_id) const;
   bool distributed(long param_id) const;
+  bool sliced(long param_id) const;
   bool zeroEnabled(const std::string& graph_id) const;
   at::Tensor getLocalParamSegment(long param_id) const;
   std::tuple<int64_t, int64_t> getLocalParamRange(long param_id) const;
   at::Tensor gatherTensorZero(const at::Tensor& ten, long param_id);
+  at::Tensor gatherTensorSliced(const at::Tensor& ten, long param_id);
   std::unordered_set<int> getRanks(long param_id) const;
 
   void deploy(
@@ -97,6 +100,8 @@ class ParamStorage {
 
   at::Tensor syncParam(long param_id, bool amp_master_param);
   at::Tensor syncParamGrad(long param_id, bool amp_master_param);
+  at::Tensor gatherParam(long param_id, bool amp_master_param);
+  at::Tensor gatherParamGrad(long param_id, bool amp_master_param);
   at::Tensor gatherParamZero(long param_id, bool amp_master_param);
   at::Tensor gatherParamGradZero(long param_id, bool amp_master_param);
 
@@ -136,6 +141,7 @@ class ParamStorage {
   void doScaleGrads(
       const std::string& graph_id, bool unscale, bool amp_master_grads);
   at::Tensor doSyncParam(long param_id, bool grad, bool amp_master_param);
+  at::Tensor doGatherParam(long param_id, bool grad, bool amp_master_param);
   at::Tensor doGatherParamZero(long param_id, bool grad, bool amp_master_param);
   void consolidateGrads(const std::string& graph_id);
   std::vector<int> sortCommTags(const std::string& graph_id);
@@ -148,7 +154,6 @@ class ParamStorage {
   std::unordered_set<long> buffer_ids_;
   std::unordered_set<long> dist_ids_;
   std::unordered_map<long, std::unordered_set<int>> ranks_;
-  std::unordered_map<long, std::unordered_set<int>> sliced_param_ranks_;
 
   // For param sharing
   // Ranks of params in a graph deployed on this rank
@@ -177,6 +182,8 @@ class ParamStorage {
   std::unordered_map<std::string, bool> use_amp_master_params_;
   std::unordered_map<std::string, std::shared_ptr<DistributedGradLocator>>
       zero_grad_locators_;
+  std::unordered_map<std::string, std::shared_ptr<SlicedParamLocator>>
+      sliced_param_locators_;
 
   static bool sync_on_init_;
 

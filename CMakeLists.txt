@@ -69,7 +69,6 @@ set(RANNC_SRCS
         src/comp/GraphLauncher.cpp
         src/comp/GraphValueStorage.cpp
         src/comp/ParamStorage.cpp
-        src/distop/PartitionTensor.cpp
         src/comp/DistributedParamLocatorBase.cpp
         src/comp/DistributedGradLocator.cpp
         src/comp/DistributedParamLocator.cpp
@@ -79,11 +78,13 @@ set(RANNC_SRCS
         src/comp/EventRecorder.cpp
         src/comp/Validator.cpp
         src/comp/OffloadedParamMap.cpp
+        src/comp/SlicedParamLocator.cpp
         src/cpg/CPG.cpp
         src/cuda/CudaUtil.cpp
         src/cuda/CudaSync.cpp
         src/distop/DistMatmul.cpp
         src/distop/DistTaskDispatcher.cpp
+        src/distop/PartitionTensor.cpp
         src/graph/ConvertGraph.cpp
         src/graph/Decomposition.cpp
         src/graph/GuessValueTypes.cpp

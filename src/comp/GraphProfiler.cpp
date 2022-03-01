@@ -406,7 +406,7 @@ ProfilingResult GraphProfiler::compute(
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
         auto graph_params = paramsToCuda(getGraphParams(subgraph));
 
-        const TensorPartioningGraphInfo& part_info = input.part_info;
+        const TensorPartitioningGraphInfo& part_info = input.part_info;
         if (part_info.ranks.size() > 0) {
           for (const auto& param_it : graph_params) {
             if (contains(part_info.param_partitions, param_it.first)) {
@@ -772,7 +772,7 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
 
   auto ret = doProfile(
       {graphs, batch_size_, 1, static_cast<size_t>(dev_num_), min_pipeline_num_,
-       checkpointing, false, false, TensorPartioningGraphInfo()},
+       checkpointing, false, false, TensorPartitioningGraphInfo()},
       values, trace_dim_names);
 
   size_t replica_num = dev_num_ * min_pipeline_num_;

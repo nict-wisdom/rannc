@@ -308,7 +308,7 @@ std::vector<long> RaNNCModule::init(
             deployment_.checkpointing,
             pconf.offload_params,
             pconf.force_dist_matmul,
-            TensorPartioningGraphInfo{}};
+            TensorPartitioningGraphInfo{}};
         profiles[it] = prof_util.profile(prof_in);
       }
       logger->info(displayGraphProfiles(
@@ -413,7 +413,7 @@ std::vector<long> RaNNCModule::init(
     for (const auto& it : deployment_.subgraphs) {
       assert(contains(deployment_.allocation, it.first));
       const auto& ranks = deployment_.allocation.at(it.first);
-      TensorPartioningGraphInfo part_info =
+      TensorPartitioningGraphInfo part_info =
           replaceWithDistOp(it.second, setToVector(ranks));
       mod_subgraphs[it.first] = part_info.graph;
 
@@ -591,6 +591,12 @@ at::Tensor RaNNCModule::doGetParam(
       return param_storage_->gatherParamGradZero(param_id, amp_master_param);
     } else {
       return param_storage_->gatherParamZero(param_id, amp_master_param);
+    }
+  } else if (param_storage_->sliced(param_id)) {
+    if (grad) {
+      return param_storage_->gatherParamGrad(param_id, amp_master_param);
+    } else {
+      return param_storage_->gatherParam(param_id, amp_master_param);
     }
   } else {
     if (grad) {

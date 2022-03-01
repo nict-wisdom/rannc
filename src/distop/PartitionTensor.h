@@ -19,12 +19,13 @@ struct DistOp {
 
 std::unordered_map<std::string, std::string> getDistOpNameMap();
 
+// param name -> (arg index, dim index)
 using ParamPartitionMap =
     std::unordered_map<std::string, std::pair<size_t, size_t>>;
 
 ParamPartitionMap getDistParams(const std::shared_ptr<IRGraph>& g);
 
-struct TensorPartioningGraphInfo {
+struct TensorPartitioningGraphInfo {
   std::shared_ptr<IRGraph> graph;
   std::vector<int> ranks;
   // param name -> (arg index, dim index)
@@ -37,7 +38,7 @@ struct TensorPartioningGraphInfo {
   MSGPACK_DEFINE(graph, ranks, param_partitions, rank_values, rank_value_names);
 };
 
-TensorPartioningGraphInfo replaceWithDistOp(
+TensorPartitioningGraphInfo replaceWithDistOp(
     const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks);
 
 at::Tensor sliceParam(

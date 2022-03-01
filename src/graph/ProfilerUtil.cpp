@@ -205,7 +205,7 @@ GraphProfile accProfileValues(
          checkpointing,
          offload_params,
          force_dist_matmul,
-         TensorPartioningGraphInfo{}});
+         TensorPartitioningGraphInfo{}});
 
     prof_sum.fwd_time += prof.fwd_time;
     prof_sum.bwd_time += prof.bwd_time;

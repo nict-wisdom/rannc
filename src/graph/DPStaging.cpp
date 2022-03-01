@@ -216,7 +216,7 @@ void DPStaging::dumpNodeProfiles(
             pipeline_num > 1,
             conf_.offload_params,
             conf_.force_dist_matmul,
-            TensorPartioningGraphInfo{}};
+            TensorPartitioningGraphInfo{}};
         const auto prof = prof_util_.profile(in);
         prof_obj["fwd_time"] = prof.fwd_time;
         prof_obj["bwd_time"] = prof.bwd_time;
@@ -303,7 +303,7 @@ GraphProfile DPStaging::estimateSolutionGraph(
       sol.pipeline_num > 1,
       conf_.offload_params,
       conf_.force_dist_matmul,
-      TensorPartioningGraphInfo{}};
+      TensorPartitioningGraphInfo{}};
   return prof_util_.profile(in);
 }
 
@@ -630,7 +630,7 @@ AllocSolution DPStaging::doRunDpComm(
                 for (int i = 0; i < (d - d_prev) * replica_num; i++) {
                   ranks.push_back(i);
                 }
-                TensorPartioningGraphInfo part_info =
+                TensorPartitioningGraphInfo part_info =
                     replaceWithDistOp(step_graph, ranks);
                 step_graph = part_info.graph;
 
@@ -657,7 +657,7 @@ AllocSolution DPStaging::doRunDpComm(
                     checkpointing,
                     conf_.offload_params,
                     conf_.force_dist_matmul,
-                    TensorPartioningGraphInfo{}};
+                    TensorPartitioningGraphInfo{}};
                 step_prof = prof_util_.profile(in);
               }
               step_mem = calcGraphMem(

@@ -300,16 +300,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
     def train(self, mode=True):
         r"""
-        Changes the training mode. If the model is changed after the deployment, model partitioning is recomputed.
+        Outputs warning because a RaNNC module cannot change the grad mode.
 
         :param mode: Training mode.
         """
         if self.model.training != mode:
-            self.model.train(mode)
-            if self.ready:
-                logger.warning("Grad mode was changed to {}. The computation graph will be reconstructed.".format(mode))
-                self.undeploy(True)
-                self.ready = False
+            logger.warning("Unable to change grad mode of RaNNC module. Use enable_dropout to enable/disable dropout.")
 
     def eval(self):
         r"""
@@ -376,25 +372,28 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             self._setup_amp_params()
         return super().calc_grad_norm()
 
-    def state_dict(self, *args, no_hook=False, sync_all_ranks=False, sync_grad=False, **kwargs):
+    def state_dict(self, *args, no_hook=False, amp_master_params=True, **kwargs):
         r"""
         Returns ``state_dict`` of the model.
 
         :param no_hook: If ``True``, hooks on ``state_dict`` of the original models are ignored.
-        :param sync_grad: Set ``True`` to synchronize gradients.
+        :param amp_master_params: Set ``True`` to get apex amp master params.
 
         .. note::
             This method must be called from all ranks.
         """
         if not self.ready:
             return self.model.state_dict(*args, **kwargs)
-        self._sync_orig_params(sync_all_ranks=sync_all_ranks, sync_grad=sync_grad)
 
         # amp O2 hook converts params to fp32
         # This may cause oom
         if no_hook:
             stashed_hooks = _stash_state_dict_hooks(self.model)
         st = self.model.state_dict(*args, **kwargs)
+
+        for param_name in st.keys():
+            st[param_name] = self.get_param(param_name, amp_master_params and self.enable_apex_amp)
+
         if no_hook:
             _unstash_state_dict_hooks(self.model, stashed_hooks)
         return st
@@ -461,18 +460,14 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         else:
             logger.warning("save_deployment works only on rank 0")
 
-    def undeploy(self, sync=False):
+    def undeploy(self):
         r"""
         Undeploys a model distributed on GPUs. This frees GPU memory used for the model.
-
-        :param sync: Set ``True`` if you need to synchronize model parameters before undeploying the model.
 
         .. note::
             This method must be called from all ranks.
         """
         if self.ready:
-            if sync:
-                self._sync_orig_params(sync_all_ranks=sync)
             super().undeploy()
 
     def enable_dropout(self, enable):
@@ -482,7 +477,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             logger.warning("Unable to change dropout mode because the module is not initialized.")
 
     def __del__(self):
-        self.undeploy(sync=False)
+        self.undeploy()
 
     def __getattr__(self, attr):
         if not hasattr(self.model, attr):

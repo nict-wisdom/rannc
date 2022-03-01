@@ -309,6 +309,15 @@ bool ParamStorage::distributed(long param_id) const {
   return contains(dist_ids_, param_id);
 }
 
+bool ParamStorage::sliced(long param_id) const {
+  for (const auto& it : sliced_param_locators_) {
+    if (it.second->registered(param_id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::vector<int> ParamStorage::sortCommTags(const std::string& graph_id) {
   auto& graph_grouped_params = grouped_params_[graph_id];
   std::vector<int> sorted_tags = keys(graph_grouped_params, true);
@@ -322,6 +331,9 @@ std::vector<int> ParamStorage::sortCommTags(const std::string& graph_id) {
 
 void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
   const auto& graph_grouped_params = grouped_params_[graph_id];
+
+  assert(contains(sliced_param_locators_, graph_id));
+  const auto& sp_loc = sliced_param_locators_.at(graph_id);
 
   std::stringstream ss;
   ss << "ParamStorage::allReduceParamGrads_graph_" << graph_id;
@@ -345,7 +357,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
 
         grads.reserve(param_ids.size());
         for (long pid : param_ids) {
-          if (contains(sliced_param_ranks_, pid)) {
+          if (sp_loc->registered(pid)) {
             continue;
           }
 
@@ -649,6 +661,19 @@ at::Tensor ParamStorage::gatherTensorZero(
   throw std::invalid_argument(ss.str());
 }
 
+at::Tensor ParamStorage::gatherTensorSliced(
+    const at::Tensor& ten, long param_id) {
+  for (const auto& it : sliced_param_locators_) {
+    if (it.second->registered(param_id)) {
+      return it.second->gather(param_id, ten);
+    }
+  }
+
+  std::stringstream ss;
+  ss << "Param is not registered in sliced param locator: " << param_id;
+  throw std::invalid_argument(ss.str());
+}
+
 std::unordered_set<int> ParamStorage::getRanks(long param_id) const {
   assert(contains(ranks_, param_id));
   return ranks_.at(param_id);
@@ -699,6 +724,11 @@ void ParamStorage::clipGradNorm(
 double ParamStorage::calcGradGlobalL2Norm(
     const std::string& graph_id, bool use_amp_master) {
   std::unordered_map<long, float> norms;
+  std::unordered_map<long, bool> distributed;
+
+  assert(contains(sliced_param_locators_, graph_id));
+  const auto& locator = sliced_param_locators_.at(graph_id);
+
   for (const auto& it : getParamIDs(graph_id, false)) {
     long pid = it.second;
     at::Tensor ten;
@@ -712,8 +742,11 @@ double ParamStorage::calcGradGlobalL2Norm(
       ten = getParamTensor(pid);
     }
     if (ten.grad().defined()) {
-      norms[id_local_to_global_.at(pid)] =
+      long global_pid = id_local_to_global_.at(pid);
+      norms[global_pid] =
           ten.grad().norm(2, c10::ScalarType::Float).item<float>();
+      distributed[global_pid] =
+          zeroEnabled(graph_id) || locator->registered(pid);
     }
   }
 
@@ -744,7 +777,7 @@ double ParamStorage::calcGradGlobalL2Norm(
   for (const auto& gn : gathered_norms) {
     for (const auto& it : gn) {
       long global_pid = it.first;
-      int rank_idx = zeroEnabled(graph_id) ? rank : 0;
+      int rank_idx = distributed[global_pid] ? rank : 0;
       norms_buf[rank_idx][global_pid] = it.second;
     }
     rank++;
@@ -846,6 +879,7 @@ void ParamStorage::deploy(
   }
 
   size_t i = 1;
+  sliced_param_locators_[graph_id] = std::make_shared<SlicedParamLocator>();
   for (const auto& param_id : sorted_param_ids) {
     if (!contains(ranks_, param_id)) {
       logger->debug("Param {} {} is not used.", param_id, id_to_name[param_id]);
@@ -903,17 +937,24 @@ void ParamStorage::deploy(
     }
 
     if (contains(partitions, param_id)) {
-      assert(contains(id_to_name, param_id));
-      assert(contains(params_, param_id));
-      const auto& param_name = id_to_name.at(param_id);
-      const auto& param = params_.at(param_id);
+      auto param = params_.at(param_id);
 
-      at::NoGradGuard no_grad;
-      const auto sliced = sliceParam(
-          param_name, param, param_ranks, mpi::getRank(), param_partitions);
-      param.set_data(sliced);
+      if (contains(param_ranks, mpi::getRank())) {
+        auto slice_locator = sliced_param_locators_[graph_id];
+        sliced_param_locators_[graph_id] = slice_locator;
 
-      sliced_param_ranks_[param_id] = param_ranks;
+        assert(contains(id_to_name, param_id));
+        assert(contains(params_, param_id));
+        const auto& param_name = id_to_name.at(param_id);
+        assert(contains(param_partitions, param_name));
+        const auto& partition = param_partitions.at(param_name);
+        size_t dim_idx = partition.second;
+
+        param =
+            slice_locator->registerParam(param_id, param, dim_idx, param_ranks);
+      } else {
+        param.set_data(torch::zeros({1}));
+      }
     }
 
     graph_grouped_params[comm_tag].push_back(param_id);
@@ -1054,7 +1095,6 @@ at::Tensor ParamStorage::doSyncParam(
   int root = param_ranks.front();
 
   at::Tensor param;
-  IRType ir_type;
   if (contains(param_ranks, mpi::getRank())) {
     if (amp_master_param) {
       assert(hasAmpMasterParam(param_id));
@@ -1115,6 +1155,47 @@ at::Tensor ParamStorage::doGatherParamZero(
   std::sort(param_ranks.begin(), param_ranks.end());
   int root = param_ranks.front();
   return bcastParam(param, root, false);
+}
+
+at::Tensor ParamStorage::gatherParam(long param_id, bool amp_master_param) {
+  return doGatherParam(param_id, false, amp_master_param);
+}
+
+at::Tensor ParamStorage::gatherParamGrad(long param_id, bool amp_master_param) {
+  return doGatherParam(param_id, true, amp_master_param);
+}
+
+at::Tensor ParamStorage::doGatherParam(
+    long param_id, bool grad, bool amp_master_param) {
+  at::Tensor gathered;
+  if (contains(ranks_.at(param_id), mpi::getRank())) {
+    torch::NoGradGuard no_grad;
+    const auto& sliced_param = hasAmpMasterParam(param_id)
+        ? getAmpMasterParamTensor(param_id)
+        : getParamTensor(param_id);
+    at::Tensor src = grad ? sliced_param.grad() : sliced_param;
+
+    if (!src.defined()) {
+      src = torch::zeros_like(sliced_param);
+    }
+
+    for (const auto& it : sliced_param_locators_) {
+      if (it.second->registered(param_id)) {
+        gathered = it.second->gather(param_id, src);
+        break;
+      }
+    }
+    if (!gathered.defined()) {
+      std::stringstream ss;
+      ss << "Couldn't find slice parameter: " << param_id;
+      throw std::runtime_error(ss.str());
+    }
+  }
+
+  auto param_ranks = setToVector(ranks_.at(param_id));
+  std::sort(param_ranks.begin(), param_ranks.end());
+  int root = param_ranks.front();
+  return bcastParam(gathered, root, false);
 }
 
 void ParamStorage::useAmpMasterParams(

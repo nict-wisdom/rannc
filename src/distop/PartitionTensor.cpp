@@ -38,7 +38,43 @@ ParamPartitionMap getDistParams(const std::shared_ptr<IRGraph>& g) {
   return ret;
 }
 
-TensorPartioningGraphInfo replaceWithDistOp(
+bool isInputDivisible(
+    const IRNode& node, const DistOp& dist_op,
+    const std::unordered_map<std::string, IRValue>& values, size_t div_num) {
+  const std::vector<std::string>& in_names = node.getInputNames();
+  for (const auto& part_dim : dist_op.partition_dim) {
+    size_t arg_idx = part_dim.first;
+    assert(arg_idx < in_names.size());
+    const auto& in_name = in_names.at(arg_idx);
+    assert(contains(values, in_name));
+
+    const auto& in_val = values.at(in_name);
+    const auto& ir_type = in_val.getType();
+    assert(ir_type.getBaseType() == IRBaseType::TENSOR);
+    const auto& dim = ir_type.getTensorDim();
+
+    size_t dim_idx = part_dim.second;
+    assert(dim_idx < dim.size());
+
+    if (dim.at(dim_idx) % div_num != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool isDistOpAvailable(
+    const IRNode& node,
+    const std::unordered_map<std::string, DistOp>& dist_op_map,
+    const std::unordered_map<std::string, IRValue>& values, size_t div_num) {
+  if (!contains(dist_op_map, node.getName())) {
+    return false;
+  }
+  return isInputDivisible(
+      node, dist_op_map.at(node.getName()), values, div_num);
+}
+
+TensorPartitioningGraphInfo replaceWithDistOp(
     const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks) {
   std::vector<IRNode> new_nodes;
   std::unordered_map<std::string, IRValue> new_values;
@@ -51,11 +87,16 @@ TensorPartioningGraphInfo replaceWithDistOp(
     new_values[in_name] = vals.at(in_name);
   }
 
+  std::unordered_map<std::string, DistOp> dist_op_map;
+  for (const auto& it : dist_ops) {
+    dist_op_map[it.original_name] = it;
+  }
+
   const auto name_map = getDistOpNameMap();
   int ex_rank_arg_idx = 0;
   int ex_rank_list_arg_idx = 0;
   for (const auto& n : g->getNodes()) {
-    if (contains(name_map, n.getName())) {
+    if (isDistOpAvailable(n, dist_op_map, vals, ranks.size())) {
       std::vector<std::string> ranks_val_node_names;
       for (const int r : ranks) {
         std::stringstream ss;
@@ -105,7 +146,7 @@ TensorPartioningGraphInfo replaceWithDistOp(
 
   ParamPartitionMap param_part = getDistParams(ret_graph);
 
-  return TensorPartioningGraphInfo{
+  return TensorPartitioningGraphInfo{
       ret_graph, ranks, param_part, dist_ranks, rank_value_names};
 }
 

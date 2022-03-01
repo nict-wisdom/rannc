@@ -237,16 +237,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
             if delay_grad_allreduce and run_update:
                 pyrannc.allreduce_grads(rmodel, r_opt)
 
-            if use_amp:
-                torch.nn.utils.clip_grad_norm_(amp.master_params(opt), MAX_NORM)
-            else:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_NORM)
-
-            rmodel.clip_grad_norm(MAX_NORM)
-
             if run_update:
-                if enable_zero:
-                    rmodel._sync_orig_params(sync_grad=True)
                 compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)
 
                 opt.step()
@@ -254,8 +245,6 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
                 opt.zero_grad()
                 r_opt.zero_grad()
 
-        if enable_zero:
-            rmodel._sync_orig_params()
         compare_params(model, rmodel, rtol, atol, has_param and use_amp, zero=enable_zero, opt_exp=opt,
                        opt_act=r_opt)
 
@@ -292,7 +281,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=use_amp, **module_args)
 
     # Verify parameters
-    r_params = {n: p for n, p in rmodel.named_parameters()}
+    r_params = {n: rmodel.get_param(n, use_amp) for n, p in rmodel.named_parameters()}
     ld_params = {n: p for n, p in ld_model.named_parameters()}
 
     for n, rp in r_params.items():

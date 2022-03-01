@@ -35,7 +35,7 @@ GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
       conf_.max_pipeline_num > 1,
       conf_.offload_params,
       conf_.force_dist_matmul,
-      TensorPartioningGraphInfo{}};
+      TensorPartitioningGraphInfo{}};
   return prof_util_.profile(in);
 }
 

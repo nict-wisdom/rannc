@@ -45,7 +45,7 @@ struct ProfilingInput {
   bool checkpointing = false;
   bool offload_params = false;
   bool force_dist_matmul = false;
-  TensorPartioningGraphInfo part_info;
+  TensorPartitioningGraphInfo part_info;
 
   MSGPACK_DEFINE(
       ir_graphs, batch_size, iteration, replica_num, pipeline_num,
