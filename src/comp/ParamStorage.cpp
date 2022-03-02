@@ -1134,8 +1134,16 @@ at::Tensor ParamStorage::doGatherParamZero(
   at::Tensor param;
   if (contains(ranks_.at(param_id), mpi::getRank())) {
     at::Tensor param_part;
-    assert(hasAmpMasterParam(param_id));
-    param_part = getAmpMasterParamTensor(param_id);
+
+    if (hasAmpMasterParam(param_id)) {
+      // if the segment size is zero, hasAmpMasterParam returns false.
+      param_part = getAmpMasterParamTensor(param_id);
+    } else {
+      at::TensorOptions options;
+      options = options.dtype(c10::ScalarType::Float)
+                    .device(c10::Device(c10::DeviceType::CUDA));
+      param_part = torch::zeros({}, options);
+    }
 
     at::Tensor buf;
     if (grad) {
