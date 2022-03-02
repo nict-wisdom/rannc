@@ -199,10 +199,17 @@ torch::Tensor DistLinearFunction::forward(
 
   logger->trace("DistLinearFunction forward starting");
 
-  logger->trace(
-      "input.size={} weight.size={} bias.size={} dist_ranks={}",
-      join_as_str(getTensorDim(input)), join_as_str(getTensorDim(weight)),
-      join_as_str(getTensorDim(*bias)), join_as_str(dist_ranks));
+  if (bias) {
+    logger->trace(
+        "input.size={} weight.size={} bias.size={} dist_ranks={}",
+        join_as_str(getTensorDim(input)), join_as_str(getTensorDim(weight)),
+        join_as_str(getTensorDim(*bias)), join_as_str(dist_ranks));
+  } else {
+    logger->trace(
+        "input.size={} weight.size={} bias=none dist_ranks={}",
+        join_as_str(getTensorDim(input)), join_as_str(getTensorDim(weight)),
+        join_as_str(dist_ranks));
+  }
 
   std::unordered_set<int> ranks;
   for (const int64_t r : dist_ranks) {

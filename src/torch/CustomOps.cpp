@@ -43,7 +43,6 @@ TORCH_LIBRARY(rannc, m) {
   m.def("offloadingPreHook", offloadingPreHook);
   m.def("offloadingPostHook", offloadingPostHook);
 
-  //  m.def("linear_dist", matmulDist);
   m.def(
       TORCH_SELECTIVE_SCHEMA(
           "rannc::linear_dist(Tensor input, Tensor weight, Tensor? bias, int[] dist_ranks) -> Tensor"),
