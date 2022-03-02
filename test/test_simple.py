@@ -38,6 +38,10 @@ test_models = [
 def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
                use_amp, allreduce_amp_master_params,
                enable_zero, dist_params, offload_params):
+    if allreduce_amp_master_params and (not use_amp):
+        print("use_amp must be True if allreduce_amp_master_params == True")
+        return
+
     if enable_zero and (not allreduce_amp_master_params):
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
