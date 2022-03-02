@@ -228,6 +228,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
         self.name_to_param = {n: p for n, p in self.model.named_parameters()}
         self.name_to_pid = {n: id(p) for n, p in self.model.named_parameters()}
+        self.shared_param_names = self._shared_param_names()
 
         super(RaNNCModule, self).__init__(enable_apex_amp, allreduce_amp_master_params, enable_zero,
                                           check_unused_values, offload_params)
@@ -389,25 +390,28 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         # This may cause oom
         if no_hook:
             stashed_hooks = _stash_state_dict_hooks(self.model)
-        st = self.model.state_dict(*args, **kwargs)
 
-        storage_to_name = {p.storage: [] for n, p in st.items()}
-        for n, p in st.items():
-            storage_to_name[p.storage].append(n)
-
-        for n, p in st.items():
-            # self.name_to_param contains only one of parameters that share the same data.
-            # (due to the behavior of named_parameters())
-            # So we only get one of them and copy into state_dict
+        new_state_dict = {}
+        shared_params = []
+        # self.name_to_param contains only one of parameters that share the same data.
+        # (due to the behavior of named_parameters())
+        for n, p in self.model.state_dict(*args, **kwargs).items():
             if n in self.name_to_param:
-                st[n] = self.get_param(n, amp_master_params and self.enable_apex_amp)
-                for clone_name in storage_to_name[p.storage]:
-                    if clone_name != n:
-                        st[clone_name] = st[n]
+                new_state_dict[n] = self.get_param(n, amp_master_params and self.enable_apex_amp)
+            else:
+                shared_params.append(n)
+        # Set shared parameters with other names
+        for name_set in self.shared_param_names:
+            stored_names = [n for n in name_set if n in new_state_dict]
+            assert (len(stored_names) == 1)
+            stored_name = stored_names[0]
+            for n in name_set:
+                if n != stored_name:
+                    new_state_dict[n] = new_state_dict[stored_name]
 
         if no_hook:
             _unstash_state_dict_hooks(self.model, stashed_hooks)
-        return st
+        return new_state_dict
 
     def load_state_dict(self, *args, **kwargs):
         r"""
@@ -548,6 +552,16 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             if id(p) in self.used_param_ids:
                 yield n, p
 
+    def _shared_param_names(self):
+        pid_to_names = {}
+        for prefix, module in self.named_modules():
+            for n, p in module._parameters.items():
+                if p is not None:
+                    name = prefix + ('.' if prefix else '') + n
+                    if id(p) not in pid_to_names:
+                        pid_to_names[id(p)] = set()
+                    pid_to_names[id(p)].add(name)
+        return list(pid_to_names.values())
 
 def allreduce_grads(rmodel, optimizer, prescale=1.0):
     if rmodel.enable_apex_amp:
