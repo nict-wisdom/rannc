@@ -45,19 +45,35 @@ class SmallParamModel(nn.Module):
 
     def __init__(self):
         super(SmallParamModel, self).__init__()
-        self.fc1 = nn.Linear(3, 2, bias=False)
-        self.fc2 = nn.Linear(2, 3, bias=False)
+        self.fc1 = nn.Linear(3, 4, bias=False)
+        self.fc2 = nn.Linear(4, 3, bias=False)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
-        x = x*2
-        x = x*3
+        x = x * 2
+        x = x * 3
+        return x
+
+
+class NestModel(nn.Module):
+    INPUT_DIM = (3,)
+    OUTPUT_DIM = (3,)
+
+    def __init__(self):
+        super(NestModel, self).__init__()
+        self.submodel = SmallParamModel()
+        self.fc = nn.Linear(3, 3, bias=False)
+
+    def forward(self, x):
+        x = self.submodel(x)
+        x = self.fc(x)
+        x = x * 2
+        x = x * 3
         return x
 
 
 class LossOutModel(nn.Module):
-
     INPUT_DIM = (3,)
     OUTPUT_DIM = (3,)
 

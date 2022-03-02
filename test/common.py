@@ -268,7 +268,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
 
     ld_model = copy.deepcopy(model_base)
 
-    loaded_state_dict = torch.load('model.pt')
+    loaded_state_dict = torch.load('model.pt', map_location='cpu')
     ld_model.load_state_dict(loaded_state_dict)
     ld_opt = optim.Adam(ld_model.parameters(), lr=lr)
 

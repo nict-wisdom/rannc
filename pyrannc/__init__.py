@@ -391,8 +391,19 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             stashed_hooks = _stash_state_dict_hooks(self.model)
         st = self.model.state_dict(*args, **kwargs)
 
-        for param_name in st.keys():
-            st[param_name] = self.get_param(param_name, amp_master_params and self.enable_apex_amp)
+        storage_to_name = {p.storage: [] for n, p in st.items()}
+        for n, p in st.items():
+            storage_to_name[p.storage].append(n)
+
+        for n, p in st.items():
+            # self.name_to_param contains only one of parameters that share the same data.
+            # (due to the behavior of named_parameters())
+            # So we only get one of them and copy into state_dict
+            if n in self.name_to_param:
+                st[n] = self.get_param(n, amp_master_params and self.enable_apex_amp)
+                for clone_name in storage_to_name[p.storage]:
+                    if clone_name != n:
+                        st[clone_name] = st[n]
 
         if no_hook:
             _unstash_state_dict_hooks(self.model, stashed_hooks)

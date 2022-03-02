@@ -29,11 +29,11 @@ test_models = [
 
 
 @pytest.mark.parametrize("test_model", test_models)
-@pytest.mark.parametrize("gradient_accumulation_steps", [1])
+@pytest.mark.parametrize("gradient_accumulation_steps", [1, 2, 4])
 @pytest.mark.parametrize("use_amp", [False, True])
 @pytest.mark.parametrize("allreduce_amp_master_params", [False, True])
-@pytest.mark.parametrize("enable_zero", [False])
-@pytest.mark.parametrize("dist_params", [False])
+@pytest.mark.parametrize("enable_zero", [False, True])
+@pytest.mark.parametrize("dist_params", [False, True])
 @pytest.mark.parametrize("offload_params", [False])
 def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient_accumulation_steps,
                use_amp, allreduce_amp_master_params,
@@ -42,8 +42,9 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
 
-    print("use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={} "
+    print("model={} use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={} "
           " gradient_accumulation_steps={} offload_params={}".format(
+        test_model["model"].__name__,
         use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps, offload_params))
 
     for k, v in default_vals.items():
