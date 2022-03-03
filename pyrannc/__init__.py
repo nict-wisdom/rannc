@@ -542,14 +542,14 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
         _pyrannc.barrier()
 
-    def _param_gen(self, f, *args, **kwargs):
+    def _param_gen(self, f, *args, from_global=False, **kwargs):
         for p in f(*args, **kwargs):
-            if id(p) in self.used_param_ids:
+            if from_global or id(p) in self.used_param_ids:
                 yield p
 
-    def _named_param_gen(self, f, *args, **kwargs):
+    def _named_param_gen(self, f, *args, from_global=False, **kwargs):
         for n, p in f(*args, **kwargs):
-            if id(p) in self.used_param_ids:
+            if from_global or id(p) in self.used_param_ids:
                 yield n, p
 
     def _shared_param_names(self):

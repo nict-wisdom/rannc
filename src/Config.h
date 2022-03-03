@@ -86,9 +86,6 @@ struct ConfigValue {
   template <typename T>
   T get() const;
 
-  template <typename T>
-  void set(T val);
-
   int int_val;
   float float_val;
   bool bool_val;
@@ -115,26 +112,6 @@ inline bool ConfigValue::get() const {
 template <>
 inline std::string ConfigValue::get() const {
   return str_val;
-}
-
-template <>
-inline void ConfigValue::set(int val) {
-  int_val = val;
-}
-
-template <>
-inline void ConfigValue::set(float val) {
-  float_val = val;
-}
-
-template <>
-inline void ConfigValue::set(bool val) {
-  bool_val = val;
-}
-
-template <>
-inline void ConfigValue::set(std::string val) {
-  str_val = std::move(val);
 }
 
 struct ConfigItem {
@@ -204,7 +181,11 @@ class Config {
 
   template <typename T>
   void setVal(const std::string& name, T val) {
-    values_[name].set(val);
+    values_[name] = ConfigValue(val);
+  }
+
+  bool hasValue(const std::string& name) const {
+    return contains(values_, name);
   }
 
   void display();

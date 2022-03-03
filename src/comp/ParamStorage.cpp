@@ -1064,7 +1064,7 @@ at::Tensor bcastParam(const at::Tensor& param, int root, bool grad) {
         buf = torch::zeros_like(param).cuda();
       }
     } else {
-      buf = param.detach().clone();
+      buf = param.cuda().detach().clone();
     }
   } else {
     buf = createTensorFromIRType(
@@ -1256,6 +1256,9 @@ void ParamStorage::clear() {
   dist_ids_.clear();
   DistributedParamLocator& zpl = DistributedParamLocator::get();
   zpl.clear();
+
+  zero_grad_locators_.clear();
+  sliced_param_locators_.clear();
 }
 
 void ParamStorage::doReleaseParam(long param_id) {

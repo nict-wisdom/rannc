@@ -281,7 +281,7 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     ld_model = pyrannc.RaNNCModule(ld_model, ld_opt, enable_apex_amp=use_amp, **module_args)
 
     # Verify parameters
-    r_params = {n: rmodel.get_param(n, use_amp) for n, p in rmodel.named_parameters()}
+    r_params = {n: rmodel.get_param(n, use_amp) for n, p in rmodel.named_parameters(from_global=True)}
     ld_params = {n: p for n, p in ld_model.named_parameters()}
 
     for n, rp in r_params.items():
