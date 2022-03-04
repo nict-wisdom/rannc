@@ -15,7 +15,7 @@ import pyrannc
 
 RELATIVE_TOLERANCE = 1e-2
 ABSOLUTE_TOLERANCE = 0
-LOSS_SCALE = 2 ** 10
+LOSS_SCALE = 2 ** 8
 MAX_NORM = 1.0
 
 torch.backends.cuda.matmul.allow_tf32 = False

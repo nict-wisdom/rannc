@@ -5,8 +5,14 @@ from . import common, models
 # from . import native_models
 
 default_vals = {
-    "rtol": 1e-1,
-    "atol": 0,
+    "rtol": {
+        "fp16": 1e-1,
+        "fp32": 1e-1
+    },
+    "atol": {
+        "fp16": 1e-2,
+        "fp32": 0.
+    },
     "get_dataset": None,
     "loss_out": False,
     "preprocess": None
@@ -22,7 +28,7 @@ test_models = [
     {"model": models.EmbeddingModel, "get_dataset": models.EmbeddingModel.get_dataset},
     {"model": models.FunctionModel, "get_dataset": models.FunctionModel.get_dataset},
     {"model": models.LossOutModel, "loss_out": True},
-    # {"model": models.BasicModel},
+    {"model": models.BasicModel, "atol": {"fp16": 5e-2, "fp32": 0.}, },
     # {"model": native_models.NativeCallModel01}, # compiles module
     # {"model": models.LayerNormModel, "preprocess": models.norm_to_float} # DP only
 ]
@@ -46,7 +52,7 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient
         print("allreduce_amp_master_params must be True if enable_zero == True")
         return
 
-    print("model={} use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={} "
+    print("model={} use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={}"
           " gradient_accumulation_steps={} offload_params={}".format(
         test_model["model"].__name__,
         use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps, offload_params))

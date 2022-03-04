@@ -1241,6 +1241,7 @@ void ParamStorage::clear() {
   unused_params_.clear();
   params_.clear();
   buffer_ids_.clear();
+  dist_ids_.clear();
   ranks_.clear();
   my_param_ranks_.clear();
   ref_counts_.clear();

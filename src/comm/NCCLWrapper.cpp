@@ -135,6 +135,7 @@ void NCCLWrapper::destroy() {
   comm_map_.clear();
   ranks_to_tag_.clear();
   buf_cache_.clear();
+  job_executor_ = NCCLBulkJobExecutor();
 }
 
 ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {

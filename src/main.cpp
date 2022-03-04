@@ -477,6 +477,13 @@ PYBIND11_MODULE(_pyrannc, m) {
         return at::Tensor();
       });
 
+  m.def("abort_all_processes", []() {
+    NCCLWrapper& nccl = NCCLWrapper::get();
+    nccl.abortAllCommunicators();
+    nccl.destroyAllCommunicators();
+    MPI_Abort(MPI_COMM_WORLD, -1);
+  });
+
 #ifdef VERSION_INFO
   m.attr("__version__") = VERSION_INFO;
 #else

@@ -93,7 +93,6 @@ class NCCLWrapper {
   void doAllreduce(
       int tag, const std::vector<at::Tensor>& tensors, ncclRedOp_t red_op);
 
-  bool initialized = false;
   std::unordered_map<int, AllReduceComm*> comm_map_;
   std::unordered_map<std::unordered_set<int>, int, IntSetHash> ranks_to_tag_;
   BufferTensorCache buf_cache_;
