@@ -104,13 +104,37 @@ class SharedParamModel(nn.Module):
     def forward(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
-        x = x*2
-        x = x*3
+        x = x * 2
+        x = x * 3
+        return x
+
+
+class SharedEmbModel(nn.Module):
+    SEQ_LEN = 16
+    VOCAB_SIZE = 10
+    EMB_SIZE = 8
+    INPUT_DIM = ()
+    OUTPUT_DIM = ()
+
+    @staticmethod
+    def get_dataset(dataset_size, input_dim, output_dim):
+        ds_x = torch.randint(EmbeddingModel.VOCAB_SIZE, (dataset_size, EmbeddingModel.SEQ_LEN))
+        ds_tgt = torch.randn(dataset_size, EmbeddingModel.SEQ_LEN, EmbeddingModel.VOCAB_SIZE)
+        return ds_x, ds_tgt
+
+    def __init__(self):
+        super().__init__()
+        self.emb = nn.Embedding(EmbeddingModel.VOCAB_SIZE, EmbeddingModel.EMB_SIZE)
+        self.fc = nn.Linear(self.emb.weight.size(1), self.emb.weight.size(0), bias=False)
+        self.fc.weight = self.emb.weight
+
+    def forward(self, x):
+        x = self.emb(x)
+        x = self.fc(x)
         return x
 
 
 class ForkJoinModel(nn.Module):
-
     INPUT_DIM = (3,)
     OUTPUT_DIM = (3,)
 
