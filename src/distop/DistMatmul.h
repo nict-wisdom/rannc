@@ -49,6 +49,20 @@ class DistLinearFunction
  private:
   static const std::shared_ptr<spdlog::logger> logger;
 };
+
+class GatherFunction : public torch::autograd::Function<GatherFunction> {
+ public:
+  static torch::Tensor forward(
+      torch::autograd::AutogradContext* ctx, torch::Tensor input,
+      int64_t dim_idx, std::vector<int64_t> dist_ranks);
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs);
+
+ private:
+  static const std::shared_ptr<spdlog::logger> logger;
+};
 } // namespace rannc
 
 #endif // TPTESTS_DISTMATMUL_H

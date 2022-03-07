@@ -62,6 +62,9 @@ class NCCLWrapper {
   void allgather(
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<at::Tensor>& out_bufs);
+  void reduceScatter(
+      int tag, const std::vector<at::Tensor>& tensors,
+      const std::vector<at::Tensor>& out_bufs);
   void startBulk();
   void endBulk();
   void checkCommError(int tag);

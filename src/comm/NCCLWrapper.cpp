@@ -373,6 +373,22 @@ void NCCLWrapper::allgather(
       });
 }
 
+void NCCLWrapper::reduceScatter(
+    int tag, const std::vector<at::Tensor>& tensors,
+    const std::vector<at::Tensor>& out_bufs) {
+  size_t num_proc = tensors.size();
+  return runCollectiveComm(
+      comm_map_, tag, tensors, out_bufs, {}, "reduceScatter",
+      [num_proc](
+          void* sendptr, void* recvptr, size_t count, int root,
+          ncclDataType_t datatype, ncclComm_t* ncomm) {
+        assert(count % num_proc == 0);
+        return ncclReduceScatter(
+            sendptr, recvptr, count / num_proc, datatype, ncclSum, *ncomm,
+            (cudaStream_t) nullptr);
+      });
+}
+
 std::string getBoolBufKey(const RouteDP& route, const std::string& action) {
   std::stringstream ss;
   ss << toString(route) << "_" << action;

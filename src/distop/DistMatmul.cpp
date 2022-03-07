@@ -242,24 +242,28 @@ torch::autograd::tensor_list DistLinearFunction::backward(
     ranks.insert(r);
   }
 
+  auto og = grad_outputs.at(0);
+
   logger->trace(
       "backward weight.size={} og.size={} ranks={}",
       join_as_str(getTensorDim(ctx->saved_data["weight"].toTensor())),
-      join_as_str(getTensorDim(grad_outputs.at(0))), join_as_str(ranks));
+      join_as_str(getTensorDim(og)), join_as_str(ranks));
 
   DistMatmul matmul1;
   at::Tensor d_input = matmul1.runRCR_AG(
-      grad_outputs.at(0).contiguous(),
-      ctx->saved_data["weight"].toTensor().contiguous(), ranks);
+      og.contiguous(), ctx->saved_data["weight"].toTensor().contiguous(),
+      ranks);
 
   logger->trace(
-      "backward og.size={} input.size={} ",
-      join_as_str(getTensorDim(grad_outputs.at(0))),
+      "backward og.size={} input.size={} ", join_as_str(getTensorDim(og)),
       join_as_str(getTensorDim(ctx->saved_data["input"].toTensor())));
+
   DistMatmul matmul2;
+
+  const auto input = ctx->saved_data["input"].toTensor();
   at::Tensor d_weight = matmul2.runCRC(
-      grad_outputs.at(0).t().contiguous(),
-      ctx->saved_data["input"].toTensor().contiguous(), ranks);
+      og.reshape({-1, og.size(-1)}).t().contiguous(),
+      input.reshape({-1, input.size(-1)}).contiguous(), ranks);
 
   at::Tensor d_bias;
 
@@ -272,6 +276,69 @@ torch::autograd::tensor_list DistLinearFunction::backward(
       grad_outputs.size());
 
   return {d_input, d_weight, d_bias, at::Tensor()};
+}
+
+torch::Tensor GatherFunction::forward(
+    torch::autograd::AutogradContext* ctx, torch::Tensor input, int64_t dim_idx,
+    std::vector<int64_t> dist_ranks) {
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  TagMap& tag_map = TagMap::get();
+
+  ctx->saved_data["dim_idx"] = dim_idx;
+  ctx->saved_data["ranks"] = dist_ranks;
+
+  std::unordered_set<int> rank_set;
+  for (int r : dist_ranks) {
+    rank_set.insert(r);
+  }
+  int tag = tag_map.getRankSetTag(rank_set);
+  nccl.createCommunicator(tag, rank_set);
+
+  std::vector<int64_t> gathered_dim;
+  gathered_dim.push_back(dist_ranks.size());
+  const auto local_dim = getTensorDim(input);
+  for (size_t d : getTensorDim(input)) {
+    gathered_dim.push_back(d);
+  }
+  at::Tensor gathered_y = torch::zeros(
+      gathered_dim, makeTensorOptions(input.dtype().toScalarType(), true));
+
+  nccl.allgather(tag, {input.contiguous()}, {gathered_y});
+
+  std::vector<at::Tensor> gathered_tensors;
+  for (int64_t idx = 0; idx < dist_ranks.size(); idx++) {
+    at::indexing::TensorIndex t_index{{idx}};
+    at::Tensor part = gathered_y.index(t_index);
+    gathered_tensors.push_back(part);
+  }
+  at::Tensor concat = torch::cat(gathered_tensors, dim_idx);
+  concat = concat.set_requires_grad(true);
+  return concat;
+}
+
+torch::autograd::tensor_list GatherFunction::backward(
+    torch::autograd::AutogradContext* ctx,
+    torch::autograd::tensor_list grad_outputs) {
+  std::unordered_set<int> rank_set;
+  for (int r : ctx->saved_data["ranks"].toIntList()) {
+    rank_set.insert(r);
+  }
+  NCCLWrapper& nccl = NCCLWrapper::get();
+  TagMap& tag_map = TagMap::get();
+
+  int tag = tag_map.getRankSetTag(rank_set);
+  nccl.createCommunicator(tag, rank_set);
+
+  const auto& out_grad = grad_outputs.at(0);
+
+  std::vector<int64_t> split_dim = getTensorDim(out_grad);
+  int64_t dim_idx = ctx->saved_data["dim_idx"].toInt();
+  split_dim[dim_idx] /= rank_set.size();
+
+  at::Tensor scattered_y = torch::zeros(
+      split_dim, makeTensorOptions(out_grad.dtype().toScalarType(), true));
+  nccl.reduceScatter(tag, {out_grad.contiguous()}, {scattered_y});
+  return {scattered_y, at::Tensor(), at::Tensor()};
 }
 
 } // namespace rannc

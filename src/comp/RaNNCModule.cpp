@@ -11,7 +11,6 @@
 #include <comm/ObjectComm.h>
 #include <Common.h>
 #include <comp/DistributedGradLocator.h>
-#include <comp/DistributedParamLocator.h>
 #include <comp/FunctionStorage.h>
 #include <Config.h>
 #include <cuda/CudaUtil.h>
@@ -419,6 +418,10 @@ std::vector<long> RaNNCModule::init(
 
       for (const auto& r_it : part_info.rank_values) {
         value_storage_->add(r_it.first, r_it.second);
+      }
+
+      for (const auto& d_it : part_info.dim_values) {
+        value_storage_->add(d_it.first, d_it.second);
       }
 
       for (const auto& pp_it : part_info.param_partitions) {

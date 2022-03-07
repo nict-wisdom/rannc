@@ -30,12 +30,16 @@ struct TensorPartitioningGraphInfo {
   std::vector<int> ranks;
   // param name -> (arg index, dim index)
   ParamPartitionMap param_partitions;
-  // value name -> rank
+  // value name -> rank (constant)
   std::unordered_map<std::string, int> rank_values;
+  // value name -> rank (constant)
+  std::unordered_map<std::string, int> dim_values;
   // node id -> [val names]
   std::unordered_map<std::string, std::vector<std::string>> rank_value_names;
 
-  MSGPACK_DEFINE(graph, ranks, param_partitions, rank_values, rank_value_names);
+  MSGPACK_DEFINE(
+      graph, ranks, param_partitions, rank_values, dim_values,
+      rank_value_names);
 };
 
 TensorPartitioningGraphInfo replaceWithDistOp(

@@ -477,6 +477,20 @@ PYBIND11_MODULE(_pyrannc, m) {
         return at::Tensor();
       });
 
+  m.def("test_gather", [](py::handle py_tensor, int64_t dim) {
+    auto iv = torch::jit::_toTypeInferredIValue(py_tensor);
+    assert(iv.isTensor());
+    at::Tensor ten = iv.toTensor().cuda();
+
+    std::vector<int64_t> ranks;
+    for (int r : mpi::getAllRanks()) {
+      ranks.push_back(r);
+    }
+    std::sort(ranks.begin(), ranks.end());
+
+    return GatherFunction::apply(ten, dim, ranks);
+  });
+
   m.def("abort_all_processes", []() {
     NCCLWrapper& nccl = NCCLWrapper::get();
     nccl.abortAllCommunicators();

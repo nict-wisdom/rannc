@@ -87,6 +87,9 @@ ProfilingResult DistTaskDispatcher::runProfiling(
   for (const auto& it : prof_input.part_info.rank_values) {
     constants[it.first] = it.second;
   }
+  for (const auto& it : prof_input.part_info.dim_values) {
+    constants[it.first] = it.second;
+  }
   scomm_.bcastIValueMap(constants, bcast_route);
 
   sg_prof_->updateConstants(constants);

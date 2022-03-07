@@ -74,6 +74,124 @@ bool isDistOpAvailable(
       node, dist_op_map.at(node.getName()), values, div_num);
 }
 
+std::pair<std::string, std::vector<std::string>> addRankList(
+    std::vector<IRNode>& nodes,
+    std::unordered_map<std::string, IRValue>& values,
+    std::unordered_map<std::string, int>& dist_ranks, int& ex_rank_arg_idx,
+    int& ex_rank_list_arg_idx, const std::string& prefix,
+    const std::vector<int>& ranks) {
+  std::vector<std::string> ranks_val_node_names;
+  for (const int r : ranks) {
+    std::stringstream ss;
+    ss << "_" << prefix << "_" << ex_rank_arg_idx;
+    std::string val_name = ss.str();
+    IRNode const_node("prim::Constant", {}, {val_name});
+    nodes.push_back(const_node);
+
+    IRValue val(val_name, IRType::createScalarType(IRScalarType::INT));
+    values[val_name] = val;
+    ranks_val_node_names.push_back(val_name);
+
+    dist_ranks[val_name] = r;
+    ex_rank_arg_idx++;
+  }
+  std::stringstream ss;
+  ss << "_" << prefix << "_list_" << ex_rank_list_arg_idx++;
+  std::string int_list_val_name = ss.str();
+  IRNode int_list_node(
+      "prim::ListConstruct", ranks_val_node_names, {int_list_val_name});
+  nodes.push_back(int_list_node);
+
+  IRValue int_list_val(
+      int_list_val_name, IRType::createListType(IRListType::INT));
+  values[int_list_val_name] = int_list_val;
+
+  return {int_list_val_name, ranks_val_node_names};
+}
+
+TensorPartitioningGraphInfo insertGather(
+    TensorPartitioningGraphInfo part_info) {
+  std::vector<IRNode> new_nodes;
+  std::unordered_map<std::string, IRValue> new_values;
+  std::unordered_map<std::string, std::vector<std::string>> rank_value_names;
+
+  spdlog::info("before insert_gather: {}", toString(*part_info.graph));
+
+  const auto& g = part_info.graph;
+  const std::unordered_map<std::string, IRValue>& vals = g->getValues();
+  for (const auto& in_name : g->getInputNames()) {
+    assert(contains(vals, in_name));
+    new_values[in_name] = vals.at(in_name);
+  }
+
+  // find target param
+  const ParamPartitionMap& param_part_map = part_info.param_partitions;
+  int ex_rank_arg_idx = 0;
+  int ex_rank_list_arg_idx = 0;
+  int ex_dim_arg_idx = 0;
+  for (const auto& node : g->getNodes()) {
+    std::vector<std::string> input_names;
+    for (const auto& in_name : node.getInputNames()) {
+      // if this node uses the sliced param
+      if (contains(param_part_map, in_name) &&
+          node.getName() != "rannc::linear_dist") { // op does not support
+        const auto& param_part = param_part_map.at(in_name);
+        const auto rank_list_info = addRankList(
+            new_nodes, new_values, part_info.rank_values, ex_rank_arg_idx,
+            ex_rank_list_arg_idx, "ex_gather_rank", part_info.ranks);
+        const std::string& int_list_val_name = rank_list_info.first;
+        const std::vector<std::string>& ranks_val_node_names =
+            rank_list_info.second;
+
+        // dim
+        std::stringstream ss_dim_arg_name;
+        ss_dim_arg_name << "_slice_dim_" << ex_dim_arg_idx;
+        const std::string dim_arg_name = ss_dim_arg_name.str();
+        part_info.dim_values[dim_arg_name] = param_part.second;
+        ex_dim_arg_idx++;
+        std::vector<std::string> gather_input_names;
+        gather_input_names.push_back(in_name);
+        gather_input_names.push_back(dim_arg_name);
+        gather_input_names.push_back(int_list_val_name);
+
+        new_values[dim_arg_name] =
+            IRValue(dim_arg_name, IRType::createScalarType(IRScalarType::INT));
+
+        IRNode slice_dim_node{"prim::Constant", {}, {dim_arg_name}};
+        new_nodes.push_back(slice_dim_node);
+
+        std::stringstream ss_gather_out_name;
+        ss_gather_out_name << in_name << "_gather_out";
+        const std::string gather_output_name = ss_gather_out_name.str();
+        IRNode gather_node{
+            "rannc::gather", gather_input_names, {gather_output_name}};
+        new_nodes.push_back(gather_node);
+        assert(contains(vals, in_name));
+        new_values[gather_output_name] =
+            IRValue(gather_output_name, vals.at(in_name).getType());
+
+        input_names.push_back(gather_output_name);
+      } else {
+        input_names.push_back(in_name);
+      }
+    }
+
+    new_nodes.emplace_back(node.getName(), input_names, node.getOutputNames());
+
+    for (const auto& out_name : node.getOutputNames()) {
+      new_values[out_name] = vals.at(out_name);
+    }
+  }
+
+  part_info.graph = std::make_shared<IRGraph>(
+      g->getName(), new_nodes, new_values, g->getInputNames(),
+      g->getOutputNames());
+
+  spdlog::info("after insert_gather: {}", toString(*part_info.graph));
+
+  return part_info;
+}
+
 TensorPartitioningGraphInfo replaceWithDistOp(
     const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks) {
   std::vector<IRNode> new_nodes;
@@ -97,32 +215,12 @@ TensorPartitioningGraphInfo replaceWithDistOp(
   int ex_rank_list_arg_idx = 0;
   for (const auto& n : g->getNodes()) {
     if (isDistOpAvailable(n, dist_op_map, vals, ranks.size())) {
-      std::vector<std::string> ranks_val_node_names;
-      for (const int r : ranks) {
-        std::stringstream ss;
-        ss << "_ex_rank_" << ex_rank_arg_idx;
-        std::string val_name = ss.str();
-        IRNode const_node("prim::Constant", {}, {val_name});
-        new_nodes.push_back(const_node);
-
-        IRValue val(val_name, IRType::createScalarType(IRScalarType::INT));
-        new_values[val_name] = val;
-        ranks_val_node_names.push_back(val_name);
-
-        dist_ranks[val_name] = r;
-        ex_rank_arg_idx++;
-      }
-      std::stringstream ss;
-      ss << "_ex_rank_list_" << ex_rank_list_arg_idx++;
-      std::string int_list_val_name = ss.str();
-      IRNode int_list_node(
-          "prim::ListConstruct", ranks_val_node_names, {int_list_val_name});
-      new_nodes.push_back(int_list_node);
-
-      IRValue int_list_val(
-          int_list_val_name, IRType::createListType(IRListType::INT));
-      new_values[int_list_val_name] = int_list_val;
-
+      const auto rank_list_info = addRankList(
+          new_nodes, new_values, dist_ranks, ex_rank_arg_idx,
+          ex_rank_list_arg_idx, "ex_rank", ranks);
+      const std::string& int_list_val_name = rank_list_info.first;
+      const std::vector<std::string>& ranks_val_node_names =
+          rank_list_info.second;
       std::vector<std::string> input_names = n.getInputNames();
       input_names.push_back(int_list_val_name);
 
@@ -146,8 +244,9 @@ TensorPartitioningGraphInfo replaceWithDistOp(
 
   ParamPartitionMap param_part = getDistParams(ret_graph);
 
-  return TensorPartitioningGraphInfo{
-      ret_graph, ranks, param_part, dist_ranks, rank_value_names};
+  auto part_info = TensorPartitioningGraphInfo{
+      ret_graph, ranks, param_part, dist_ranks, {}, rank_value_names};
+  return insertGather(part_info);
 }
 
 at::Tensor sliceParam(
@@ -157,7 +256,6 @@ at::Tensor sliceParam(
   assert(contains(ranks, my_rank));
 
   const auto& partition = param_partitions.at(name);
-  size_t arg_idx = partition.first;
   size_t dim_idx = partition.second;
 
   if (param.size(dim_idx) % ranks.size() != 0) {
