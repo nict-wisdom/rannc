@@ -40,6 +40,10 @@ struct TensorPartitioningGraphInfo {
   MSGPACK_DEFINE(
       graph, ranks, param_partitions, rank_values, dim_values,
       rank_value_names);
+
+  bool valid() const {
+    return (bool)graph;
+  }
 };
 
 TensorPartitioningGraphInfo replaceWithDistOp(

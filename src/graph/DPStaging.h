@@ -21,6 +21,18 @@ class GraphMergeHelper {
   GraphMergeCache graph_merge_cache_;
 };
 
+struct AllocSolution {
+  std::vector<std::shared_ptr<IRGraph>> graphs;
+  std::unordered_map<std::string, int> repl_nums;
+  int pipeline_num;
+  bool checkpointing;
+  std::vector<size_t> boundaries;
+  std::vector<size_t> dev_nums;
+
+  MSGPACK_DEFINE(
+      graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums);
+};
+
 class DPStaging {
  public:
   DPStaging(
@@ -45,9 +57,7 @@ class DPStaging {
   virtual GraphProfile estimateSolutionGraph(
       const AllocSolution& sol, const MLGraph& graph, size_t g_idx);
 
-  GraphProfile estimateProf(
-      const MLGraph& graph, size_t from, size_t to, size_t dev_num,
-      size_t pipeline_num, bool checkpointing);
+  GraphProfile estimateProf(const ProfilingInput& prof_in);
 
   void dumpNodeProfiles(const std::string& path, const MLGraph& graph);
 

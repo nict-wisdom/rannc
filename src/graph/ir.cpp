@@ -663,64 +663,6 @@ int64_t guessGraphBatchSize(const std::shared_ptr<IRGraph>& ir_graph) {
   return 0;
 }
 
-size_t getOptMemSize(
-    const std::shared_ptr<IRGraph>& ir_graph, int opt_param_factor,
-    bool use_amp_master_param, bool enable_zero, int zero_dist_num) {
-  if (!enable_zero) {
-    zero_dist_num = 1;
-  }
-
-  // This does not need to consider batch size
-  size_t sum = 0;
-  for (const auto& v : ir_graph->getValues()) {
-    const auto& val = v.second;
-    if (val.isParam()) {
-      if (use_amp_master_param) {
-        if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
-          sum += val.getSizeInByte() // amp holds params
-              * 2 // FP32
-              / zero_dist_num; // Each rank holds only fragments of FP32 master
-                               // params
-          sum += val.getSizeInByte() // amp holds grads
-              * 2 // FP32
-              / zero_dist_num;
-          sum += val.getSizeInByte() // optimizer state
-              * 2 // FP32
-              * opt_param_factor / zero_dist_num;
-        } else if (
-            val.getType().getTensorElemType() == IRTensorElemType::FLOAT ||
-            val.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
-          // we have to keep memory for stashed gradients
-          sum += val.getSizeInByte() * opt_param_factor /
-                  zero_dist_num // optimizer state
-              + val.getSizeInByte(); // stashed gradients
-        } else {
-          throw std::runtime_error(
-              "Unexpected param type: " +
-              toString(val.getType().getTensorElemType()));
-        }
-      } else {
-        sum += val.getSizeInByte() * opt_param_factor /
-            zero_dist_num; // optimizer state
-      }
-    }
-  }
-  return sum;
-}
-
-size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph) {
-  size_t sum = 0;
-  for (const auto& v : ir_graph->getValues()) {
-    const auto& val = v.second;
-    if (val.isParam()) {
-      if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
-        sum += val.getSizeInByte() * 2; // FP32
-      }
-    }
-  }
-  return sum;
-}
-
 bool verifyNoDuplicatedOutputs(const std::shared_ptr<IRGraph>& g) {
   std::unordered_set<std::string> out_names;
 

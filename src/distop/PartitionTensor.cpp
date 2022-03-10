@@ -115,8 +115,6 @@ TensorPartitioningGraphInfo insertGather(
   std::unordered_map<std::string, IRValue> new_values;
   std::unordered_map<std::string, std::vector<std::string>> rank_value_names;
 
-  spdlog::info("before insert_gather: {}", toString(*part_info.graph));
-
   const auto& g = part_info.graph;
   const std::unordered_map<std::string, IRValue>& vals = g->getValues();
   for (const auto& in_name : g->getInputNames()) {
@@ -186,8 +184,6 @@ TensorPartitioningGraphInfo insertGather(
   part_info.graph = std::make_shared<IRGraph>(
       g->getName(), new_nodes, new_values, g->getInputNames(),
       g->getOutputNames());
-
-  spdlog::info("after insert_gather: {}", toString(*part_info.graph));
 
   return part_info;
 }

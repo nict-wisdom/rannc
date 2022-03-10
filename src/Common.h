@@ -270,6 +270,8 @@ fs::path getHomeDir();
 std::vector<std::unordered_set<int>> combination(
     const std::vector<int>& group, int size);
 
+std::vector<int> createDummyRanks(int num);
+
 struct IntSetHash {
   std::size_t operator()(const std::unordered_set<int>& iset) const {
     auto ivec = setToVector(iset);

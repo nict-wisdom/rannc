@@ -71,6 +71,11 @@ class MLPartitioner {
       std::vector<MLVertex> nodes, const MLBGraph& bg);
   long eval(const GraphProfile& prof);
 
+  bool fitToMem(
+      const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
+      long capacity, bool use_amp_master_params, bool enable_zero,
+      int zero_dist_num);
+
   ProfilerUtil prof_util_;
   PartitioningConf conf_;
   size_t batch_size_;

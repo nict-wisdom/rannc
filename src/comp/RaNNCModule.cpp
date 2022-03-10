@@ -290,7 +290,9 @@ std::vector<long> RaNNCModule::init(
       std::unordered_map<std::string, GraphProfile> profiles;
       ProfilerUtil prof_util(sg_prof);
       std::vector<std::shared_ptr<IRGraph>> graphs;
-      std::unordered_map<std::string, int> repl_nums;
+      std::unordered_map<std::string, size_t> repl_nums;
+      std::unordered_map<std::string, TensorPartitioningGraphInfo>
+          part_info_map;
 
       for (const auto& it : deployment_.fwd_graph_order) {
         const auto& g = deployment_.subgraphs.at(it);
@@ -299,20 +301,27 @@ std::vector<long> RaNNCModule::init(
         graphs.push_back(g);
         repl_nums[it] = repl_num;
         ProfilingInput prof_in{
-            {{g->getName(), g}},
-            static_cast<size_t>(batch_size),
+            g,
             3,
             static_cast<size_t>(repl_num),
             static_cast<size_t>(deployment_.pipeline_num),
             deployment_.checkpointing,
-            pconf.offload_params,
-            pconf.force_dist_matmul,
-            TensorPartitioningGraphInfo{}};
+            TensorPartitioningGraphInfo{},
+            pconf};
         profiles[it] = prof_util.profile(prof_in);
+        part_info_map[it] = TensorPartitioningGraphInfo{};
       }
-      logger->info(displayGraphProfiles(
-          graphs, batch_size, deployment_.pipeline_num, use_amp_master_params_,
-          enable_zero_, repl_nums, profiles));
+
+      ProfilingInput prof_in{
+          deployment_.subgraphs,
+          3,
+          repl_nums,
+          static_cast<size_t>(deployment_.pipeline_num),
+          deployment_.checkpointing,
+          part_info_map,
+          pconf};
+
+      logger->info(displayGraphProfiles(prof_in, profiles));
 
       logger->info("Allocations: dev_num={}", mpi::getSize());
       for (const auto& it : deployment_.subgraphs) {

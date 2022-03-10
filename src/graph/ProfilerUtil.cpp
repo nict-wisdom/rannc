@@ -52,35 +52,93 @@ long calcAllReduceTime(long size) {
   return size * 1e6 / (double)(10 * 1024L * 1024L * 1024L);
 }
 
+size_t getOptMemSize(
+    const std::shared_ptr<IRGraph>& ir_graph, const ProfilingInput& prof_in) {
+  assert(contains(prof_in.replica_nums, ir_graph->getName()));
+  int replica_num = prof_in.replica_nums.at(ir_graph->getName());
+  int zero_dist_num = prof_in.enable_zero ? 1 : replica_num;
+
+  // This does not need to consider batch size
+  size_t sum = 0;
+  assert(contains(prof_in.part_info, ir_graph->getName()));
+  const auto sliced_params =
+      key_set(prof_in.part_info.at(ir_graph->getName()).param_partitions);
+  for (const auto& v : ir_graph->getValues()) {
+    const auto& val = v.second;
+    if (val.isParam()) {
+      int slice_num = contains(sliced_params, val.getName()) ? replica_num : 1;
+
+      if (prof_in.use_amp_master_params) {
+        if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
+          sum += val.getSizeInByte() // amp holds params
+              * 2 // FP32
+              / zero_dist_num // Each rank holds only fragments of FP32 master
+                              // params
+              / slice_num;
+          sum += val.getSizeInByte() // amp holds grads
+              * 2 // FP32
+              / zero_dist_num / slice_num;
+          sum += val.getSizeInByte() // optimizer state
+              * 2 // FP32
+              * prof_in.opt_param_factor / zero_dist_num / slice_num;
+        } else if (
+            val.getType().getTensorElemType() == IRTensorElemType::FLOAT ||
+            val.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
+          // we have to keep memory for stashed gradients
+          sum += val.getSizeInByte() * prof_in.opt_param_factor /
+              zero_dist_num // optimizer state
+              / slice_num;
+          +val.getSizeInByte() / slice_num; // stashed gradients
+        } else {
+          throw std::runtime_error(
+              "Unexpected param type: " +
+              toString(val.getType().getTensorElemType()));
+        }
+      } else {
+        sum += val.getSizeInByte() * prof_in.opt_param_factor /
+            zero_dist_num // optimizer state
+            / slice_num;
+      }
+    }
+  }
+  return sum;
+}
+
+size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph) {
+  size_t sum = 0;
+  for (const auto& v : ir_graph->getValues()) {
+    const auto& val = v.second;
+    if (val.isParam()) {
+      if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
+        sum += val.getSizeInByte() * 2; // FP32
+      }
+    }
+  }
+  return sum;
+}
+
+// size_t calcGraphMem(
+//     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
+//     bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
 size_t calcGraphMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-    bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
-  static int opt_param_factor =
-      config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-  size_t opt_mem = getOptMemSize(
-      g, opt_param_factor, use_amp_master_params, enable_zero, zero_dist_num);
+    const ProfilingInput& prof_in) {
+  size_t opt_mem = getOptMemSize(g, prof_in);
 
   return prof.max_allocated_mem + opt_mem;
 }
 
 size_t calcGraphMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-    size_t batch_size, int replica_num, int pipeline_num,
-    bool use_amp_master_params, bool enable_zero) {
-  size_t bs = ceil(batch_size / (double)(replica_num * pipeline_num));
+    size_t batch_size, ProfilingInput in) {
+  assert(contains(in.replica_nums, g->getName()));
+  int replica_num = in.replica_nums.at(g->getName());
+
+  size_t bs = ceil(batch_size / (double)(replica_num * in.pipeline_num));
   auto scaled = std::make_shared<IRGraph>("scaled", *g);
   scaled->setBatchSize(bs);
-  return calcGraphMem(
-             g, prof, use_amp_master_params, enable_zero, replica_num) +
-      calcCommBufSize(scaled);
-}
 
-bool fitToMem(
-    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
-    bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
-  return calcGraphMem(
-             g, prof, use_amp_master_params, enable_zero, zero_dist_num) <
-      (size_t)capacity;
+  return calcGraphMem(g, prof, in) + calcCommBufSize(scaled);
 }
 
 GraphProfile makeErrorProfile() {
@@ -93,6 +151,18 @@ GraphProfile makeErrorProfile() {
 }
 
 GraphProfile ProfilerUtil::profile(const ProfilingInput& in) {
+  if (in.force_dist_matmul) {
+    bool dist = true;
+    for (const auto& part_info : in.part_info) {
+      if (!part_info.second.valid()) {
+        dist = false;
+        break;
+      }
+    }
+    if (dist) {
+      return profileDist(in);
+    }
+  }
   return doProfile(in, [this](const ProfilingInput& input) {
     return this->profiler_->profile(input);
   });
@@ -110,10 +180,6 @@ GraphProfile ProfilerUtil::profileDist(const ProfilingInput& in) {
       }
     }
 
-    std::unordered_set<int> target_ranks;
-    for (int i = 0; i < input.replica_num; i++) {
-      target_ranks.insert(i);
-    }
     DistTaskDispatcher& dtd = DistTaskDispatcher::get();
     return dtd.profile(input, in_values);
   });
@@ -122,14 +188,17 @@ GraphProfile ProfilerUtil::profileDist(const ProfilingInput& in) {
 GraphProfile ProfilerUtil::doProfile(
     const ProfilingInput& in,
     const std::function<ProfilingResult(const ProfilingInput& input)>& f) {
-  assert(in.replica_num > 0);
   assert(in.pipeline_num > 0);
   assert(in.ir_graphs.size() == 1);
 
   const std::shared_ptr<IRGraph>& g = (*in.ir_graphs.begin()).second;
   assert(g);
 
-  size_t bs = ceil(in.batch_size / (double)(in.replica_num * in.pipeline_num));
+  assert(contains(in.replica_nums, g->getName()));
+  int replica_num = in.replica_nums.at(g->getName());
+  assert(replica_num > 0);
+
+  size_t bs = ceil(in.batch_size / (double)(replica_num * in.pipeline_num));
 
   const MLProfileKey k{g->getName(), bs, in.checkpointing};
   if (contains(profile_cache_, k)) {
@@ -160,8 +229,7 @@ GraphProfile ProfilerUtil::doProfile(
     if (pos1 == std::string::npos && pos2 == std::string::npos) {
       spdlog::error(
           "Failed to profile graph: {} batch_size={} replica_num={} pipeline_num={} {}",
-          g->getName(), in.batch_size, in.replica_num, in.pipeline_num,
-          e.what());
+          g->getName(), in.batch_size, replica_num, in.pipeline_num, e.what());
       throw std::runtime_error("Failed to profile graph: " + toString(*g));
     } else {
       profile_cache_[k] = makeErrorProfile();
@@ -178,27 +246,26 @@ GraphProfile ProfilerUtil::doProfile(
 }
 
 GraphProfile accProfileValues(
-    ProfilerUtil& prof_util, size_t batch_size, int iteration,
-    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, size_t pipeline_num, bool checkpointing,
-    bool offload_params, bool force_dist_matmul) {
-  assert(from <= to);
-  assert(to < graphs.size());
-
+    ProfilerUtil& prof_util, const ProfilingInput& prof_in) {
   GraphProfile prof_sum{"MERGED", 0, 0, 0};
 
-  for (size_t i = from; i <= to; i++) {
-    const auto& graph = graphs.at(i);
+  for (const auto& it : prof_in.ir_graphs) {
+    auto graph = it.second;
+    assert(contains(prof_in.part_info, graph->getName()));
+
     const auto prof = prof_util.profile(
         {{{graph->getName(), graph}},
-         batch_size,
-         iteration,
-         dev_num,
-         pipeline_num,
-         checkpointing,
-         offload_params,
-         force_dist_matmul,
-         TensorPartitioningGraphInfo{}});
+         prof_in.batch_size,
+         prof_in.iteration,
+         prof_in.replica_nums,
+         prof_in.pipeline_num,
+         prof_in.checkpointing,
+         prof_in.opt_param_factor,
+         prof_in.use_amp_master_params,
+         prof_in.enable_zero,
+         prof_in.offload_params,
+         prof_in.force_dist_matmul,
+         {{graph->getName(), prof_in.part_info.at(graph->getName())}}});
 
     prof_sum.fwd_time += prof.fwd_time;
     prof_sum.bwd_time += prof.bwd_time;
@@ -208,37 +275,34 @@ GraphProfile accProfileValues(
 }
 
 std::string displayGraphProfiles(
-    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t batch_size,
-    int pipeline_num, bool use_amp_master_params, bool enable_zero,
-    const std::unordered_map<std::string, int>& repl_nums,
+    const ProfilingInput& prof_inputs,
     const std::unordered_map<std::string, GraphProfile>& profiles) {
   std::stringstream ss;
 
   int dev_num = 0;
-  for (const auto& it : repl_nums) {
+  for (const auto& it : prof_inputs.replica_nums) {
     dev_num += it.second;
   }
 
-  ss << "Estimated profiles of subgraphs: batch_size=" << batch_size
-     << " np=" << dev_num << " pipeline=" << pipeline_num
-     << " use_amp=" << use_amp_master_params << " zero=" << enable_zero
-     << std::endl;
+  ss << "Estimated profiles of subgraphs: batch_size=" << prof_inputs.batch_size
+     << " np=" << dev_num << " pipeline=" << prof_inputs.pipeline_num
+     << " use_amp=" << prof_inputs.use_amp_master_params
+     << " zero=" << prof_inputs.enable_zero << std::endl;
 
   size_t idx = 0;
-  for (const auto& g : graphs) {
-    const auto& name = g->getName();
-    assert(contains(repl_nums, name));
+  for (const auto& it : prof_inputs.ir_graphs) {
+    const auto& name = it.first;
+    const auto& g = it.second;
+    assert(contains(prof_inputs.replica_nums, name));
     assert(contains(profiles, name));
 
-    int repl_num = repl_nums.at(name);
+    int repl_num = prof_inputs.replica_nums.at(name);
     const auto& prof = profiles.at(name);
 
-    int opt_param_factor =
-        config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-    size_t opt_mem = getOptMemSize(
-        g, opt_param_factor, use_amp_master_params, enable_zero, repl_num);
+    size_t opt_mem = getOptMemSize(g, prof_inputs);
 
-    size_t bs = ceil(batch_size / (double)(repl_num * pipeline_num));
+    size_t bs = ceil(
+        prof_inputs.batch_size / (double)(repl_num * prof_inputs.pipeline_num));
     auto scaled = std::make_shared<IRGraph>("scaled", *g);
     scaled->setBatchSize(bs);
     size_t comm_buf = calcCommBufSize(scaled);
@@ -275,7 +339,7 @@ std::string displayGraphProfiles(
        << " total_mem=" << total << " (fwd+bwd=" << prof.max_allocated_mem
        << " opt=" << opt_mem << " comm=" << comm_buf << ")";
 
-    if (idx < graphs.size() - 1) {
+    if (idx < prof_inputs.ir_graphs.size() - 1) {
       ss << std::endl;
     }
     idx++;

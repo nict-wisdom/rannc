@@ -18,16 +18,16 @@ long calcInputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
 long calcOutputCommTime(const std::shared_ptr<IRGraph>& g, int repl);
 long calcAllReduceTime(long cut_size);
 
+size_t getOptMemSize(
+    const std::shared_ptr<IRGraph>& ir_graph, const ProfilingInput& prof_in);
+size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph);
+
 size_t calcGraphMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-    bool use_amp_master_params, bool enable_zero, int zero_dist_num);
+    const ProfilingInput& prof_in);
 size_t calcGraphMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-    size_t batch_size, int replica_num, int pipeline_num,
-    bool use_amp_master_params, bool enable_zero);
-bool fitToMem(
-    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
-    bool use_amp_master_params, bool enable_zero, int zero_dist_num);
+    size_t batch_size, ProfilingInput in);
 
 struct MLProfileKey {
   std::string id;
@@ -87,15 +87,10 @@ class ProfilerUtil {
 };
 
 GraphProfile accProfileValues(
-    ProfilerUtil& prof_util, size_t batch_size, int iteration,
-    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t from, size_t to,
-    size_t dev_num, size_t pipeline_num, bool checkpointing,
-    bool offload_params, bool force_dist_matmul);
+    ProfilerUtil& prof_util, const ProfilingInput& prof_in);
 
 std::string displayGraphProfiles(
-    const std::vector<std::shared_ptr<IRGraph>>& graphs, size_t batch_size,
-    int pipeline_num, bool use_amp_master_params, bool enable_zero,
-    const std::unordered_map<std::string, int>& repl_nums,
+    const ProfilingInput& prof_inputs,
     const std::unordered_map<std::string, GraphProfile>& profiles);
 } // namespace rannc
 #endif // PYRANNC_PROFILERUTIL_H

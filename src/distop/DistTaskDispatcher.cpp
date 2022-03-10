@@ -66,7 +66,11 @@ ProfilingResult DistTaskDispatcher::runProfiling(
   ProfilingInput prof_input = input;
   prof_input = ocomm_.bcast(prof_input);
 
-  std::unordered_set<int> ranks = vectorToSet(prof_input.part_info.ranks);
+  assert(prof_input.ir_graphs.size() == 1);
+  const std::shared_ptr<IRGraph>& graph = prof_input.ir_graphs.begin()->second;
+  assert(contains(prof_input.part_info, graph->getName()));
+  const auto& part_info = prof_input.part_info.at(graph->getName());
+  std::unordered_set<int> ranks = vectorToSet(part_info.ranks);
   if (!contains(ranks, mpi::getRank())) {
     return ProfilingResult{};
   }
@@ -76,18 +80,18 @@ ProfilingResult DistTaskDispatcher::runProfiling(
 
   int src_tag = tag_map.getRankSetTag({0});
   RouteDP bcast_route(
-      IValueLocation("PROF_INPUTS"), {0}, prof_input.part_info.ranks, tag,
-      src_tag, RouteTypeDP::BROADCAST);
+      IValueLocation("PROF_INPUTS"), {0}, part_info.ranks, tag, src_tag,
+      RouteTypeDP::BROADCAST);
   createRouteCommunicator({bcast_route});
   nccl_.syncWithErrorCheck();
 
   input_vals = scomm_.bcastIValueMap(input_vals, bcast_route);
 
   IValueMap constants;
-  for (const auto& it : prof_input.part_info.rank_values) {
+  for (const auto& it : part_info.rank_values) {
     constants[it.first] = it.second;
   }
-  for (const auto& it : prof_input.part_info.dim_values) {
+  for (const auto& it : part_info.dim_values) {
     constants[it.first] = it.second;
   }
   scomm_.bcastIValueMap(constants, bcast_route);

@@ -204,4 +204,13 @@ std::vector<std::unordered_set<int>> combination(
   calcCombination(std::unordered_set<int>(), group, size, 0, results);
   return results;
 }
+
+std::vector<int> createDummyRanks(int num) {
+  std::vector<int> dummy_ranks;
+  for (int i = 0; i < num; i++) {
+    dummy_ranks.push_back(i);
+  }
+  return dummy_ranks;
+}
+
 } // namespace rannc

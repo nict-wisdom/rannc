@@ -25,17 +25,26 @@ long MLPartitioner::eval(const GraphProfile& prof) {
   return prof.max_allocated_mem;
 }
 
+bool MLPartitioner::fitToMem(
+    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
+    bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
+  ProfilingInput prof_in{g,    0,     static_cast<size_t>(zero_dist_num),
+                         1,    false, TensorPartitioningGraphInfo{},
+                         conf_};
+
+  return calcGraphMem(g, prof, prof_in) < (size_t)capacity;
+}
+
 GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
   ProfilingInput in{
-      {{g->getName(), g}},
-      batch_size_,
+      g,
       DEFALUT_ITERATION_NUM,
       static_cast<size_t>(conf_.dev_num),
       static_cast<size_t>(conf_.max_pipeline_num),
       conf_.max_pipeline_num > 1,
-      conf_.offload_params,
-      conf_.force_dist_matmul,
-      TensorPartitioningGraphInfo{}};
+      TensorPartitioningGraphInfo{},
+      conf_};
+
   return prof_util_.profile(in);
 }
 

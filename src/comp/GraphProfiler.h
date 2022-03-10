@@ -37,19 +37,82 @@ struct GraphProfile {
 };
 
 struct ProfilingInput {
+  ProfilingInput() = default;
+
+  ProfilingInput(
+      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& irGraphs,
+      size_t batchSize, int iteration,
+      std::unordered_map<std::string, size_t> replicaNums, size_t pipelineNum,
+      bool checkpointing, int optParamFactor, bool useAmpMasterParams,
+      bool enableZero, bool offloadParams, bool forceDistMatmul,
+      const std::unordered_map<std::string, TensorPartitioningGraphInfo>&
+          partInfo)
+      : ir_graphs(irGraphs),
+        batch_size(batchSize),
+        iteration(iteration),
+        replica_nums(replicaNums),
+        pipeline_num(pipelineNum),
+        checkpointing(checkpointing),
+        opt_param_factor(optParamFactor),
+        use_amp_master_params(useAmpMasterParams),
+        enable_zero(enableZero),
+        offload_params(offloadParams),
+        force_dist_matmul(forceDistMatmul),
+        part_info(partInfo) {}
+
+  ProfilingInput(
+      const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& irGraphs,
+      int iteration, const std::unordered_map<std::string, size_t>& replicaNums,
+      size_t pipelineNum, int checkpointing,
+      std::unordered_map<std::string, TensorPartitioningGraphInfo>& partInfo,
+      const PartitioningConf& conf)
+      : ir_graphs(irGraphs),
+        batch_size(conf.batch_size),
+        iteration(iteration),
+        replica_nums(replicaNums),
+        pipeline_num(pipelineNum),
+        checkpointing(checkpointing),
+        opt_param_factor(conf.opt_param_factor),
+        use_amp_master_params(conf.use_amp_master_params),
+        enable_zero(conf.enable_zero),
+        offload_params(conf.offload_params),
+        force_dist_matmul(conf.force_dist_matmul),
+        part_info(partInfo) {}
+
+  ProfilingInput(
+      const std::shared_ptr<IRGraph>& ir_graph, int iteration,
+      size_t replicaNum, size_t pipelineNum, int checkpointing,
+      const TensorPartitioningGraphInfo& partInfo, const PartitioningConf& conf)
+      : ir_graphs({{ir_graph->getName(), ir_graph}}),
+        batch_size(conf.batch_size),
+        iteration(iteration),
+        replica_nums({{ir_graph->getName(), replicaNum}}),
+        pipeline_num(pipelineNum),
+        checkpointing(checkpointing),
+        opt_param_factor(conf.opt_param_factor),
+        use_amp_master_params(conf.use_amp_master_params),
+        enable_zero(conf.enable_zero),
+        offload_params(conf.offload_params),
+        force_dist_matmul(conf.force_dist_matmul),
+        part_info({{ir_graph->getName(), partInfo}}) {}
+
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
   size_t batch_size = 0;
   int iteration = 0;
-  size_t replica_num = 0;
+  std::unordered_map<std::string, size_t> replica_nums;
   size_t pipeline_num = 0;
   bool checkpointing = false;
+  int opt_param_factor = 2;
+  bool use_amp_master_params;
+  bool enable_zero;
   bool offload_params = false;
   bool force_dist_matmul = false;
-  TensorPartitioningGraphInfo part_info;
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info;
 
   MSGPACK_DEFINE(
-      ir_graphs, batch_size, iteration, replica_num, pipeline_num,
-      checkpointing, offload_params, force_dist_matmul, part_info);
+      ir_graphs, batch_size, iteration, replica_nums, pipeline_num,
+      checkpointing, opt_param_factor, use_amp_master_params, enable_zero,
+      offload_params, force_dist_matmul, part_info);
 };
 
 struct ProfilingResult {
@@ -62,11 +125,11 @@ struct ProfilingResult {
 struct ProfileItemKey {
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
   size_t batch_size;
-  size_t repl_num;
+  std::unordered_map<std::string, size_t> repl_nums;
   int iteration;
   bool checkpointing;
 
-  MSGPACK_DEFINE(ir_graphs, batch_size, repl_num, iteration, checkpointing);
+  MSGPACK_DEFINE(ir_graphs, batch_size, repl_nums, iteration, checkpointing);
 };
 
 struct ProfileItem {

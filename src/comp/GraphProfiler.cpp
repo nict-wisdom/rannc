@@ -25,7 +25,8 @@ std::string profItemToStr(const ProfileItemKey& prof_key) {
 
   std::stringstream ss;
   ss << "graphs=" << join_as_str(graph_str_vec) << "_bs=" << prof_key.batch_size
-     << "_repl_num=" << prof_key.repl_num << "_iteration=" << prof_key.iteration
+     << "_repl_num=" << join_as_str(prof_key.repl_nums)
+     << "_iteration=" << prof_key.iteration
      << "_checkpointing=" << prof_key.checkpointing;
 
   return ss.str();
@@ -406,7 +407,8 @@ ProfilingResult GraphProfiler::compute(
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
         auto graph_params = paramsToCuda(getGraphParams(subgraph));
 
-        const TensorPartitioningGraphInfo& part_info = input.part_info;
+        assert(contains(input.part_info, id));
+        const TensorPartitioningGraphInfo& part_info = input.part_info.at(id);
         if (part_info.ranks.size() > 0) {
           for (const auto& param_it : graph_params) {
             if (contains(part_info.param_partitions, param_it.first)) {
@@ -643,8 +645,10 @@ ProfilingResult GraphProfiler::doProfile(
         const auto in_val =
             contains(values_, loc) ? values_.at(loc) : values.at(loc);
 
+        assert(contains(input.replica_nums, it.first));
+        int replica_num = input.replica_nums.at(it.first);
         const auto pad_in = splitBatchInIValue(
-            in_val, 1, input.batch_size, input.replica_num * input.pipeline_num,
+            in_val, 1, input.batch_size, replica_num * input.pipeline_num,
             false);
 
         const auto& paths = findPathsToTensorInIValue(pad_in);
@@ -666,9 +670,7 @@ ProfilingResult GraphProfiler::doProfile(
     }
   }
 
-  logger->trace(
-      "GraphProfiler::profile starting doCompute replica_num={}",
-      input.replica_num * input.pipeline_num);
+  logger->trace("GraphProfiler::profile starting doCompute");
   ProfilingResult ret_profiles = compute(input, values, 0, trace_dim_names);
   logger->trace("GraphProfiler::profile finished doCompute");
 
@@ -684,22 +686,27 @@ ProfilingResult GraphProfiler::doProfile(
 ProfilingResult GraphProfiler::profile(const ProfilingInput& input) {
   const auto& ir_graphs = input.ir_graphs;
 
+  std::unordered_map<std::string, size_t> replica_nums;
+  for (const auto& it : ir_graphs) {
+    assert(contains(input.replica_nums, it.first));
+    replica_nums[it.first] =
+        input.replica_nums.at(it.first) * input.pipeline_num;
+  }
+
   ProfileItemKey key{
-      ir_graphs, batch_size_, input.replica_num * input.pipeline_num,
-      input.iteration, input.checkpointing};
+      ir_graphs, batch_size_, replica_nums, input.iteration,
+      input.checkpointing};
   if (profile_db_.hasRecord(key)) {
     logger->trace(
         "Cache hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_,
-        input.replica_num * input.pipeline_num, input.iteration,
-        input.checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_, join_as_str(replica_nums),
+        input.iteration, input.checkpointing);
     return profile_db_.get(key);
   } else {
     logger->trace(
         "Cache NOT hit {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(ir_graphs)), batch_size_,
-        input.replica_num * input.pipeline_num, input.iteration,
-        input.checkpointing);
+        join_as_str(keys(ir_graphs)), batch_size_, join_as_str(replica_nums),
+        input.iteration, input.checkpointing);
   }
 
   IValueMap values; // temporal value
@@ -735,6 +742,8 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   }
 
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> graphs;
+  std::unordered_map<std::string, size_t> repl_nums;
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info;
   std::unordered_map<std::string, IRNode> node_map;
   const auto& nodes = base_graph_->getNodes();
   for (const auto& n : nodes) {
@@ -765,17 +774,20 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     graphs[id] = std::make_shared<IRGraph>(
         id, pf_nodes, pf_values, input_names, n.getOutputNames());
     node_map[id] = n;
+
+    repl_nums[id] = dev_num_;
+    part_info[id] = TensorPartitioningGraphInfo{};
   }
 
   IValueMap values; // temporal value
   bool checkpointing = false;
 
   auto ret = doProfile(
-      {graphs, batch_size_, 1, static_cast<size_t>(dev_num_), min_pipeline_num_,
-       checkpointing, false, false, TensorPartitioningGraphInfo()},
+      {graphs, batch_size_, 1, repl_nums, min_pipeline_num_, checkpointing, 0,
+       false, false, false, false, part_info},
       values, trace_dim_names);
 
-  size_t replica_num = dev_num_ * min_pipeline_num_;
+  size_t split_num = dev_num_ * min_pipeline_num_;
 
   // set types of unused values
   for (const auto& np : non_param_inputs_) {
@@ -810,7 +822,7 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     const auto& ir_val = base_graph_->getValue(it.first.value_name);
     if (ir_val.isBatch()) {
       values_[it.first] = scaleBatchInIValue(
-          it.second, ceil(batch_size_ / (double)replica_num), 1, false);
+          it.second, ceil(batch_size_ / (double)split_num), 1, false);
       logger->trace(
           "Scaled {}: {} to {}", toString(it.first),
           toString(toIRType(it.second)), toString(toIRType(values_[it.first])));
@@ -824,11 +836,12 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
   // Since the following decomposition steps use the records (e.g. sort by the
   // profiled values), value changes lead to different decompositions and
   // reduces cache hits.
-  ProfileItemKey key{graphs, batch_size_, replica_num, 1, checkpointing};
+  ProfileItemKey key{graphs, batch_size_, repl_nums, 1, checkpointing};
   if (profile_db_.hasRecord(key)) {
     logger->trace(
         "Cache hit on init {} bs={} repl={} iter={} cp={}",
-        join_as_str(keys(graphs)), batch_size_, replica_num, 1, checkpointing);
+        join_as_str(keys(graphs)), batch_size_, join_as_str(repl_nums), 1,
+        checkpointing);
     return profile_db_.get(key);
   }
 

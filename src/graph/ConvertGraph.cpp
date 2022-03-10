@@ -133,6 +133,12 @@ void ConvertGraph::doToTorch(
       for (const std::string& outName : irNode.getOutputNames()) {
         assert(contains(values, outName));
         const auto& val = values.at(outName);
+
+        std::vector<std::string> const_keys;
+        for (const auto& it : constants) {
+          const_keys.push_back(toString(it.first));
+        }
+
         assert(contains(constants, IValueLocation(val.getName())));
         const c10::IValue& iv = constants.at(val.getName());
         auto v = graph->insertConstant(iv);

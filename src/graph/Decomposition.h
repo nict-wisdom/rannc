@@ -545,18 +545,6 @@ typedef boost::adjacency_list<
     HGraph;
 typedef boost::graph_traits<HGraph>::vertex_descriptor HVertex;
 
-struct AllocSolution {
-  std::vector<std::shared_ptr<IRGraph>> graphs;
-  std::unordered_map<std::string, int> repl_nums;
-  int pipeline_num;
-  bool checkpointing;
-  std::vector<size_t> boundaries;
-  std::vector<size_t> dev_nums;
-
-  MSGPACK_DEFINE(
-      graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums);
-};
-
 struct PartitioningConf {
   int dev_num;
   size_t batch_size;
