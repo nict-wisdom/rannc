@@ -73,6 +73,8 @@ class ProfilerUtil {
     profile_cache_ = profileCache;
   }
 
+  void clearCache();
+
   static const long ERROR_VAL = LONG_MAX / 1024;
 
  private:

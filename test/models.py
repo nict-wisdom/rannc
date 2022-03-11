@@ -125,7 +125,8 @@ class SharedEmbModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.emb = nn.Embedding(EmbeddingModel.VOCAB_SIZE, EmbeddingModel.EMB_SIZE)
-        self.fc = nn.Linear(self.emb.weight.size(1), self.emb.weight.size(0), bias=False)
+        # you cannot use self.emb.weight.size() because the weight is split when dist_params=True
+        self.fc = nn.Linear(EmbeddingModel.EMB_SIZE, EmbeddingModel.VOCAB_SIZE, bias=False)
         self.fc.weight = self.emb.weight
 
     def forward(self, x):

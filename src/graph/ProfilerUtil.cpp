@@ -245,6 +245,10 @@ GraphProfile ProfilerUtil::doProfile(
   return profile_cache_.at(k);
 }
 
+void ProfilerUtil::clearCache() {
+  profile_cache_.clear();
+}
+
 GraphProfile accProfileValues(
     ProfilerUtil& prof_util, const ProfilingInput& prof_in) {
   GraphProfile prof_sum{"MERGED", 0, 0, 0};

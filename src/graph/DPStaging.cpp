@@ -299,6 +299,10 @@ GraphProfile DPStaging::estimateSolutionGraph(
 }
 
 AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
+  // Clear cache because cache keys currently do not contain configurations of
+  // tensor partitioning
+  prof_util_.clearCache();
+
   config::Config& config = config::Config::get();
 
   // Forcibly set pipeline num for debugging
@@ -595,7 +599,6 @@ AllocSolution DPStaging::doRunDpComm(
 
                 TensorPartitioningGraphInfo part_info;
                 if (conf_.force_dist_matmul) {
-                  //// under development
                   part_info = replaceWithDistOp(
                       g, createDummyRanks((d - d_prev) * replica_num));
                   ir_graphs[g->getName()] = part_info.graph;

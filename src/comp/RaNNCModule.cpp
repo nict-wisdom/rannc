@@ -240,10 +240,10 @@ std::vector<long> RaNNCModule::init(
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
       pconf.min_pipeline_num);
 
+  sg_prof->setCacheParamValues(mpi::isMaster() && !pconf.force_dist_matmul);
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
   dtd.start(sg_prof);
   if (mpi::isMaster()) {
-    sg_prof->setCacheParamValues(true);
 
     if (load_profile_) {
       logger->info("Loading graph profiles from {}", graph_profile_file_);
@@ -347,8 +347,6 @@ std::vector<long> RaNNCModule::init(
         save(deployment_file_, deployment_, np, dev_info.total_mem);
       }
     }
-
-    sg_prof->setCacheParamValues(false);
 
     for (const auto& it : deployment_.subgraphs) {
       logger->trace("subgraph {}", toString(*it.second));
