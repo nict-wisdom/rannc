@@ -56,7 +56,7 @@ size_t getOptMemSize(
     const std::shared_ptr<IRGraph>& ir_graph, const ProfilingInput& prof_in) {
   assert(contains(prof_in.replica_nums, ir_graph->getName()));
   int replica_num = prof_in.replica_nums.at(ir_graph->getName());
-  int zero_dist_num = prof_in.enable_zero ? 1 : replica_num;
+  int zero_dist_num = prof_in.enable_zero ? replica_num : 1;
 
   // This does not need to consider batch size
   size_t sum = 0;
@@ -67,6 +67,7 @@ size_t getOptMemSize(
     const auto& val = v.second;
     if (val.isParam()) {
       int slice_num = contains(sliced_params, val.getName()) ? replica_num : 1;
+      spdlog::info("  {} slice_num={}", val.getName(), slice_num);
 
       if (prof_in.use_amp_master_params) {
         if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
@@ -202,8 +203,15 @@ GraphProfile ProfilerUtil::doProfile(
 
   const MLProfileKey k{g->getName(), bs, in.checkpointing};
   if (contains(profile_cache_, k)) {
+    spdlog::info(
+        "ProfilerUtil cache hit: graph={} bs={} cp={}", g->getName(), bs,
+        in.checkpointing);
     return profile_cache_.at(k);
   }
+
+  spdlog::info(
+      "ProfilerUtil cache NOT hit: graph={} bs={} cp={}", g->getName(), bs,
+      in.checkpointing);
 
   if (!contains(max_batch_size_cache_[in.checkpointing], g->getName())) {
     max_batch_size_cache_[in.checkpointing][g->getName()] = SIZE_MAX;
