@@ -6,6 +6,7 @@
 
 #include <comm/MPIUtil.h>
 #include <comm/SComm.h>
+#include <comp/EventRecorder.h>
 
 #include "comm/NCCLWrapper.h"
 #include "comp/TimeCounter.h"
@@ -28,6 +29,8 @@ const std::shared_ptr<spdlog::logger> DistLinearFunction::logger =
 at::Tensor DistMatmul::run(
     const at::Tensor& x, const at::Tensor& y,
     const std::unordered_set<int>& ranks) {
+  TraceEvent evt(getFuncKey("DistMatmul", "run", "no_id", 0, false));
+
   NCCLWrapper& nccl = NCCLWrapper::get();
   TagMap& tag_map = TagMap::get();
   int tag = tag_map.getRankSetTag(ranks);
@@ -58,6 +61,9 @@ at::Tensor DistMatmul::run(
 
   for (int i = 0; i <= np; i++) {
     if (i < np) {
+      TraceEvent evt_bcast(
+          getFuncKey("DistMatmul", "bcast", "no_id", i, false));
+
       nccl.bcast(tag, {y}, {i});
       nccl.syncWithErrorCheck();
     }
@@ -70,24 +76,16 @@ at::Tensor DistMatmul::run(
     }
 
     if (i != my_rank) {
+      TraceEvent evt_bcast(
+          getFuncKey("DistMatmul", "matmul", "no_id", i, false));
+
       int64_t x_split_dim = x_dim.size() - 1;
 
       int64_t step = x_dim.at(x_split_dim) / np;
 
       const auto x_slice =
           x.slice(x_split_dim, step * target_idx, step * (target_idx + 1));
-
-      //      spdlog::info("x.shape={} x_slice.shape={} y.shape={} step={}
-      //      target_idx={}",
-      //                   join_as_str(getTensorDim(x)),
-      //                   join_as_str(getTensorDim(x_slice)),
-      //                   join_as_str(getTensorDim(y)),
-      //                   step, target_idx);
-
       at::Tensor z = torch::matmul(x_slice, y);
-      //      spdlog::info("matmul done: x.shape={} out_buf_.shape={}",
-      //                   join_as_str(getTensorDim(z)),
-      //                   join_as_str(getTensorDim(out_buf_)));
       out_buf_ += z;
       nccl.syncWithErrorCheck();
     }
@@ -120,19 +118,36 @@ at::Tensor DistMatmul::run_AG(
 
   at::Tensor ret;
   if (part_y_column) {
+    TraceEvent evt(getFuncKey("DistMatmul", "run_AG", "part_y=true", 0, false));
+
     std::vector<int64_t> gathered_y_buf_dim = {y_dim.at(1) * np, y_dim.at(0)};
     at::Tensor gathered_y = torch::zeros(
         gathered_y_buf_dim, makeTensorOptions(x.dtype().toScalarType(), false));
-    nccl.allgather(tag, {y.t().contiguous()}, {gathered_y});
-    ret = torch::matmul(x, gathered_y.t()).contiguous();
+    {
+      TraceEvent evt_allgather(
+          getFuncKey("DistMatmul", "run_AG", "allgather", 0, false));
+      nccl.allgather(tag, {y.t().contiguous()}, {gathered_y});
+    }
+    {
+      TraceEvent evt_matmul(
+          getFuncKey("DistMatmul", "run_AG", "matmul", 0, false));
+      ret = torch::matmul(x, gathered_y.t()).contiguous();
+    }
   } else {
+    TraceEvent evt(
+        getFuncKey("DistMatmul", "run_AG", "part_y=false", 0, false));
+
     std::vector<int64_t> gathered_y_dim = {y_dim.at(0) * np, y_dim.at(1)};
     at::Tensor gathered_y = torch::zeros(
         gathered_y_dim, makeTensorOptions(x.dtype().toScalarType(), false));
-    nccl.allgather(tag, {y}, {gathered_y});
-    ret = torch::matmul(x, gathered_y);
+    {
+      TraceEvent evt_allgather(
+          getFuncKey("DistMatmul", "run_AG", "allgather", 0, false));
+      nccl.allgather(tag, {y}, {gathered_y});
+    }
+    { ret = torch::matmul(x, gathered_y); }
+    nccl.syncWithErrorCheck();
   }
-  nccl.syncWithErrorCheck();
   return ret;
 }
 
@@ -170,7 +185,14 @@ at::Tensor DistMatmul::runCRC(
   std::vector<int64_t> y_dim = getTensorDim(y);
   assert(y_dim.size() == 2);
 
-  at::Tensor z = torch::matmul(x, y);
+  TraceEvent evt(getFuncKey("DistMatmul", "runCRC", "part_y=true", 0, false));
+
+  at::Tensor z;
+  {
+    TraceEvent evt(getFuncKey("DistMatmul", "runCRC", "matmul", 0, false));
+    z = torch::matmul(x, y);
+  }
+
   at::Tensor out_buf = torch::zeros(
       {x_dim.at(0), y_dim.at(1) / np},
       makeTensorOptions(x.dtype().toScalarType(), true));
@@ -178,7 +200,10 @@ at::Tensor DistMatmul::runCRC(
   int64_t step = y_dim.at(1) / np;
   for (int i = 0; i < np; i++) {
     const auto z_slice = z.slice(1, step * i, step * (i + 1)).contiguous();
-    nccl.reduce(tag, {z_slice}, {getLocalRank(ranks, i)});
+    {
+      TraceEvent evt(getFuncKey("DistMatmul", "runCRC", "reduce", i, false));
+      nccl.reduce(tag, {z_slice}, {getLocalRank(ranks, i)});
+    }
     if (getLocalRank(ranks, mpi::getRank()) == i) {
       out_buf.copy_(z_slice);
     }
@@ -284,6 +309,8 @@ torch::Tensor GatherFunction::forward(
   NCCLWrapper& nccl = NCCLWrapper::get();
   TagMap& tag_map = TagMap::get();
 
+  TraceEvent evt(getFuncKey("GatherFunction", "forward", "no_id", 0, false));
+
   ctx->saved_data["dim_idx"] = dim_idx;
   ctx->saved_data["ranks"] = dist_ranks;
 
@@ -319,6 +346,8 @@ torch::Tensor GatherFunction::forward(
 torch::autograd::tensor_list GatherFunction::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
+  TraceEvent evt(getFuncKey("GatherFunction", "backward", "no_id", 0, false));
+
   std::unordered_set<int> rank_set;
   for (int r : ctx->saved_data["ranks"].toIntList()) {
     rank_set.insert(r);
@@ -337,8 +366,15 @@ torch::autograd::tensor_list GatherFunction::backward(
 
   at::Tensor scattered_y = torch::zeros(
       split_dim, makeTensorOptions(out_grad.dtype().toScalarType(), true));
-  nccl.reduceScatter(tag, {out_grad.contiguous()}, {scattered_y});
-  return {scattered_y, at::Tensor(), at::Tensor()};
+
+  auto split_out_grad = out_grad.split(split_dim.at(dim_idx), dim_idx);
+  for (size_t i = 0; i < split_out_grad.size(); i++) {
+    split_out_grad[i] = split_out_grad[i].contiguous();
+  }
+  for (int r : rank_set) {
+    nccl.reduce(tag, {split_out_grad[r]}, {r});
+  }
+  return {split_out_grad[mpi::getRank()], at::Tensor(), at::Tensor()};
 }
 
 } // namespace rannc
