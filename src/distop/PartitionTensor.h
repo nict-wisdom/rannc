@@ -53,6 +53,10 @@ at::Tensor sliceParam(
     const std::string& name, const at::Tensor& param,
     const std::unordered_set<int>& ranks, int my_rank,
     const ParamPartitionMap& partition);
+
+TensorPartitioningGraphInfo setRanks(
+    const TensorPartitioningGraphInfo& part_info,
+    const std::unordered_set<int>& ranks);
 } // namespace rannc
 
 #endif // PYRANNC_PARTITIONTENSOR_H

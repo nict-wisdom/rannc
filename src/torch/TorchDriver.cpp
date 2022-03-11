@@ -384,16 +384,6 @@ void TorchDriver::createModule(
 
   time_counter_.start("TorchDriver::createModule");
 
-  //  if (conf_.force_dist_matmul) {
-  //    std::unordered_map<std::string, std::shared_ptr<IRGraph>>
-  //    dist_subgraphs; for (const auto& it: deployment.subgraphs) {
-  //      assert(contains(deployment.allocation, it.first));
-  //      TensorPartioningGraphInfo part_info =
-  //          replaceWithDistOp(it.second, deployment.allocation.at(it.first));
-  //      dist_subgraphs[it.first] = part_info.
-  //    }
-  //  }
-
   subgraph_ids_[model_id].push_back(id);
 
   ir_graphs_[id] = irGraph;

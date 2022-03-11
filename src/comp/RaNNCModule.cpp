@@ -415,13 +415,12 @@ std::vector<long> RaNNCModule::init(
 
   ParamPartitionMap param_partitions;
   if (deployment_.force_dist_matmul) {
-    std::unordered_map<std::string, std::shared_ptr<IRGraph>> mod_subgraphs;
     for (const auto& it : deployment_.subgraphs) {
       assert(contains(deployment_.allocation, it.first));
       const auto& ranks = deployment_.allocation.at(it.first);
-      TensorPartitioningGraphInfo part_info =
-          replaceWithDistOp(it.second, setToVector(ranks));
-      mod_subgraphs[it.first] = part_info.graph;
+      assert(contains(deployment_.part_info, it.first));
+      TensorPartitioningGraphInfo& part_info =
+          deployment_.part_info.at(it.first);
 
       for (const auto& r_it : part_info.rank_values) {
         value_storage_->add(r_it.first, r_it.second);
@@ -435,7 +434,6 @@ std::vector<long> RaNNCModule::init(
         param_partitions[pp_it.first] = pp_it.second;
       }
     }
-    deployment_.subgraphs = mod_subgraphs;
   }
 
   if (mpi::getRank() == 0) {

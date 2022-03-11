@@ -71,6 +71,13 @@ Deployment MLPartDecomposer::decompose(
     alloc = searchAllocationSimple(repl, conf_.dev_num, conf_.dev_mem);
   }
 
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info;
+  for (const auto& it : alloc) {
+    assert(contains(sol.part_info, it.first));
+    const auto& plan_part_info = sol.part_info.at(it.first);
+    part_info[it.first] = setRanks(plan_part_info, it.second);
+  }
+
   if (alloc.empty()) {
     throw std::runtime_error("Failed to allocate gpus to subgraphs.");
   }
@@ -85,6 +92,7 @@ Deployment MLPartDecomposer::decompose(
   deployment.checkpointing = sol.checkpointing;
   deployment.offload_params = conf_.offload_params;
   deployment.force_dist_matmul = conf_.force_dist_matmul;
+  deployment.part_info = part_info;
 
   logger->trace("MLPartDecomposer::decompose finished");
 

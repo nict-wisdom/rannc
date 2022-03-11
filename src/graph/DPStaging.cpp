@@ -279,13 +279,7 @@ GraphProfile DPStaging::estimateSolutionGraph(
     const AllocSolution& sol, const MLGraph& graph, size_t g_idx) {
   auto sg = sol.graphs.at(g_idx);
   assert(contains(sol.repl_nums, sg->getName()));
-
-  TensorPartitioningGraphInfo part_info;
-  if (conf_.force_dist_matmul) {
-    part_info = replaceWithDistOp(
-        sg, createDummyRanks(sol.repl_nums.at(sg->getName())));
-    sg = part_info.graph;
-  }
+  assert(contains(sol.part_info, sg->getName()));
 
   ProfilingInput in{
       sg,
@@ -293,7 +287,7 @@ GraphProfile DPStaging::estimateSolutionGraph(
       static_cast<size_t>(sol.repl_nums.at(sg->getName())),
       static_cast<size_t>(sol.pipeline_num),
       sol.pipeline_num > 1,
-      part_info,
+      sol.part_info.at(sg->getName()),
       conf_};
   return prof_util_.profile(in);
 }
@@ -412,15 +406,15 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
 
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> ir_graphs;
   std::unordered_map<std::string, GraphProfile> profiles;
-  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info_map;
   std::unordered_map<std::string, size_t> repl_nums;
   for (size_t g_idx = 0; g_idx < best_sol.graphs.size(); g_idx++) {
     const auto& g = best_sol.graphs.at(g_idx);
     profiles[g->getName()] = estimateSolutionGraph(best_sol, graph, g_idx);
+    // vector -> map
     ir_graphs[g->getName()] = g;
+    // int -> size_t
     assert(contains(best_sol.repl_nums, g->getName()));
     repl_nums[g->getName()] = best_sol.repl_nums.at(g->getName());
-    part_info_map[g->getName()] = TensorPartitioningGraphInfo{};
   }
 
   ProfilingInput prof_in{
@@ -429,7 +423,7 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
       repl_nums,
       static_cast<size_t>(best_sol.pipeline_num),
       best_sol.checkpointing,
-      part_info_map,
+      best_sol.part_info,
       conf_};
 
   logger->info(displayGraphProfiles(prof_in, profiles));
@@ -597,14 +591,9 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= b - 1; i++) {
                 const auto& g = graph.nodes.at(i).graph;
 
-                TensorPartitioningGraphInfo part_info;
-                if (conf_.force_dist_matmul) {
-                  part_info = replaceWithDistOp(
-                      g, createDummyRanks((d - d_prev) * replica_num));
-                  ir_graphs[g->getName()] = part_info.graph;
-                } else {
-                  ir_graphs[g->getName()] = g;
-                }
+                TensorPartitioningGraphInfo part_info =
+                    partitionParams(g, (d - d_prev) * replica_num);
+                ir_graphs[g->getName()] = part_info.graph;
                 part_info_map[g->getName()] = part_info;
                 repl_nums[g->getName()] = (d - d_prev) * replica_num;
               }
@@ -634,6 +623,10 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= (b - 1); i++) {
                 const auto& node = graph.nodes.at(i);
                 opt_mem += getOptMemSize(node.graph, in);
+
+                spdlog::info(
+                    "graph {}: opt_mem={}", i,
+                    getOptMemSize(node.graph->getName(), in));
               }
               step_mem = step_prof.max_allocated_mem + opt_mem +
                   (step_in_comm + step_out_comm) * 2;
@@ -648,16 +641,12 @@ AllocSolution DPStaging::doRunDpComm(
                   ((d - d_prev) * replica_num * pipeline_num));
               ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
 
-              TensorPartitioningGraphInfo part_info;
-              if (conf_.force_dist_matmul) {
-                //// under development
-                part_info = replaceWithDistOp(
-                    step_graph, createDummyRanks((d - d_prev) * replica_num));
-                step_graph = part_info.graph;
-              }
+              TensorPartitioningGraphInfo part_info =
+                  partitionParams(step_graph, (d - d_prev) * replica_num);
+
               // run profiler for the merged graph
               ProfilingInput in{
-                  step_graph,
+                  part_info.graph,
                   DEFALUT_ITERATION_NUM,
                   (d - d_prev) * replica_num,
                   static_cast<size_t>(pipeline_num),
@@ -666,8 +655,8 @@ AllocSolution DPStaging::doRunDpComm(
                   conf_};
               step_prof = prof_util_.profile(in);
 
-              step_mem =
-                  calcGraphMem(step_graph, step_prof, conf_.batch_size, in);
+              step_mem = calcGraphMem(
+                  part_info.graph, step_prof, conf_.batch_size, in);
               step_val = ::rannc::estimateEval(
                   step_prof, step_in_comm, step_out_comm,
                   table[s - 1][b_prev][d_prev].max_fwd,
@@ -767,6 +756,7 @@ AllocSolution DPStaging::doRunDpComm(
   dev_nums.push_back(d_sol);
 
   std::unordered_map<std::string, int> repl_nums;
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info_map;
   std::vector<std::shared_ptr<IRGraph>> sol_graphs;
   for (size_t s_sol = stage_num; s_sol > 0; s_sol--) {
     const auto& state = table[s_sol][b_sol][d_sol];
@@ -774,12 +764,12 @@ AllocSolution DPStaging::doRunDpComm(
       return AllocSolution{{}, std::unordered_map<std::string, int>()};
     }
 
-    const auto step_graph = merge_helper.merge(state.pre_boundary, b_sol - 1);
+    auto sg = merge_helper.merge(state.pre_boundary, b_sol - 1);
+    repl_nums[sg->getName()] = (d_sol - state.pre_dev_num) * replica_num;
+    part_info_map[sg->getName()] =
+        partitionParams(sg, repl_nums.at(sg->getName()));
 
-    //            const auto& g = state.step_graph;
-    sol_graphs.push_back(step_graph);
-    repl_nums[step_graph->getName()] =
-        (d_sol - state.pre_dev_num) * replica_num;
+    sol_graphs.push_back(part_info_map[sg->getName()].graph);
 
     b_sol = state.pre_boundary;
     d_sol = state.pre_dev_num;
@@ -794,8 +784,17 @@ AllocSolution DPStaging::doRunDpComm(
   logger->trace("sol boundaries={}", join_as_str(boundaries));
   logger->trace("sol dev_nums={}", join_as_str(dev_nums));
 
-  return AllocSolution{sol_graphs,    repl_nums,  pipeline_num,
+  return AllocSolution{sol_graphs,    repl_nums,  part_info_map, pipeline_num,
                        checkpointing, boundaries, dev_nums};
+}
+
+TensorPartitioningGraphInfo DPStaging::partitionParams(
+    std::shared_ptr<IRGraph> g, int repl_num) const {
+  TensorPartitioningGraphInfo part_info;
+  if (conf_.force_dist_matmul) {
+    part_info = replaceWithDistOp(g, createDummyRanks(repl_num));
+  }
+  return part_info;
 }
 
 GraphProfile DPDryStaging::estimateSolutionGraph(

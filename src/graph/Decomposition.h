@@ -157,6 +157,7 @@ struct Deployment {
   std::shared_ptr<IRGraph> graph;
   std::unordered_map<std::string, std::shared_ptr<IRGraph>> subgraphs;
   std::unordered_map<std::string, std::unordered_set<int>> allocation;
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info;
   std::vector<RouteDP> fwd_routes;
   std::vector<RouteDP> fwd_in_routes;
   std::vector<RouteDP> fwd_out_routes;
@@ -174,7 +175,7 @@ struct Deployment {
       std::ostream& os, const Deployment& deployment);
 
   MSGPACK_DEFINE(
-      id, graph, subgraphs, allocation, fwd_routes, fwd_in_routes,
+      id, graph, subgraphs, allocation, part_info, fwd_routes, fwd_in_routes,
       fwd_out_routes, fwd_graph_order, bwd_routes, bwd_in_routes,
       bwd_out_routes, bwd_graph_order, pipeline_num, checkpointing,
       offload_params, force_dist_matmul);

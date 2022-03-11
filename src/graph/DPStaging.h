@@ -24,6 +24,7 @@ class GraphMergeHelper {
 struct AllocSolution {
   std::vector<std::shared_ptr<IRGraph>> graphs;
   std::unordered_map<std::string, int> repl_nums;
+  std::unordered_map<std::string, TensorPartitioningGraphInfo> part_info;
   int pipeline_num;
   bool checkpointing;
   std::vector<size_t> boundaries;
@@ -60,6 +61,9 @@ class DPStaging {
   GraphProfile estimateProf(const ProfilingInput& prof_in);
 
   void dumpNodeProfiles(const std::string& path, const MLGraph& graph);
+
+  TensorPartitioningGraphInfo partitionParams(
+      std::shared_ptr<IRGraph> g, int repl_num) const;
 
   ProfilerUtil prof_util_;
   PartitioningConf conf_;

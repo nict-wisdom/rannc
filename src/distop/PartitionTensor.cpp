@@ -268,4 +268,25 @@ at::Tensor sliceParam(
   return param.slice(
       dim_idx, segment_size * local_rank, segment_size * (local_rank + 1));
 }
+
+TensorPartitioningGraphInfo setRanks(
+    const TensorPartitioningGraphInfo& part_info,
+    const std::unordered_set<int>& ranks) {
+  std::vector<int> sorted_ranks = setToVector(ranks);
+  std::sort(sorted_ranks.begin(), sorted_ranks.end());
+
+  std::unordered_map<std::string, int> rank_values;
+  for (const auto& it : part_info.rank_value_names) {
+    assert(it.second.size() == ranks.size());
+    int idx = 0;
+    for (const auto& val_name : it.second) {
+      rank_values[val_name] = sorted_ranks.at(idx++);
+    }
+  }
+
+  TensorPartitioningGraphInfo ret = part_info;
+  ret.rank_values = rank_values;
+
+  return ret;
+}
 } // namespace rannc
