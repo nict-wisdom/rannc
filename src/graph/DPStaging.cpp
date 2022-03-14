@@ -464,6 +464,7 @@ AllocSolution DPStaging::doRunDpComm(
     int replica_num, int pipeline_num, bool checkpointing) {
   GraphMergeHelper merge_helper(graph);
 
+  const ParamPartitionMap global_param_part = getDistParams(ir_graph_);
   const std::vector<MLNode>& nodes = graph.nodes;
   size_t layer_num = nodes.size();
   const int min_pipeline_bs =
@@ -591,8 +592,8 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= b - 1; i++) {
                 const auto& g = graph.nodes.at(i).graph;
 
-                TensorPartitioningGraphInfo part_info =
-                    partitionParams(g, (d - d_prev) * replica_num);
+                TensorPartitioningGraphInfo part_info = partitionParams(
+                    g, (d - d_prev) * replica_num, global_param_part);
                 ir_graphs[g->getName()] = part_info.graph;
                 part_info_map[g->getName()] = part_info;
                 repl_nums[g->getName()] = (d - d_prev) * replica_num;
@@ -623,10 +624,6 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= (b - 1); i++) {
                 const auto& node = graph.nodes.at(i);
                 opt_mem += getOptMemSize(node.graph, in);
-
-                spdlog::info(
-                    "graph {}: opt_mem={}", i,
-                    getOptMemSize(node.graph->getName(), in));
               }
               step_mem = step_prof.max_allocated_mem + opt_mem +
                   (step_in_comm + step_out_comm) * 2;
@@ -641,8 +638,8 @@ AllocSolution DPStaging::doRunDpComm(
                   ((d - d_prev) * replica_num * pipeline_num));
               ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
 
-              TensorPartitioningGraphInfo part_info =
-                  partitionParams(step_graph, (d - d_prev) * replica_num);
+              TensorPartitioningGraphInfo part_info = partitionParams(
+                  step_graph, (d - d_prev) * replica_num, global_param_part);
 
               // run profiler for the merged graph
               ProfilingInput in{
@@ -766,8 +763,9 @@ AllocSolution DPStaging::doRunDpComm(
 
     auto sg = merge_helper.merge(state.pre_boundary, b_sol - 1);
     repl_nums[sg->getName()] = (d_sol - state.pre_dev_num) * replica_num;
+    const ParamPartitionMap global_param_part = getDistParams(ir_graph_);
     part_info_map[sg->getName()] =
-        partitionParams(sg, repl_nums.at(sg->getName()));
+        partitionParams(sg, repl_nums.at(sg->getName()), global_param_part);
 
     sol_graphs.push_back(part_info_map[sg->getName()].graph);
 
@@ -789,10 +787,11 @@ AllocSolution DPStaging::doRunDpComm(
 }
 
 TensorPartitioningGraphInfo DPStaging::partitionParams(
-    std::shared_ptr<IRGraph> g, int repl_num) const {
+    std::shared_ptr<IRGraph> g, int repl_num,
+    const ParamPartitionMap& param_part) const {
   TensorPartitioningGraphInfo part_info;
   if (conf_.force_dist_matmul) {
-    part_info = replaceWithDistOp(g, createDummyRanks(repl_num));
+    part_info = replaceWithDistOp(g, createDummyRanks(repl_num), param_part);
   }
   return part_info;
 }

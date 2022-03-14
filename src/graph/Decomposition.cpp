@@ -1574,7 +1574,12 @@ std::ostream& operator<<(std::ostream& os, const Deployment& deployment) {
     os << "  order: " << idx << " " << *graph;
     os << "  allocation: " << join_as_str(deployment.allocation.at(sg_name))
        << std::endl;
-    idx++;
+
+    const auto& part_info = deployment.part_info.at(sg_name);
+    os << "  rank_vals: " << std::endl;
+    for (const auto& rv : part_info.rank_values) {
+      os << "   " << rv.first << "=" << rv.second << std::endl;
+    }
   }
 
   for (const auto& r : deployment.fwd_in_routes) {

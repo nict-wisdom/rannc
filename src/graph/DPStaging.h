@@ -63,7 +63,8 @@ class DPStaging {
   void dumpNodeProfiles(const std::string& path, const MLGraph& graph);
 
   TensorPartitioningGraphInfo partitionParams(
-      std::shared_ptr<IRGraph> g, int repl_num) const;
+      std::shared_ptr<IRGraph> g, int repl_num,
+      const ParamPartitionMap& param_part) const;
 
   ProfilerUtil prof_util_;
   PartitioningConf conf_;

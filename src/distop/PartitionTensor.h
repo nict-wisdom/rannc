@@ -32,7 +32,7 @@ struct TensorPartitioningGraphInfo {
   ParamPartitionMap param_partitions;
   // value name -> rank (constant)
   std::unordered_map<std::string, int> rank_values;
-  // value name -> rank (constant)
+  // value name -> dim_idx (constant)
   std::unordered_map<std::string, int> dim_values;
   // node id -> [val names]
   std::unordered_map<std::string, std::vector<std::string>> rank_value_names;
@@ -47,7 +47,8 @@ struct TensorPartitioningGraphInfo {
 };
 
 TensorPartitioningGraphInfo replaceWithDistOp(
-    const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks);
+    const std::shared_ptr<IRGraph>& g, const std::vector<int>& ranks,
+    const ParamPartitionMap& param_part);
 
 at::Tensor sliceParam(
     const std::string& name, const at::Tensor& param,

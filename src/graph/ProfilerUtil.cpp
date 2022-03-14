@@ -67,7 +67,6 @@ size_t getOptMemSize(
     const auto& val = v.second;
     if (val.isParam()) {
       int slice_num = contains(sliced_params, val.getName()) ? replica_num : 1;
-      spdlog::info("  {} slice_num={}", val.getName(), slice_num);
 
       if (prof_in.use_amp_master_params) {
         if (val.getType().getTensorElemType() == IRTensorElemType::HALF) {
@@ -203,15 +202,8 @@ GraphProfile ProfilerUtil::doProfile(
 
   const MLProfileKey k{g->getName(), bs, in.checkpointing};
   if (contains(profile_cache_, k)) {
-    spdlog::info(
-        "ProfilerUtil cache hit: graph={} bs={} cp={}", g->getName(), bs,
-        in.checkpointing);
     return profile_cache_.at(k);
   }
-
-  spdlog::info(
-      "ProfilerUtil cache NOT hit: graph={} bs={} cp={}", g->getName(), bs,
-      in.checkpointing);
 
   if (!contains(max_batch_size_cache_[in.checkpointing], g->getName())) {
     max_batch_size_cache_[in.checkpointing][g->getName()] = SIZE_MAX;
