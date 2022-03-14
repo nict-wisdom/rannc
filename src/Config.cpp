@@ -73,6 +73,7 @@ const char RUN_WATCHDOG[] = "run_watchdog";
 const char WATCHDOG_LOCKFILE_DIR[] = "watchdog_lockfile_dir";
 const char FORCE_DIST_MATMUL[] = "force_dist_matmul";
 const char USE_NAMED_TENSORS[] = "use_named_tensors";
+const char PROFILER_CACHE_SIZE[] = "profiler_cache_size";
 
 const char CONF_DIR[] = "conf_dir";
 
@@ -178,6 +179,7 @@ Config::Config() {
       makeConfigItem(WATCHDOG_LOCKFILE_DIR, std::string("")),
       makeConfigItem(FORCE_DIST_MATMUL, false),
       makeConfigItem(USE_NAMED_TENSORS, false),
+      makeConfigItem(PROFILER_CACHE_SIZE, 0),
 
       makeConfigItem(CONF_DIR, "")};
 

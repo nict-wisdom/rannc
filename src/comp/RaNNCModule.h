@@ -104,6 +104,7 @@ class RaNNCModule {
   std::string decomp_name_;
   bool save_profile_;
   bool verify_partitioning_;
+  size_t prof_cache_size_;
 
   bool checkpointing_enabled_ = false;
   bool use_amp_master_params_;

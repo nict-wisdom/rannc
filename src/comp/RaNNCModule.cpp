@@ -116,6 +116,9 @@ RaNNCModule::RaNNCModule(
   decomp_name_ = conf.getVal<std::string>(config::DECOMPOSER);
   save_profile_ = conf.getVal<bool>(config::SAVE_GRAPH_PROFILE);
   verify_partitioning_ = conf.getVal<bool>(config::VERIFY_PARTITIONING);
+  prof_cache_size_ =
+      static_cast<size_t>(conf.getVal<int>(config::PROFILER_CACHE_SIZE)) *
+      1024 * 1024;
 
   param_storage_ = master_->getParamStorage();
   param_storage_->useAmpMasterParams(id_, use_amp_master_params_);
@@ -240,11 +243,9 @@ std::vector<long> RaNNCModule::init(
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
       pconf.min_pipeline_num);
 
-  sg_prof->setCacheParamValues(mpi::isMaster() && !pconf.force_dist_matmul);
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
-  dtd.start(sg_prof);
+  dtd.start(sg_prof, prof_cache_size_);
   if (mpi::isMaster()) {
-
     if (load_profile_) {
       logger->info("Loading graph profiles from {}", graph_profile_file_);
       sg_prof->load(graph_profile_file_);

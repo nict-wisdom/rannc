@@ -10,6 +10,7 @@
 #include <comm/SComm.h>
 #include <comp/DistributedParamLocator.h>
 #include <comp/GraphProfiler.h>
+#include <comp/GraphValueCache.h>
 #include <graph/ProfilerUtil.h>
 
 namespace rannc {
@@ -18,7 +19,7 @@ enum class DistTaskType { STOP, GET_PARAM, PROFILE };
 
 class DistTaskDispatcher {
  public:
-  void start(const std::shared_ptr<GraphProfiler>& sg_prof);
+  void start(const std::shared_ptr<GraphProfiler>& sg_prof, size_t cache_size);
   void stop();
 
   at::Tensor getParam(long param_id);
@@ -33,6 +34,7 @@ class DistTaskDispatcher {
   DistTaskDispatcher();
   ProfilingResult runProfiling(
       const ProfilingInput& input, IValueMap input_vals);
+  at::Tensor getParamWithCache(long param_id);
 
   NCCLWrapper& nccl_;
   DistributedParamLocator& dpl_;
@@ -41,6 +43,7 @@ class DistTaskDispatcher {
 
   std::shared_ptr<GraphProfiler> sg_prof_;
   int comm_tag_;
+  ParamCache param_cache_;
 
   const std::shared_ptr<spdlog::logger> logger =
       getLogger("DistTaskDispatcher");

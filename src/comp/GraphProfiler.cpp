@@ -119,12 +119,6 @@ std::vector<IRValue> getParamValues(const std::shared_ptr<IRGraph>& graph) {
   return results;
 }
 
-void GraphValueCache::put(
-    const std::string& name, const torch::jit::IValue& value) {}
-
-torch::jit::IValue GraphValueCache::get(
-    const std::string& name, size_t batch_size) {}
-
 static at::Dimname dimnameFromString(const std::string& str) {
   return at::Dimname::fromSymbol(at::Symbol::dimname(str));
 }
@@ -617,20 +611,8 @@ std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
   for (const auto& irp : ir_params) {
     assert(contains(graph_params_, irp.getName()));
 
-    if (cache_param_values_) {
-      if (contains(param_cache_, irp.getName())) {
-        graph_param_tensors[irp.getName()] = param_cache_.at(irp.getName());
-      } else {
-        logger->debug("Fetching param: {}", irp.getName());
-        const auto param_tensor =
-            param_storage_->getParamTensor(graph_params_.at(irp.getName()));
-        graph_param_tensors[irp.getName()] = param_cache_[irp.getName()] =
-            param_tensor;
-      }
-    } else {
       graph_param_tensors[irp.getName()] =
           param_storage_->getParamTensor(graph_params_.at(irp.getName()));
-    }
   }
   return graph_param_tensors;
 }

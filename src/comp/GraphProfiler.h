@@ -150,20 +150,6 @@ class ProfileDB {
   std::unordered_map<size_t, ProfileItem> items_;
 };
 
-class GraphValueCache {
- public:
-  GraphValueCache(size_t batch_size) : batch_size_(batch_size) {}
-
-  void put(const std::string& name, const torch::jit::IValue& value);
-  torch::jit::IValue get(const std::string& name, size_t batch_size);
-
- private:
-  std::unordered_map<std::string, torch::jit::IValue> values_;
-  size_t batch_size_;
-
-  const std::shared_ptr<spdlog::logger> logger = getLogger("GraphValueCache");
-};
-
 class GraphProfiler {
  public:
   GraphProfiler(
@@ -182,7 +168,6 @@ class GraphProfiler {
         batch_size_(batch_size),
         dev_num_(dev_num),
         min_pipeline_num_(min_pipeline_num) {
-    cache_param_values_ = false;
   }
 
   ~GraphProfiler() {
@@ -204,17 +189,6 @@ class GraphProfiler {
     return values_;
   }
 
-  bool isCacheParamValues() const {
-    return cache_param_values_;
-  }
-
-  void setCacheParamValues(bool cacheParamValues) {
-    cache_param_values_ = cacheParamValues;
-    if (!cacheParamValues) {
-      param_cache_.clear();
-    }
-  }
-
  private:
   std::shared_ptr<ParamStorage> param_storage_;
   TorchDriver driver_;
@@ -232,9 +206,6 @@ class GraphProfiler {
 
   IValueMap values_;
   ProfileDB profile_db_;
-
-  bool cache_param_values_;
-  std::unordered_map<std::string, at::Tensor> param_cache_;
 
   void backward(
       const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs,

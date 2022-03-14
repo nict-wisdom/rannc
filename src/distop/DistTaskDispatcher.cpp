@@ -13,10 +13,13 @@ DistTaskDispatcher::DistTaskDispatcher()
     : nccl_(NCCLWrapper::get()),
       dpl_(DistributedParamLocator::get()),
       scomm_(SComm::get()),
-      ocomm_(ObjectComm::get()) {}
+      ocomm_(ObjectComm::get()),
+      param_cache_(0) {}
 
-void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
+void DistTaskDispatcher::start(
+    const std::shared_ptr<GraphProfiler>& sg_prof, size_t cache_size) {
   sg_prof_ = sg_prof;
+  param_cache_ = ParamCache(cache_size);
 
   TagMap& tag_map = TagMap::get();
   comm_tag_ = tag_map.getRankSetTag(mpi::getAllRanks());
@@ -33,10 +36,8 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
       switch (task_type) {
         case DistTaskType::GET_PARAM: {
           logger->trace("Received GET_PARAM");
-          long param_id;
-          MPI_Bcast(&param_id, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-          logger->trace("Received pid={}", param_id);
-          dpl_.load(dpl_.pidToLocal(param_id));
+          long param_id; // dummy
+          getParamWithCache(param_id);
           break;
         }
         case DistTaskType::PROFILE: {
@@ -53,12 +54,20 @@ void DistTaskDispatcher::start(const std::shared_ptr<GraphProfiler>& sg_prof) {
   }
 }
 
+at::Tensor DistTaskDispatcher::getParamWithCache(long param_id) {
+  MPI_Bcast(&param_id, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+  long local_pid = dpl_.pidToLocal(param_id);
+
+  if (!param_cache_.exists(local_pid)) {
+    param_cache_.put(local_pid, dpl_.load(local_pid));
+  }
+  return param_cache_.get(local_pid);
+}
+
 at::Tensor DistTaskDispatcher::getParam(long param_id) {
   int task_type_buf = static_cast<int>(DistTaskType::GET_PARAM);
   MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&param_id, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-
-  return dpl_.load(dpl_.pidToLocal(param_id));
+  return getParamWithCache(param_id);
 }
 
 ProfilingResult DistTaskDispatcher::runProfiling(
