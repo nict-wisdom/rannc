@@ -792,6 +792,8 @@ TensorPartitioningGraphInfo DPStaging::partitionParams(
   TensorPartitioningGraphInfo part_info;
   if (conf_.force_dist_matmul) {
     part_info = replaceWithDistOp(g, createDummyRanks(repl_num), param_part);
+  } else {
+    part_info.graph = g;
   }
   return part_info;
 }
@@ -807,7 +809,7 @@ GraphProfile DPDryStaging::estimateSolutionGraph(
       DEFALUT_ITERATION_NUM,
       static_cast<size_t>(repl),
       static_cast<size_t>(sol.pipeline_num),
-      sol.pipeline_num > 1 > 1,
+      sol.pipeline_num > 1,
       TensorPartitioningGraphInfo{},
       conf_};
   return this->estimateProf(in);
