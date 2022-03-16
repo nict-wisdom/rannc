@@ -300,7 +300,9 @@ std::vector<long> RaNNCModule::init(
         int repl_num = deployment_.allocation.at(it).size();
 
         assert(contains(deployment_.part_info, it));
-        const auto& part_info = part_info_map.at(it);
+        // Profiling run must contain rank 0.
+        const auto& part_info = setRanks(
+            part_info_map.at(it), vectorToSet(createDummyRanks(repl_num)));
 
         graphs.push_back(g);
         repl_nums[it] = repl_num;
