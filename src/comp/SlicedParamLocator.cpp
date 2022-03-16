@@ -54,7 +54,10 @@ at::Tensor SlicedParamLocator::gather(long param_id, at::Tensor src) const {
   torch::NoGradGuard no_grad;
 
   const auto& slice_info = slice_info_.at(param_id);
-  at::Tensor buf = createBufTensor(slice_info.type);
+  const auto buf_type = IRType::createTensorType(
+      toTensorElemType(src.scalar_type()), slice_info.type.getTensorDim(),
+      false);
+  at::Tensor buf = createBufTensor(buf_type);
   TagMap& tag_map = TagMap::get();
   int tag = tag_map.getRankSetTag(slice_info.ranks);
   NCCLWrapper& nccl = NCCLWrapper::get();
