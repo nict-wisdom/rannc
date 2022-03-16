@@ -202,7 +202,7 @@ at::Tensor DistMatmul::runCRC(
     const auto z_slice = z.slice(1, step * i, step * (i + 1)).contiguous();
     {
       TraceEvent evt(getFuncKey("DistMatmul", "runCRC", "reduce", i, false));
-      nccl.reduce(tag, {z_slice}, {getLocalRank(ranks, i)});
+      nccl.reduce(tag, {z_slice}, {i});
     }
     if (getLocalRank(ranks, mpi::getRank()) == i) {
       out_buf.copy_(z_slice);
