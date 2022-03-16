@@ -15,7 +15,7 @@
 
 namespace rannc {
 
-enum class DistTaskType { STOP, GET_PARAM, PROFILE };
+enum class DistTaskType { STOP, GET_PARAM, PROFILE, CLEAR_CACHE };
 
 class DistTaskDispatcher {
  public:
@@ -24,6 +24,7 @@ class DistTaskDispatcher {
 
   at::Tensor getParam(long param_id);
   ProfilingResult profile(const ProfilingInput& input, IValueMap input_vals);
+  void clearCache();
 
   static DistTaskDispatcher& get() {
     static DistTaskDispatcher instance;

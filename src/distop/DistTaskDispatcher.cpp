@@ -45,6 +45,10 @@ void DistTaskDispatcher::start(
           pybind11::gil_scoped_release no_gil;
           runProfiling(ProfilingInput{}, IValueMap{});
         } break;
+        case DistTaskType::CLEAR_CACHE:
+          logger->trace("Received CLEAR_CACHE");
+          clearCache();
+          break;
         case DistTaskType::STOP:
           logger->trace("Received STOP");
           running = false;
@@ -120,6 +124,12 @@ ProfilingResult DistTaskDispatcher::profile(
   MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   return runProfiling(input, input_vals);
+}
+
+void DistTaskDispatcher::clearCache() {
+  int task_type_buf = static_cast<int>(DistTaskType::CLEAR_CACHE);
+  MPI_Bcast(&task_type_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  param_cache_.clear();
 }
 
 void DistTaskDispatcher::stop() {
