@@ -444,6 +444,7 @@ class CommErrorException : public std::runtime_error {
   int code_;
 };
 
+double getResidentMem();
 } // namespace rannc
 
 #endif // PT_RANNC_COMMON_H
