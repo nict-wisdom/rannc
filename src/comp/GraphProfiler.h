@@ -215,15 +215,16 @@ class GraphProfiler {
       bool trace_dim_names);
   std::pair<IValueMap, GraphProfile> computeGraph(
       const std::shared_ptr<IRGraph>& subgraph, const IValueMap& graph_inputs,
-      const std::unordered_map<std::string, at::Tensor>& graph_params,
-      int iteration, IValueMap& values, int split_index, bool trace_dim_names,
+      std::unordered_map<std::string, at::Tensor>& graph_params, int iteration,
+      IValueMap& values, int split_index, bool trace_dim_names,
       const DriverExecConf& conf);
   ProfilingResult doProfile(
       const ProfilingInput& input, IValueMap& values, bool trace_dim_names);
   size_t setRequiresGrad(
       const std::shared_ptr<IRGraph>& ir_graph, const IValueMap& outputs);
   std::unordered_map<std::string, at::Tensor> getGraphParams(
-      const std::shared_ptr<IRGraph>& graph);
+      const std::shared_ptr<IRGraph>& graph,
+      const TensorPartitioningGraphInfo& part_info);
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("GraphProfiler");
 };

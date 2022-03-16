@@ -232,8 +232,8 @@ void recordDimNamesFromIValue(
 std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
     const std::shared_ptr<IRGraph>& subgraph,
     const IValueMap& graph_inputs_with_names,
-    const std::unordered_map<std::string, at::Tensor>& graph_params,
-    int iteration, IValueMap& values, int split_index, bool trace_dim_names,
+    std::unordered_map<std::string, at::Tensor>& graph_params, int iteration,
+    IValueMap& values, int split_index, bool trace_dim_names,
     const DriverExecConf& conf) {
   emptyCache();
 
@@ -248,7 +248,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 
   // clear grads
   long param_size = 0;
-  for (auto& param_it : getGraphParams(subgraph)) {
+  for (auto& param_it : graph_params) {
     auto& param = param_it.second;
     param_size += param.numel() * param.element_size();
     getMutableGradRef(param) = at::Tensor();
@@ -393,27 +393,18 @@ ProfilingResult GraphProfiler::compute(
           ret_profiles.value_types[in_name] = toIRType(graph_inputs[in_name]);
           input_size += ret_profiles.value_types[in_name].getSizeInByte();
         }
-        for (const auto& it : getGraphParams(untyped_subgraph)) {
+
+        assert(contains(input.part_info, id));
+        const TensorPartitioningGraphInfo& part_info = input.part_info.at(id);
+
+        auto graph_params =
+            paramsToCuda(getGraphParams(untyped_subgraph, part_info));
+        for (const auto& it : graph_params) {
           ret_profiles.value_types[it.first] = toIRType(it.second);
         }
 
         const auto& subgraph =
             setInputTypes(untyped_subgraph, ret_profiles.value_types);
-        auto graph_params = paramsToCuda(getGraphParams(subgraph));
-
-        assert(contains(input.part_info, id));
-        const TensorPartitioningGraphInfo& part_info = input.part_info.at(id);
-        if (part_info.ranks.size() > 0) {
-          for (const auto& param_it : graph_params) {
-            if (contains(part_info.param_partitions, param_it.first)) {
-              const auto& partition =
-                  part_info.param_partitions.at(param_it.first);
-              graph_params[param_it.first] = sliceParam(
-                  param_it.first, param_it.second, vectorToSet(part_info.ranks),
-                  mpi::getRank(), part_info.param_partitions);
-            }
-          }
-        }
 
         if (trace_dim_names) {
           for (const auto& it : graph_params) {
@@ -502,7 +493,7 @@ ProfilingResult GraphProfiler::compute(
         driver_out.clear();
 
         // clear grad again
-        for (auto& param_it : getGraphParams(subgraph)) {
+        for (auto& param_it : graph_params) {
           auto& param = param_it.second;
           getMutableGradRef(param) = at::Tensor();
         }
@@ -605,14 +596,24 @@ void GraphProfiler::backward(
 }
 
 std::unordered_map<std::string, at::Tensor> GraphProfiler::getGraphParams(
-    const std::shared_ptr<IRGraph>& graph) {
+    const std::shared_ptr<IRGraph>& graph,
+    const TensorPartitioningGraphInfo& part_info) {
   std::unordered_map<std::string, at::Tensor> graph_param_tensors;
   auto ir_params = graphParamValues(graph);
   for (const auto& irp : ir_params) {
     assert(contains(graph_params_, irp.getName()));
 
-      graph_param_tensors[irp.getName()] =
-          param_storage_->getParamTensor(graph_params_.at(irp.getName()));
+    graph_param_tensors[irp.getName()] =
+        param_storage_->getParamTensor(graph_params_.at(irp.getName()));
+
+    if (contains(part_info.param_partitions, irp.getName())) {
+      const auto& partition = part_info.param_partitions.at(irp.getName());
+
+      graph_param_tensors[irp.getName()] = sliceParam(
+          irp.getName(), graph_param_tensors[irp.getName()],
+          vectorToSet(part_info.ranks), mpi::getRank(),
+          part_info.param_partitions);
+    }
   }
   return graph_param_tensors;
 }
@@ -715,7 +716,8 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     }
   }
 
-  const auto graph_params = getGraphParams(base_graph_);
+  const auto graph_params =
+      getGraphParams(base_graph_, TensorPartitioningGraphInfo{});
   if (trace_dim_names) {
     for (const auto& p_it : graph_params) {
       const auto dim_names = createDimnames(p_it.first, p_it.second, false);
@@ -801,6 +803,8 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
 
   logger->trace("Scaling {} intermediate values ...", values.size());
   for (auto& it : values) {
+    torch::NoGradGuard no_grad;
+
     const auto& ir_val = base_graph_->getValue(it.first.value_name);
     if (ir_val.isBatch()) {
       values_[it.first] = scaleBatchInIValue(
