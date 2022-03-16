@@ -156,16 +156,9 @@ ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
     case at::ScalarType::Long:
       datatype = ncclInt64;
       break;
-
-#if defined(__NCCL_SUPPORTS_BFLOAT16__)
     case at::ScalarType::BFloat16:
       datatype = ncclBfloat16;
       break;
-#else
-    case at::ScalarType::BFloat16:
-      datatype = ncclFloat32;
-      break;
-#endif
     default:
       std::stringstream ss;
       ss << "Unsupported type given to NCCL: " << toString(t.scalar_type());
@@ -192,17 +185,9 @@ ncclDataType_t getRedistNcclDataType(const IRTensorElemType t) {
     case IRTensorElemType::LONG:
       datatype = ncclInt64;
       break;
-
-#if defined(__NCCL_SUPPORTS_BFLOAT16__)
     case IRTensorElemType::BFLOAT16:
       datatype = ncclBfloat16;
       break;
-#else
-    case IRTensorElemType::BFLOAT16:
-      datatype = ncclFloat16;
-      break;
-#endif
-
     default:
       std::stringstream ss;
       ss << "Unsupported type given to NCCL: " << toString(t);
@@ -235,15 +220,6 @@ void runCollectiveCommBuf(
   }
   ss << "nccl_" << op_name << "_tag_" << tag << "_elem_" << elem_sum;
   recordStart(ss.str());
-
-#if not defined(__NCCL_SUPPORTS_BFLOAT16__)
-  for (size_t i = 0; i < send_tensors.size(); i++) {
-    const auto& ten = send_tensors.at(i);
-    if (ten.scalar_type() == c10::ScalarType::BFloat16) {
-      throw std::runtime_error("Parameters in bfloat16 are not supported.");
-    }
-  }
-#endif
 
   ncclGroupStart();
   for (size_t index = 0; index < send_tensors.size(); index++) {

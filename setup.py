@@ -53,9 +53,6 @@ class CMakeBuild(build_ext):
             build_args += ['--', parallel_opt]
 
         env = os.environ.copy()
-        if 'NCCL_SUPPORTS_BFLOAT16' in env:
-            cmake_args += ['-DNCCL_SUPPORTS_BFLOAT16=' + env['NCCL_SUPPORTS_BFLOAT16']]
-
         if 'Torch_DIR' not in env:
             env['Torch_DIR'] = os.path.join(distutils.sysconfig.get_python_lib(), 'torch')
 

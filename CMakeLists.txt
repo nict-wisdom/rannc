@@ -107,12 +107,6 @@ set(RANNC_SRCS
         src/torch/TorchUtil.cpp
         src/torch/CustomOps.cpp)
 
-option(NCCL_SUPPORTS_BFLOAT16 "Enable Bfloat16 support of NCCL." off)
-if(NCCL_SUPPORTS_BFLOAT16)
-    message("Enabling NCCL's Bfloat16 support.")
-    add_definitions(-D__NCCL_SUPPORTS_BFLOAT16__)
-endif ()
-
 pybind11_add_module(_pyrannc ${RANNC_SRCS})
 target_link_libraries(_pyrannc PRIVATE "${TORCH_LIBRARIES}" "${MPI_C_LIBRARIES}" "${CUDA_LIBRARIES}" "${Boost_LIBRARIES}" nccl)
 
