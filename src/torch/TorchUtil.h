@@ -89,6 +89,8 @@ IRValue toIRValue(torch::jit::Value* value);
 torch::jit::TypePtr fromIRScalarType(const IRScalarType& ir_scalar_type);
 at::ScalarType fromIRTensorElemTypeToScalarType(
     IRTensorElemType ir_tensor_elem);
+torch::jit::TypePtr fromIRType(const IRType& ir_type);
+torch::jit::TypePtr fromIRListType(const IRType& ir_type);
 at::ScalarType fromIRListTypeToScalarType(IRListType list_type);
 IRScalarType fromIRListTypeToIRScalarType(IRListType list_type);
 torch::jit::IValue toTensorListIfElemsAreTensors(

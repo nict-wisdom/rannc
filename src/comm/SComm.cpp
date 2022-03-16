@@ -232,7 +232,52 @@ torch::jit::IValue SComm::bcastIValue(
   } else if (ir_type.getBaseType() == IRBaseType::TENSOR) {
     return bcastTensor(ivalue, ir_type, route, communicator);
   } else if (ir_type.getBaseType() == IRBaseType::LIST) {
-    return bcastPrimitiveArray(ivalue, ir_type, root, communicator);
+    const auto& elem_types = ir_type.getCompoundTypes();
+    assert(!elem_types.empty());
+    const auto& a_type = elem_types.front();
+    bool is_tensor_list = a_type.getBaseType() == IRBaseType::TENSOR;
+
+    std::vector<torch::jit::IValue> results;
+    for (size_t i = 0; i < ir_type.getListSize(); i++) {
+      torch::jit::IValue elem;
+      if (mpi::getRank() == root) {
+        elem = ivalue.toListRef().at(i);
+      }
+      elem = bcastIValue(elem, route);
+      results.push_back(elem);
+    }
+
+    if (is_tensor_list) {
+      std::vector<at::Tensor> tensors;
+      tensors.reserve(results.size());
+      for (const auto& iv : results) {
+        assert(iv.isTensor());
+        tensors.push_back(iv.toTensor());
+      }
+      return c10::List<at::Tensor>(tensors);
+    }
+
+    c10::impl::GenericList list(at::AnyType::get());
+    for (const auto& iv : results) {
+      assert(iv.isTensor());
+      list.push_back(iv.toTensor());
+    }
+    return list;
+  } else if (ir_type.getBaseType() == IRBaseType::TUPLE) {
+    const auto& elem_types = ir_type.getCompoundTypes();
+    size_t idx = 0;
+    std::vector<torch::jit::IValue> results;
+    for (const auto& elem_type : elem_types) {
+      torch::jit::IValue elem;
+      if (mpi::getRank() == root) {
+        elem = ivalue.toTuple()->elements().at(idx);
+      }
+      elem = bcastIValue(elem, route);
+      results.push_back(elem);
+
+      idx++;
+    }
+    return c10::ivalue::Tuple::create(results);
   } else if (ir_type.getBaseType() == IRBaseType::NONE) {
     return torch::jit::IValue();
   }
@@ -256,7 +301,7 @@ IValueMap SComm::bcastIValueMap(
   IValueMap results;
   assert(!route.sources.empty());
   for (const auto& loc : locs) {
-    if (mpi::getRank() == route.sources.front()) {
+    if (mpi::getRank() == root) {
       results[loc] = bcastIValue(ivalue_map.at(loc), route);
     } else {
       results[loc] = bcastIValue(torch::jit::IValue(), route);

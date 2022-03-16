@@ -600,6 +600,87 @@ at::ScalarType fromIRListTypeToScalarType(IRListType list_type) {
       "The list type is not scalar: " + toString(list_type));
 }
 
+torch::jit::TypePtr fromIRType(const IRType& ir_type) {
+  auto base_type = ir_type.getBaseType();
+  switch (base_type) {
+    case IRBaseType::SCALAR:
+      return fromIRScalarType(ir_type.getScalarType());
+    case IRBaseType::TENSOR: {
+      if (ir_type.getTensorElemType() == IRTensorElemType::UNDEF) {
+        return torch::jit::TensorType::get();
+      } else {
+        at::ScalarType tensor_elem_type =
+            fromIRTensorElemTypeToScalarType(ir_type.getTensorElemType());
+        auto& tensor_dim = ir_type.getTensorDim();
+        return torch::jit::TensorType::createContiguous(
+            tensor_elem_type, at::kCPU, tensor_dim);
+      }
+    }
+    case IRBaseType::LIST: {
+      torch::jit::TypePtr type;
+      switch (ir_type.getListType()) {
+        case IRListType::INT:
+          type = torch::jit::IntType::get();
+          break;
+        case IRListType::FLOAT:
+          type = torch::jit::FloatType::get();
+          break;
+        case IRListType::BOOL:
+          type = torch::jit::BoolType::get();
+          break;
+        case IRListType::TENSOR:
+          type = torch::jit::TensorType::get();
+          break;
+        case IRListType::GENERIC: {
+          assert(ir_type.getCompoundTypes().size() == 1);
+          type = fromIRType(ir_type.getCompoundTypes().front());
+          break;
+        }
+      }
+      return torch::jit::ListType::create(type);
+    }
+    case IRBaseType::TUPLE: {
+      const auto& ir_elem_types = ir_type.getCompoundTypes();
+      std::vector<torch::jit::TypePtr> elem_types;
+      elem_types.reserve(ir_elem_types.size());
+      for (const auto& elem_type : ir_elem_types) {
+        elem_types.push_back(fromIRType(elem_type));
+      }
+      return torch::jit::TupleType::create(elem_types);
+    }
+    case IRBaseType::OPTIONAL: {
+      const auto& ir_elem_types = ir_type.getCompoundTypes();
+      assert(ir_elem_types.size() == 1);
+      const auto elem_type = fromIRType(ir_elem_types.at(0));
+      return torch::jit::OptionalType::create(elem_type);
+    }
+    case IRBaseType::STRING: {
+      return torch::jit::StringType::get();
+    }
+    case IRBaseType::NONE: {
+      return torch::jit::NoneType::get();
+    }
+  }
+}
+
+torch::jit::TypePtr fromIRListType(const IRType& ir_type) {
+  assert(ir_type.getBaseType() == IRBaseType::LIST);
+  switch (ir_type.getListType()) {
+    case IRListType::INT:
+      return torch::jit::IntType::get();
+    case IRListType::FLOAT:
+      return torch::jit::FloatType::get();
+    case IRListType::BOOL:
+      return torch::jit::BoolType::get();
+    case IRListType::TENSOR:
+      return torch::jit::TensorType::get();
+    case IRListType::GENERIC: {
+      assert(ir_type.getCompoundTypes().size() == 1);
+      return fromIRType(ir_type.getCompoundTypes().front());
+    }
+  }
+}
+
 IRScalarType fromIRListTypeToIRScalarType(IRListType list_type) {
   switch (list_type) {
     case IRListType::INT:

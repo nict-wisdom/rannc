@@ -42,7 +42,6 @@ IRValue toIRValue(torch::jit::Value* value);
 std::shared_ptr<IRGraph> fromTorch(
     const std::string& name, const std::shared_ptr<torch::jit::Graph>& graph,
     size_t real_input_num);
-torch::jit::TypePtr fromIRType(const IRType& ir_type);
 
 std::shared_ptr<IRGraph> guessBatchValuesByReachability(
     const std::shared_ptr<IRGraph>& g);
