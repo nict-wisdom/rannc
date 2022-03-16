@@ -249,6 +249,7 @@ TensorPartitioningGraphInfo replaceWithDistOp(
   const auto name_map = getDistOpNameMap();
   int ex_rank_arg_idx = 0;
   int ex_rank_list_arg_idx = 0;
+  ParamPartitionMap param_part;
   for (const auto& n : g->getNodes()) {
     if (isDistOpAvailable(
             n, dist_op_map, vals, ranks.size(), global_param_part)) {
@@ -258,6 +259,18 @@ TensorPartitioningGraphInfo replaceWithDistOp(
       const std::string& int_list_val_name = rank_list_info.first;
       const std::vector<std::string>& ranks_val_node_names =
           rank_list_info.second;
+
+      for (const auto& dist_info : dist_ops) {
+        if (dist_info.original_name == n.getName()) {
+          for (const auto& part_dim : dist_info.partition_dim) {
+            const auto dim_idx = part_dim.first;
+            const auto& param_name = n.getInputNames().at(dim_idx);
+            assert(contains(global_param_part, param_name));
+            param_part[param_name] = global_param_part.at(param_name);
+          }
+        }
+      }
+
       std::vector<std::string> input_names = n.getInputNames();
       input_names.push_back(int_list_val_name);
 
@@ -280,8 +293,8 @@ TensorPartitioningGraphInfo replaceWithDistOp(
       g->getOutputNames());
 
   auto part_info = TensorPartitioningGraphInfo{
-      ret_graph, ranks, global_param_part, dist_ranks, {}, rank_value_names};
-  return insertGather(part_info, global_param_part);
+      ret_graph, ranks, param_part, dist_ranks, {}, rank_value_names};
+  return part_info;
 }
 
 at::Tensor sliceParam(
