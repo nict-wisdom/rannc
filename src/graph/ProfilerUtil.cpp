@@ -253,6 +253,7 @@ GraphProfile accProfileValues(
     ProfilerUtil& prof_util, const ProfilingInput& prof_in) {
   GraphProfile prof_sum{"MERGED", 0, 0, 0};
 
+  int idx = 0;
   for (const auto& it : prof_in.ir_graphs) {
     auto graph = it.second;
     assert(contains(prof_in.part_info, graph->getName()));
@@ -273,8 +274,27 @@ GraphProfile accProfileValues(
 
     prof_sum.fwd_time += prof.fwd_time;
     prof_sum.bwd_time += prof.bwd_time;
-    prof_sum.max_allocated_mem += prof.max_allocated_mem;
+    prof_sum.param_size += prof.param_size;
+    prof_sum.input_size += 0;
+    //    prof_sum.output_size += 0;
+    prof_sum.output_size += prof.output_size;
+    prof_sum.activation_size += prof.activation_size;
+    prof_sum.working_mem = std::max(prof.working_mem, prof_sum.working_mem);
+
+    //    spdlog::info("accProfileValues idx={} alloc={} param+grad={} in={}
+    //    out={} act={} work={}",
+    //                 idx++,
+    //                 prof.max_allocated_mem,
+    //                 prof.param_size*2,
+    //                 prof.input_size,
+    //                 prof.output_size,
+    //                 prof.activation_size,
+    //                 prof.working_mem);
   }
+
+  prof_sum.max_allocated_mem =
+      prof_sum.param_size * 2 + prof_sum.activation_size + prof_sum.working_mem;
+
   return prof_sum;
 }
 

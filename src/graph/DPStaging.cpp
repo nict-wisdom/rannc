@@ -579,6 +579,29 @@ AllocSolution DPStaging::doRunDpComm(
             long ar_comm = 0;
             GraphProfile step_prof;
 
+            // merge graphs from j+1 to i (inclusive)
+            auto step_graph = merge_helper.merge(b_prev, b - 1);
+            size_t step_in_comm = calcCommTime(
+                calcInputSize(step_graph) /
+                ((d - d_prev) * replica_num * pipeline_num));
+            size_t step_out_comm = calcCommTime(
+                calcOutputSize(step_graph) /
+                ((d - d_prev) * replica_num * pipeline_num));
+            ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
+
+            TensorPartitioningGraphInfo part_info = partitionParams(
+                step_graph, (d - d_prev) * replica_num, global_param_part);
+
+            // run profiler for the merged graph
+            ProfilingInput merged_in{
+                part_info.graph,
+                DEFALUT_ITERATION_NUM,
+                (d - d_prev) * replica_num,
+                static_cast<size_t>(pipeline_num),
+                checkpointing,
+                part_info,
+                conf_};
+
             bool profile_by_acc =
                 config::Config::get().getVal<bool>(config::PROFILE_BY_ACC);
             if (profile_by_acc) {
@@ -592,74 +615,31 @@ AllocSolution DPStaging::doRunDpComm(
               for (size_t i = b_prev; i <= b - 1; i++) {
                 const auto& g = graph.nodes.at(i).graph;
 
-                TensorPartitioningGraphInfo part_info = partitionParams(
+                TensorPartitioningGraphInfo part_info_sg = partitionParams(
                     g, (d - d_prev) * replica_num, global_param_part);
-                ir_graphs[g->getName()] = part_info.graph;
-                part_info_map[g->getName()] = part_info;
+                ir_graphs[g->getName()] = part_info_sg.graph;
+                part_info_map[g->getName()] = part_info_sg;
                 repl_nums[g->getName()] = (d - d_prev) * replica_num;
               }
-              ProfilingInput in{
+
+              ProfilingInput acc_in{
                   ir_graphs,     DEFALUT_ITERATION_NUM,
                   repl_nums,     static_cast<size_t>(pipeline_num),
                   checkpointing, part_info_map,
                   conf_};
-
-              step_prof = estimateProf(in);
-              size_t input_size = estimateInputSize(values(ir_graphs));
-              size_t step_in_comm = calcCommTime(
-                  input_size / ((d - d_prev) * replica_num * pipeline_num));
-              size_t output_size = estimateOutputSize(values(ir_graphs));
-              size_t step_out_comm = calcCommTime(
-                  output_size / ((d - d_prev) * replica_num * pipeline_num));
-
-              step_val = ::rannc::estimateEval(
-                  step_prof, step_in_comm, step_out_comm,
-                  table[s - 1][b_prev][d_prev].max_fwd,
-                  table[s - 1][b_prev][d_prev].max_bwd,
-                  table[s - 1][b_prev][d_prev].max_allreduce);
-
-              int opt_param_factor =
-                  config::Config::get().getVal<int>(config::OPT_PARAM_FACTOR);
-              long opt_mem = 0;
-              for (size_t i = b_prev; i <= (b - 1); i++) {
-                const auto& node = graph.nodes.at(i);
-                opt_mem += getOptMemSize(node.graph, in);
-              }
-              step_mem = step_prof.max_allocated_mem + opt_mem +
-                  (step_in_comm + step_out_comm) * 2;
-            } else {
-              // merge graphs from j+1 to i (inclusive)
-              auto step_graph = merge_helper.merge(b_prev, b - 1);
-              size_t step_in_comm = calcCommTime(
-                  calcInputSize(step_graph) /
-                  ((d - d_prev) * replica_num * pipeline_num));
-              size_t step_out_comm = calcCommTime(
-                  calcOutputSize(step_graph) /
-                  ((d - d_prev) * replica_num * pipeline_num));
-              ar_comm = calcAllReduceTime(step_graph->getParamSizeInByte());
-
-              TensorPartitioningGraphInfo part_info = partitionParams(
-                  step_graph, (d - d_prev) * replica_num, global_param_part);
-
-              // run profiler for the merged graph
-              ProfilingInput in{
-                  part_info.graph,
-                  DEFALUT_ITERATION_NUM,
-                  (d - d_prev) * replica_num,
-                  static_cast<size_t>(pipeline_num),
-                  checkpointing,
-                  part_info,
-                  conf_};
-              step_prof = prof_util_.profile(in);
+              step_prof = accProfileValues(prof_util_, acc_in);
 
               step_mem = calcGraphMem(
-                  part_info.graph, step_prof, conf_.batch_size, in);
-              step_val = ::rannc::estimateEval(
-                  step_prof, step_in_comm, step_out_comm,
-                  table[s - 1][b_prev][d_prev].max_fwd,
-                  table[s - 1][b_prev][d_prev].max_bwd,
-                  table[s - 1][b_prev][d_prev].max_allreduce);
+                  step_graph, step_prof, conf_.batch_size, merged_in);
+            } else {
+              step_prof = prof_util_.profile(merged_in);
             }
+
+            step_val = ::rannc::estimateEval(
+                step_prof, step_in_comm, step_out_comm,
+                table[s - 1][b_prev][d_prev].max_fwd,
+                table[s - 1][b_prev][d_prev].max_bwd,
+                table[s - 1][b_prev][d_prev].max_allreduce);
 
             if (step_mem >= conf_.dev_mem) {
               logger->trace(

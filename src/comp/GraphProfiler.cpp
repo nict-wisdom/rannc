@@ -259,6 +259,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   IValueMap graph_inputs = graph_inputs_with_names;
   IValueMap driver_out;
   TimeCounter time_counter(true);
+  long alloc_fwd_out_with_act, alloc_fwd_out_no_act;
   for (size_t i = 0; i < iteration; i++) {
     driver_out.clear();
 
@@ -267,6 +268,9 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       // Run forward enabling grad to judge whether bwd is required or not
       driver_out = driver.forward(id, graph_inputs, split_index);
       bool run_bwd = setRequiresGrad(subgraph, driver_out) > 0;
+      if (i == 0) {
+        alloc_fwd_out_with_act = getAllocatedMemory();
+      }
 
       // Clear to release memory
       driver_out.clear();
@@ -277,6 +281,10 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
               return driver.forward(id, graph_inputs, split_index);
             },
             i, iteration / 2, time_counter, fwd_time_key);
+
+        if (i == 0) {
+          alloc_fwd_out_no_act = getAllocatedMemory();
+        }
       }
 
       if (run_bwd) {
@@ -324,9 +332,29 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   // Add param size because params remain on a cuda device
   long total_mem = getMaxAllocatedMemory() - alloc_mem_start + param_size;
 
+  long input_size = 0;
+  for (const auto& it : graph_inputs) {
+    input_size += toIRType(it.second).getSizeInByte();
+  }
+  long output_size = 0;
+  for (const auto& it : driver_out) {
+    output_size += toIRType(it.second).getSizeInByte();
+  }
+  long act_mem = alloc_fwd_out_with_act - alloc_fwd_out_no_act;
+  long work_mem =
+      total_mem - (input_size + output_size + param_size * 2 + act_mem);
+
   GraphProfile prof{
-      id, time_counter.get<std::chrono::microseconds>(fwd_time_key), bwd_time,
-      total_mem, conf.checkpointing};
+      id,
+      time_counter.get<std::chrono::microseconds>(fwd_time_key),
+      bwd_time,
+      total_mem,
+      param_size,
+      input_size,
+      output_size,
+      alloc_fwd_out_with_act - alloc_fwd_out_no_act,
+      work_mem, // gradients
+      conf.checkpointing};
 
   return {driver_out, prof};
 }

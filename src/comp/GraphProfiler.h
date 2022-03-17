@@ -22,6 +22,11 @@ struct GraphProfile {
   long fwd_time;
   long bwd_time;
   long max_allocated_mem;
+  long param_size;
+  long input_size;
+  long output_size;
+  long activation_size;
+  long working_mem;
   bool checkpointing;
 
   friend std::ostream& operator<<(
@@ -33,7 +38,9 @@ struct GraphProfile {
     return os;
   }
 
-  MSGPACK_DEFINE(name, fwd_time, bwd_time, max_allocated_mem, checkpointing);
+  MSGPACK_DEFINE(
+      name, fwd_time, bwd_time, max_allocated_mem, param_size, input_size,
+      output_size, working_mem, activation_size, checkpointing);
 };
 
 struct ProfilingInput {
@@ -167,8 +174,7 @@ class GraphProfiler {
         functions_(std::move(functions)),
         batch_size_(batch_size),
         dev_num_(dev_num),
-        min_pipeline_num_(min_pipeline_num) {
-  }
+        min_pipeline_num_(min_pipeline_num) {}
 
   ~GraphProfiler() {
     clear();
