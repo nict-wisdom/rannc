@@ -33,7 +33,22 @@ Deployment MLPartDecomposer::decompose(
 
   const bool coarsen_by_time = conf.getVal<bool>(config::COARSEN_BY_TIME);
   MLPartitioner partitioner(sg_prof_, conf_, coarsen_by_time);
-  MLGraph part_graph = partitioner.partition(ir_graph);
+
+  MLGraph part_graph;
+  const std::string mlpart_results_file =
+      conf.getVal<std::string>(config::MLPART_RESULTS_FILE);
+  if (conf.getVal<bool>(config::LOAD_MLPART_RESULTS)) {
+    logger->info(
+        "Loading results of MLPartitioner from {}", mlpart_results_file);
+    part_graph = loadFromFile<MLGraph>(mlpart_results_file);
+  } else {
+    part_graph = partitioner.partition(ir_graph);
+
+    if (conf.getVal<bool>(config::SAVE_MLPART_RESULTS)) {
+      logger->info("Saving result of MLPartitioner to {}", mlpart_results_file);
+      saveToFile(mlpart_results_file, part_graph);
+    }
+  }
 
   ///////////
   logger->trace(

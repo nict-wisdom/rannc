@@ -65,6 +65,15 @@ const char PROFILE_BY_ACC[] = "profile_by_acc";
 const char VERIFY_PARTITIONING[] = "verify_partitioning";
 const char ALLOC_REPL_FLAT[] = "alloc_repl_flat";
 const char SYNC_ALLREDUCE[] = "sync_allreduce";
+
+const char SAVE_MLPART_RESULTS[] = "save_mlpart_results";
+const char LOAD_MLPART_RESULTS[] = "load_mlpart_results";
+const char MLPART_RESULTS_FILE[] = "mlpart_results_file";
+
+const char SAVE_ALLOC_SOLUTIONS[] = "save_alloc_solutions";
+const char LOAD_ALLOC_SOLUTIONS[] = "load_alloc_solutions";
+const char ALLOC_SOLUTIONS_FILE_PREFIX[] = "alloc_solutions_file_prefix";
+
 const char DUMP_DP_NODE_PROFILES[] = "dump_dp_node_profiles";
 const char DUMP_DP_CACHE[] = "dump_dp_cache";
 const char PARTITIONING_DRY_RUN_NP[] = "partitioning_dry_run_np";
@@ -171,6 +180,17 @@ Config::Config() {
       makeConfigItem(VERIFY_PARTITIONING, false),
       makeConfigItem(ALLOC_REPL_FLAT, true),
       makeConfigItem(SYNC_ALLREDUCE, false),
+
+      makeConfigItem(SAVE_MLPART_RESULTS, false),
+      makeConfigItem(LOAD_MLPART_RESULTS, false),
+      makeConfigItem(
+          MLPART_RESULTS_FILE, std::string("/tmp/rannc_mlpart_results.bin")),
+
+      makeConfigItem(SAVE_ALLOC_SOLUTIONS, false),
+      makeConfigItem(LOAD_ALLOC_SOLUTIONS, false),
+      makeConfigItem(
+          ALLOC_SOLUTIONS_FILE_PREFIX, std::string("/tmp/rannc_alloc_sols")),
+
       makeConfigItem(DUMP_DP_NODE_PROFILES, std::string("")),
       makeConfigItem(DUMP_DP_CACHE, std::string("")),
       makeConfigItem(PARTITIONING_DRY_RUN_NP, 0),

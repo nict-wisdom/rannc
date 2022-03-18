@@ -31,7 +31,8 @@ struct AllocSolution {
   std::vector<size_t> dev_nums;
 
   MSGPACK_DEFINE(
-      graphs, repl_nums, pipeline_num, checkpointing, boundaries, dev_nums);
+      graphs, repl_nums, part_info, pipeline_num, checkpointing, boundaries,
+      dev_nums);
 };
 
 class DPStaging {
@@ -65,6 +66,10 @@ class DPStaging {
   TensorPartitioningGraphInfo partitionParams(
       std::shared_ptr<IRGraph> g, int repl_num,
       const ParamPartitionMap& param_part) const;
+
+  void saveAllocSolution(
+      size_t stage_num, size_t pipeline_num, const AllocSolution& sol);
+  AllocSolution loadAllocSolution(size_t stage_num, size_t pipeline_num);
 
   ProfilerUtil prof_util_;
   PartitioningConf conf_;

@@ -310,6 +310,10 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
       conf_.batch_size, conf_.dev_num, conf_.min_pipeline_num);
 
   const bool dp_search_all = config.getVal<bool>(config::DP_SEARCH_ALL);
+  const bool load_alloc_sols =
+      config.getVal<bool>(config::LOAD_ALLOC_SOLUTIONS);
+  const bool save_alloc_sols =
+      config.getVal<bool>(config::SAVE_ALLOC_SOLUTIONS);
 
   int dev_per_node = std::min((int)conf_.dev_num, getCudaDeviceCount());
 
@@ -358,9 +362,18 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
         logger->trace(
             "Searching allocations: #nodes={} #dev_per_node={} #stages={} replica_num={} pipeline_num={}",
             node_num_used, dev_per_node, stage_num, replica_num, pipeline_num);
-        AllocSolution sol = doRunDpComm(
-            graph, stage_num, dev_per_node * node_num_used, replica_num,
-            pipeline_num, checkpointing);
+
+        AllocSolution sol;
+        if (load_alloc_sols) {
+          sol = loadAllocSolution(stage_num, pipeline_num);
+        } else {
+          sol = doRunDpComm(
+              graph, stage_num, dev_per_node * node_num_used, replica_num,
+              pipeline_num, checkpointing);
+          if (save_alloc_sols) {
+            saveAllocSolution(stage_num, pipeline_num, sol);
+          }
+        }
 
         // DP found a solution
         if (!sol.graphs.empty()) {
@@ -392,6 +405,8 @@ AllocSolution DPStaging::runDpComm(const MLGraph& graph) {
 
   if (pl_sols.empty()) {
     throw std::runtime_error("Failed to find a feasible allocation.");
+  } else {
+    logger->info("Successfully found a feasible allocation.");
   }
 
   long best_time = LONG_MAX;
@@ -458,6 +473,14 @@ struct DPState {
   size_t pre_dev_num;
   std::shared_ptr<IRGraph> step_graph;
 };
+
+std::string makeAllocSolutionFileName(size_t stage_num, size_t pipeline_num) {
+  const auto prefix = config::Config::get().getVal<std::string>(
+      config::ALLOC_SOLUTIONS_FILE_PREFIX);
+  std::stringstream ss;
+  ss << prefix << "_s" << stage_num << "_p" << pipeline_num << ".bin";
+  return ss.str();
+}
 
 AllocSolution DPStaging::doRunDpComm(
     const MLGraph& graph, size_t stage_num, size_t dev_num_per_group,
@@ -776,6 +799,20 @@ TensorPartitioningGraphInfo DPStaging::partitionParams(
     part_info.graph = g;
   }
   return part_info;
+}
+
+void DPStaging::saveAllocSolution(
+    size_t stage_num, size_t pipeline_num, const AllocSolution& sol) {
+  const auto file = makeAllocSolutionFileName(stage_num, pipeline_num);
+  logger->info("Saving an allocation to {}", file);
+  saveToFile(file, sol);
+}
+
+AllocSolution DPStaging::loadAllocSolution(
+    size_t stage_num, size_t pipeline_num) {
+  const auto file = makeAllocSolutionFileName(stage_num, pipeline_num);
+  logger->info("Loading an allocation from {}", file);
+  return loadFromFile<AllocSolution>(file);
 }
 
 GraphProfile DPDryStaging::estimateSolutionGraph(

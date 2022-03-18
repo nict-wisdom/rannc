@@ -61,6 +61,15 @@ extern const char PROFILE_BY_ACC[];
 extern const char VERIFY_PARTITIONING[];
 extern const char ALLOC_REPL_FLAT[];
 extern const char SYNC_ALLREDUCE[];
+
+extern const char SAVE_MLPART_RESULTS[];
+extern const char LOAD_MLPART_RESULTS[];
+extern const char MLPART_RESULTS_FILE[];
+
+extern const char SAVE_ALLOC_SOLUTIONS[];
+extern const char LOAD_ALLOC_SOLUTIONS[];
+extern const char ALLOC_SOLUTIONS_FILE_PREFIX[];
+
 extern const char DUMP_DP_NODE_PROFILES[];
 extern const char DUMP_DP_CACHE[];
 extern const char PARTITIONING_DRY_RUN_NP[];
