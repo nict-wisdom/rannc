@@ -27,11 +27,17 @@ long MLPartitioner::eval(const GraphProfile& prof) {
 
 bool MLPartitioner::fitToMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
-    bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
+    bool use_amp_master_params, bool enable_zero, int zero_dist_num) const {
   ProfilingInput prof_in{g,    0,     static_cast<size_t>(zero_dist_num),
                          1,    false, TensorPartitioningGraphInfo{},
                          conf_};
 
+  return calcGraphMem(g, prof, prof_in) < (size_t)capacity;
+}
+
+bool MLPartitioner::fitToMem(
+    const std::shared_ptr<IRGraph>& g, const GraphProfile& prof, long capacity,
+    const ProfilingInput& prof_in) const {
   return calcGraphMem(g, prof, prof_in) < (size_t)capacity;
 }
 
@@ -48,7 +54,8 @@ GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
   return prof_util_.profile(in);
 }
 
-GraphProfile MLPartitioner::profileDist(const std::shared_ptr<IRGraph>& g) {
+ProfilingInput MLPartitioner::makeProfileDistInput(
+    const std::shared_ptr<IRGraph>& g) const {
   TensorPartitioningGraphInfo part_info;
   if (conf_.force_dist_matmul) {
     part_info =
@@ -65,8 +72,7 @@ GraphProfile MLPartitioner::profileDist(const std::shared_ptr<IRGraph>& g) {
       conf_.max_pipeline_num > 1,
       part_info,
       conf_};
-
-  return prof_util_.profile(in);
+  return in;
 }
 
 std::vector<MLVertex> MLPartitioner::sortNodesByEval(
@@ -768,7 +774,8 @@ MLGraph MLPartitioner::mergeSmall(
     for (size_t idx = 0; idx < merged_graph.nodes.size(); idx++) {
       const auto& n = merged_graph.nodes.at(idx);
       if (!contains(eval_map, n.id)) {
-        eval_map[n.id] = eval(profile(n.graph));
+        eval_map[n.id] =
+            eval(prof_util_.profile(makeProfileDistInput(n.graph)));
       }
       long val = eval_map.at(n.id);
       if (val < min_val) {
@@ -788,10 +795,9 @@ MLGraph MLPartitioner::mergeSmall(
 
       merged =
           merge(preceding, min_node, merged_graph.nodes, merged_graph.edges);
-      const auto prof = profileDist(merged.graph);
-      if (!fitToMem(
-              merged.graph, prof, conf_.dev_mem, conf_.use_amp_master_params,
-              conf_.enable_zero, max_repl_num_)) {
+      const auto prof_in = makeProfileDistInput(merged.graph);
+      const auto prof = prof_util_.profile(prof_in);
+      if (!fitToMem(merged.graph, prof, conf_.dev_mem, prof_in)) {
         break;
       }
       min_adj_eval = eval(prof);
@@ -804,10 +810,9 @@ MLGraph MLPartitioner::mergeSmall(
 
       const auto merged_fol =
           merge(min_node, following, merged_graph.nodes, merged_graph.edges);
-      const auto prof = profileDist(merged_fol.graph);
-      if (!fitToMem(
-              merged_fol.graph, prof, conf_.dev_mem,
-              conf_.use_amp_master_params, conf_.enable_zero, max_repl_num_)) {
+      const auto prof_in = makeProfileDistInput(merged_fol.graph);
+      const auto prof = prof_util_.profile(prof_in);
+      if (!fitToMem(merged_fol.graph, prof, conf_.dev_mem, prof_in)) {
         break;
       }
       long val_following = eval(prof);

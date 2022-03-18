@@ -46,7 +46,8 @@ class MLPartitioner {
   MLGraph coarsen(const MLGraph& ml_graph, int min_partition_num);
   MLGraph uncoarsen(const MLGraph& ml_graph);
   GraphProfile profile(const std::shared_ptr<IRGraph>& g);
-  GraphProfile profileDist(const std::shared_ptr<IRGraph>& g);
+  //  GraphProfile profileDist(const std::shared_ptr<IRGraph>& g);
+  ProfilingInput makeProfileDistInput(const std::shared_ptr<IRGraph>& g) const;
 
   MLGraph mergeAdjacents(
       const MLGraph& ml_graph, bool skip_profiling, int min_partition_num);
@@ -75,7 +76,10 @@ class MLPartitioner {
   bool fitToMem(
       const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
       long capacity, bool use_amp_master_params, bool enable_zero,
-      int zero_dist_num);
+      int zero_dist_num) const;
+  bool fitToMem(
+      const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
+      long capacity, const ProfilingInput& prof_in) const;
 
   ProfilerUtil prof_util_;
   PartitioningConf conf_;

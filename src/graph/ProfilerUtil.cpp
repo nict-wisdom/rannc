@@ -117,9 +117,6 @@ size_t getAmpMasterParamSize(const std::shared_ptr<IRGraph>& ir_graph) {
   return sum;
 }
 
-// size_t calcGraphMem(
-//     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
-//     bool use_amp_master_params, bool enable_zero, int zero_dist_num) {
 size_t calcGraphMem(
     const std::shared_ptr<IRGraph>& g, const GraphProfile& prof,
     const ProfilingInput& prof_in) {
