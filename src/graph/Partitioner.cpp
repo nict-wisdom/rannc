@@ -48,6 +48,27 @@ GraphProfile MLPartitioner::profile(const std::shared_ptr<IRGraph>& g) {
   return prof_util_.profile(in);
 }
 
+GraphProfile MLPartitioner::profileDist(const std::shared_ptr<IRGraph>& g) {
+  TensorPartitioningGraphInfo part_info;
+  if (conf_.force_dist_matmul) {
+    part_info =
+        replaceWithDistOp(g, createDummyRanks(conf_.dev_num), getDistParams(g));
+  } else {
+    part_info.graph = g;
+  }
+
+  ProfilingInput in{
+      part_info.graph,
+      DEFALUT_ITERATION_NUM,
+      static_cast<size_t>(conf_.dev_num),
+      static_cast<size_t>(conf_.max_pipeline_num),
+      conf_.max_pipeline_num > 1,
+      part_info,
+      conf_};
+
+  return prof_util_.profile(in);
+}
+
 std::vector<MLVertex> MLPartitioner::sortNodesByEval(
     std::vector<MLVertex> nodes, const MLBGraph& bg) {
   // To reduce time for profiling, we set replica num to dev_num_
@@ -767,7 +788,7 @@ MLGraph MLPartitioner::mergeSmall(
 
       merged =
           merge(preceding, min_node, merged_graph.nodes, merged_graph.edges);
-      const auto prof = profile(merged.graph);
+      const auto prof = profileDist(merged.graph);
       if (!fitToMem(
               merged.graph, prof, conf_.dev_mem, conf_.use_amp_master_params,
               conf_.enable_zero, max_repl_num_)) {
@@ -783,7 +804,7 @@ MLGraph MLPartitioner::mergeSmall(
 
       const auto merged_fol =
           merge(min_node, following, merged_graph.nodes, merged_graph.edges);
-      const auto prof = profile(merged_fol.graph);
+      const auto prof = profileDist(merged_fol.graph);
       if (!fitToMem(
               merged_fol.graph, prof, conf_.dev_mem,
               conf_.use_amp_master_params, conf_.enable_zero, max_repl_num_)) {

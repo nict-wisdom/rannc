@@ -46,6 +46,7 @@ class MLPartitioner {
   MLGraph coarsen(const MLGraph& ml_graph, int min_partition_num);
   MLGraph uncoarsen(const MLGraph& ml_graph);
   GraphProfile profile(const std::shared_ptr<IRGraph>& g);
+  GraphProfile profileDist(const std::shared_ptr<IRGraph>& g);
 
   MLGraph mergeAdjacents(
       const MLGraph& ml_graph, bool skip_profiling, int min_partition_num);
