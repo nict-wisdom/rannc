@@ -62,10 +62,14 @@ at::Tensor DistTaskDispatcher::getParamWithCache(long param_id) {
   MPI_Bcast(&param_id, 1, MPI_LONG, 0, MPI_COMM_WORLD);
   long local_pid = dpl_.pidToLocal(param_id);
 
-  if (!param_cache_.exists(local_pid)) {
-    param_cache_.put(local_pid, dpl_.load(local_pid));
+  if (param_cache_.exists(local_pid)) {
+    return param_cache_.get(local_pid);
   }
-  return param_cache_.get(local_pid);
+
+  const auto param = dpl_.load(local_pid);
+  param_cache_.put(local_pid, param);
+  // cache may not contain this value
+  return param;
 }
 
 at::Tensor DistTaskDispatcher::getParam(long param_id) {
