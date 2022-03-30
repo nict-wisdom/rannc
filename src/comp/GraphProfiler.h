@@ -31,9 +31,15 @@ struct GraphProfile {
 
   friend std::ostream& operator<<(
       std::ostream& os, const GraphProfile& profile) {
-    os << "name: " << profile.name << " fwd_time: " << profile.fwd_time
+    os << "name: " << profile.name
+       << " fwd_time: " << profile.fwd_time
        << " bwd_time: " << profile.bwd_time
        << " max_allocated_mem: " << profile.max_allocated_mem
+       << " param_size: " << profile.param_size
+       << " input_size: " << profile.input_size
+       << " output_size: " << profile.output_size
+       << " activation_size: " << profile.activation_size
+       << " working_mem: " << profile.working_mem
        << " checkpointing: " << profile.checkpointing;
     return os;
   }

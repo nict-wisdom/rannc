@@ -849,6 +849,7 @@ void TorchDriver::destroyModule(const std::string& id) {
   last_inputs_.erase(id);
   last_outputs_.erase(id);
   ir_graphs_.erase(id);
+  clone_input_ir_graphs_.erase(id);
   subgraph_ids_.erase(id);
 
   param_tensors_.erase(id);
@@ -859,6 +860,8 @@ void TorchDriver::destroyModule(const std::string& id) {
   functions_.erase(id);
 
   buffer_cache_.erase(id);
+  constants_.erase(id);
+  func_storages_.erase(id);
 }
 
 void TorchDriver::destroy() {

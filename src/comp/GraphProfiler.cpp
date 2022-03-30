@@ -237,8 +237,6 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
     const DriverExecConf& conf) {
   emptyCache();
 
-  ProfilingResult ret_profiles;
-
   const std::string& id = subgraph->getName();
   std::string fwd_time_key = getFwdTimeKey(id);
   std::string bwd_time_key = getBwdTimeKey(id);
@@ -356,13 +354,14 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       work_mem, // gradients
       conf.checkpointing};
 
+  logger->trace("{}", toString(prof));
+
   return {driver_out, prof};
 }
 
 ProfilingResult GraphProfiler::compute(
     const ProfilingInput& input, IValueMap& values, int split_index,
     bool trace_dim_names) {
-  TimeCounter time_counter(true);
   ProfilingResult ret_profiles;
   std::unordered_set<std::string> graphs_done;
 
@@ -744,9 +743,9 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     }
   }
 
-  const auto graph_params =
-      getGraphParams(base_graph_, TensorPartitioningGraphInfo{});
   if (trace_dim_names) {
+    const auto graph_params =
+        getGraphParams(base_graph_, TensorPartitioningGraphInfo{});
     for (const auto& p_it : graph_params) {
       const auto dim_names = createDimnames(p_it.first, p_it.second, false);
       dim_names_[p_it.first] = dim_names;
