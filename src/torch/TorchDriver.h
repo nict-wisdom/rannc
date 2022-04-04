@@ -162,7 +162,6 @@ class TorchDriver {
   std::unordered_map<std::string, IValueMap> constants_;
   std::unordered_map<std::string, std::shared_ptr<FunctionStorage>>
       func_storages_;
-  std::unordered_map<std::string, DriverExecConf> exec_conf_;
 
   int last_split_idx_ = INT32_MAX;
 
