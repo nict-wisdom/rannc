@@ -25,8 +25,11 @@ at::Tensor sliceParam(
   int local_rank = getLocalRank(ranks, my_rank);
 
   torch::NoGradGuard no_grad;
-  return param.slice(
-      dim_idx, segment_size * local_rank, segment_size * (local_rank + 1));
+  return param
+      .slice(
+          dim_idx, segment_size * local_rank, segment_size * (local_rank + 1))
+      .clone()
+      .detach();
 }
 
 at::Tensor SlicedParamLocator::registerParam(
