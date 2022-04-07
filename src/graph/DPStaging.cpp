@@ -656,6 +656,8 @@ AllocSolution DPStaging::doRunDpComm(
                   step_graph, step_prof, conf_.batch_size, merged_in);
             } else {
               step_prof = prof_util_.profile(merged_in);
+              step_mem = calcGraphMem(
+                  step_graph, step_prof, conf_.batch_size, merged_in);
             }
 
             step_val = ::rannc::estimateEval(
