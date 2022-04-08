@@ -8,8 +8,7 @@
 #include <nccl.h>
 #include <torch/torch.h>
 
-#include <ATen/CPUGeneratorImpl.h>
-#include <ATen/CUDAGeneratorImpl.h>
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <ATen/Generator.h>
 #include <ostream>
 

@@ -5,6 +5,7 @@
 #include <cuda_runtime_api.h>
 
 #include <torch/csrc/jit/runtime/profiling_record.h>
+#include <torch/cuda.h>
 
 #include <comm/SCommCommon.h>
 #include <cuda/CudaUtil.h>
@@ -16,16 +17,13 @@
 #include "graph/ir.h"
 #include "TorchUtil.h"
 
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <c10/cuda/CUDACachingAllocator.h>
-
-#include <ATen/CPUGeneratorImpl.h>
-#include <ATen/CUDAGeneratorImpl.h>
 
 #undef USE_DISTRIBUTED
 #undef USE_RPC
 
 #include <torch/csrc/jit/python/pybind_utils.h>
-#include <torch/torch.h>
 
 namespace py = pybind11;
 
@@ -1487,7 +1485,8 @@ RngState getRngState() {
     cpu_gen = default_cpu_gen.clone();
   }
 
-  const auto& default_cuda_gen = at::cuda::detail::getDefaultCUDAGenerator();
+  const auto& default_cuda_gen =
+      at::detail::getCUDAHooks().getDefaultCUDAGenerator();
   at::Generator cuda_gen;
   {
     std::lock_guard<std::mutex> lock(
@@ -1514,7 +1513,7 @@ void setRngState(const RngState& state) {
         saved_gen->next_double_normal_sample());
   }
 
-  auto default_cuda_gen = at::cuda::detail::getDefaultCUDAGenerator();
+  auto default_cuda_gen = at::detail::getCUDAHooks().getDefaultCUDAGenerator();
   {
     const auto def_gen =
         at::check_generator<at::CUDAGeneratorImpl>(default_cuda_gen);

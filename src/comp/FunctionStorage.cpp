@@ -1,8 +1,6 @@
 
 #include "FunctionStorage.h"
 
-#include <ATen/core/function.h>
-
 namespace rannc {
 
 //
@@ -14,15 +12,12 @@ void FunctionStorage::deploy(const std::shared_ptr<torch::jit::Graph>& graph) {
       continue;
     }
 
-    c10::ConstTypePtr tp = node->output()->type();
+    const auto tp = node->output()->type();
     if (tp->kind() != c10::TypeKind::FunctionType) {
       continue;
     }
 
-    std::shared_ptr<const c10::FunctionType> ftype =
-        std::static_pointer_cast<const c10::FunctionType>(
-            tp->shared_from_this());
-    torch::jit::Function* const func = ftype->function();
+    const auto func = tp->expectRef<c10::FunctionType>().function();
     const std::string name =
         node->output()->debugName() + '@' + func->qualname().name();
     this->functions_[name] = func;
@@ -35,8 +30,7 @@ void FunctionStorage::deploy(const std::shared_ptr<torch::jit::Graph>& graph) {
 //
 //    Get attr::name of the function.
 //
-
-const std::string& FunctionStorage::getAttrName(const std::string name) const {
+const std::string& FunctionStorage::getAttrName(const std::string& name) const {
   return func_attr_.at(name);
 }
 

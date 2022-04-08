@@ -34,7 +34,7 @@ class FunctionStorage {
   **  @param [in] name    Function name.
   **  @return     string : the attr::name value.
   **/
-  const std::string& getAttrName(const std::string name) const;
+  const std::string& getAttrName(const std::string& name) const;
 
  private:
   FunctionTable functions_;
