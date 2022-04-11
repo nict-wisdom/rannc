@@ -163,7 +163,7 @@ def patch_amp_scaler():
             _allreduce_sum(flag_overflow)
 
             if flag_overflow.item() > 0:
-                scale_buf = torch.cuda.IntTensor([scaler._loss_scale])
+                scale_buf = torch.cuda.IntTensor([int(scaler._loss_scale)])
                 _allreduce_min(scale_buf)
                 scaler._loss_scale = scale_buf.item()
                 scaler._unskipped = 0
