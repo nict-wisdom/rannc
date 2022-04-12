@@ -205,7 +205,7 @@ std::shared_ptr<IRGraph> insertInValueHook(
 
           const std::string hook_out_name = in_name + "_hook_out";
           IRNode hook(op_name, {in_name, out_name_var}, {hook_out_name});
-          hook.setBatch(n.isBatch());
+          hook.setBatch(n.isBatch(), n.getBatchSize());
           hook.setCriterion(n.isCriterion());
           new_nodes.push_back(hook);
 
@@ -226,7 +226,7 @@ std::shared_ptr<IRGraph> insertInValueHook(
     }
 
     IRNode new_node(n.getName(), input_names, n.getOutputNames());
-    new_node.setBatch(n.isBatch());
+    new_node.setBatch(n.isBatch(), n.getBatchSize());
     new_node.setCriterion(n.isCriterion());
     new_nodes.push_back(new_node);
 
@@ -238,7 +238,7 @@ std::shared_ptr<IRGraph> insertInValueHook(
 
   return std::make_shared<IRGraph>(
       g->getName(), new_nodes, new_values, g->getInputNames(),
-      g->getOutputNames());
+      g->getOutputNames(), g->getBatchSize());
 }
 
 std::shared_ptr<IRGraph> insertOutValueHook(
@@ -268,7 +268,7 @@ std::shared_ptr<IRGraph> insertOutValueHook(
     }
 
     IRNode new_node(n.getName(), input_names, n.getOutputNames());
-    new_node.setBatch(n.isBatch());
+    new_node.setBatch(n.isBatch(), n.getBatchSize());
     new_node.setCriterion(n.isCriterion());
     new_nodes.push_back(new_node);
 
@@ -288,7 +288,7 @@ std::shared_ptr<IRGraph> insertOutValueHook(
 
         const std::string hook_out_name = out_name + "_hook_out";
         IRNode hook(op_name, {out_name, out_name_var}, {hook_out_name});
-        hook.setBatch(n.isBatch());
+        hook.setBatch(n.isBatch(), n.getBatchSize());
         hook.setCriterion(n.isCriterion());
         new_nodes.push_back(hook);
 
@@ -311,7 +311,8 @@ std::shared_ptr<IRGraph> insertOutValueHook(
   }
 
   return std::make_shared<IRGraph>(
-      g->getName(), new_nodes, new_values, g->getInputNames(), output_names);
+      g->getName(), new_nodes, new_values, g->getInputNames(),
+      output_names, g->getBatchSize());
 }
 
 std::shared_ptr<IRGraph> insertOffloadingPreHooks(

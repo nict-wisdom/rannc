@@ -186,7 +186,7 @@ class IRType {
     return list_size;
   }
 
-  void setBatchSize(int64_t batch_size);
+  void setBatchSize(int64_t old_batch_size, int64_t new_batch_size);
 
   const std::string& getFunctionName() const {
     return this->func_name_;
@@ -338,8 +338,11 @@ class IRValue {
     return is_batch_;
   }
 
-  void setBatch(bool isBatch) {
+  void setBatch(bool isBatch, int64_t batch_size) {
     is_batch_ = isBatch;
+    if (isBatch) {
+      batch_size_ = batch_size;
+    }
   }
 
   bool isLoss() const {
@@ -352,8 +355,13 @@ class IRValue {
 
   void setBatchSize(int64_t batch_size) {
     if (isBatch()) {
-      type_.setBatchSize(batch_size);
+      type_.setBatchSize(batch_size_, batch_size);
+      batch_size_ = batch_size;
     }
+  }
+
+  int64_t getBatchSize() const {
+    return batch_size_;
   }
 
   /**
@@ -370,7 +378,7 @@ class IRValue {
 
   friend std::ostream& operator<<(std::ostream& os, const IRValue& value);
 
-  MSGPACK_DEFINE(name_, type_, is_param_, is_batch_, is_loss_);
+  MSGPACK_DEFINE(name_, type_, is_param_, is_batch_, is_loss_, batch_size_);
 
  private:
   std::string name_;
@@ -378,6 +386,7 @@ class IRValue {
   bool is_param_ = false;
   bool is_batch_ = false;
   bool is_loss_ = false;
+  int64_t batch_size_ = 0;
 };
 
 class IRNode {
@@ -392,7 +401,8 @@ class IRNode {
         output_names_(std::move(outputNames)),
         id_(generateName("node_")),
         is_criterion_(false),
-        is_batch_(false) {}
+        is_batch_(false),
+        batch_size_(0) {}
 
   const std::string& getName() const {
     return name_;
@@ -422,8 +432,15 @@ class IRNode {
     return is_batch_;
   }
 
-  void setBatch(bool isBatch) {
+  void setBatch(bool isBatch, int64_t batch_size) {
     is_batch_ = isBatch;
+    if (isBatch) {
+      batch_size_ = batch_size;
+    }
+  }
+
+  int64_t getBatchSize() const {
+    return batch_size_;
   }
 
   /**
@@ -439,7 +456,7 @@ class IRNode {
   friend std::ostream& operator<<(std::ostream& os, const IRNode& node);
 
   MSGPACK_DEFINE(
-      name_, input_names_, output_names_, id_, is_criterion_, is_batch_);
+      name_, input_names_, output_names_, id_, is_criterion_, is_batch_, batch_size_);
 
  private:
   std::string name_;
@@ -448,6 +465,7 @@ class IRNode {
   std::string id_;
   bool is_criterion_;
   bool is_batch_;
+  int64_t batch_size_;
 };
 
 class IRGraph {
@@ -457,13 +475,15 @@ class IRGraph {
   IRGraph(
       std::string name, std::vector<IRNode> nodes,
       std::unordered_map<std::string, IRValue> values,
-      std::vector<std::string> inputNames, std::vector<std::string> outputNames)
+      std::vector<std::string> inputNames, std::vector<std::string> outputNames,
+      int64_t batch_size)
       : name_(std::move(name)),
         nodes_(std::move(nodes)),
         values_(std::move(values)),
         input_names_(std::move(inputNames)),
         output_names_(std::move(outputNames)),
-        is_replicable_(false) {
+        is_replicable_(false),
+        batch_size_(batch_size) {
     checkReplicable();
   }
 
@@ -473,6 +493,7 @@ class IRGraph {
     input_names_ = g.input_names_;
     output_names_ = g.output_names_;
     is_replicable_ = g.is_replicable_;
+    batch_size_ = g.batch_size_;
   }
 
   const std::string& getName() const {
@@ -562,6 +583,10 @@ class IRGraph {
 
   void setBatchSize(int64_t batch_size);
 
+  int64_t getBatchSize() const {
+    return batch_size_;
+  }
+
   const std::unordered_map<std::string, std::vector<std::string>>& getDimNames()
       const {
     return dim_names_;
@@ -576,7 +601,7 @@ class IRGraph {
   friend std::ostream& operator<<(std::ostream& os, const IRGraph& graph);
 
   MSGPACK_DEFINE(
-      name_, nodes_, values_, input_names_, output_names_, is_replicable_);
+      name_, nodes_, values_, input_names_, output_names_, is_replicable_, batch_size_);
 
  private:
   std::string name_;
@@ -586,6 +611,7 @@ class IRGraph {
   std::vector<std::string> output_names_;
   bool is_replicable_;
   std::unordered_map<std::string, std::vector<std::string>> dim_names_;
+  int64_t batch_size_;
 };
 
 std::vector<IRValue> graphNonParamInputValues(

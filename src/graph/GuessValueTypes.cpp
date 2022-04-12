@@ -150,8 +150,7 @@ std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph>& g) {
     IRValue& in_val = values.at(bg[in].name);
     const IRType& type = in_val.getType();
     assert(type.getBaseType() == IRBaseType::TENSOR);
-    in_val.setBatch(true);
-
+    in_val.setBatch(true, g->getBatchSize());
     types[bg[in].id] = ValueType::BATCH;
   }
 
@@ -189,7 +188,7 @@ std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph>& g) {
       switch (src_type) {
         case ValueType::BATCH: {
           IRValue& ir_val = values.at(bg[v].name);
-          ir_val.setBatch(true);
+          ir_val.setBatch(true, g->getBatchSize());
           break;
         }
         case ValueType::PARAM:
@@ -215,7 +214,7 @@ std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph>& g) {
         types[bg[v].id] = ValueType::BATCH;
         assert(contains(node_map, bg[v].id));
         IRNode& ir_node = node_map.at(bg[v].id);
-        ir_node.setBatch(true);
+        ir_node.setBatch(true, g->getBatchSize());
       } else if (matchParamRule(src_types)) {
         //                    spdlog::info("match {} PARAM", bg[v].name);
         types[bg[v].id] = ValueType::PARAM;
@@ -248,8 +247,9 @@ std::shared_ptr<IRGraph> guessValueTypes(const std::shared_ptr<IRGraph>& g) {
     }
   }
 
-  const auto typed_graph = std::make_shared<IRGraph>(
-      g->getName(), nodes, values, g->getInputNames(), g->getOutputNames());
+  auto typed_graph = std::make_shared<IRGraph>(
+      g->getName(), nodes, values, g->getInputNames(), g->getOutputNames(), g->getBatchSize());
+
   //        std::stringstream ss;
   //        ss << "typed graph: " << *typed_graph;
   //        spdlog::info(ss.str());

@@ -51,6 +51,7 @@ struct EdgeInfo {};
 
 struct GraphInfo {
   std::string id;
+  int64_t batch_size;
 };
 
 typedef boost::adjacency_list<
@@ -455,8 +456,6 @@ std::unordered_map<std::string, GraphRoutes> getRoutesByGraph(
 
 template <typename Graph>
 std::shared_ptr<IRGraph> fromBGL(const Graph& b_graph) {
-  std::shared_ptr<IRGraph> irGraph = std::make_shared<IRGraph>();
-
   typename boost::graph_traits<Graph>::vertex_iterator i, end;
 
   std::vector<IRNode> nodes;
@@ -499,7 +498,7 @@ std::shared_ptr<IRGraph> fromBGL(const Graph& b_graph) {
 
   return std::make_shared<IRGraph>(
       b_graph[boost::graph_bundle].id, nodes, values, input_names,
-      output_names);
+      output_names, b_graph[boost::graph_bundle].batch_size);
 }
 
 BGraph toBGL(const std::shared_ptr<IRGraph>& ir_graph);
@@ -539,7 +538,6 @@ std::string toString(const GraphRoutes& routes);
 void fixNonBatchRanks(BGraph& g);
 std::vector<size_t> splitByValueSizes(const BGraph& g, int n_partition);
 void setRanksOnGraph(BGraph& g, const std::vector<size_t>& split);
-BGraph copyGraphWithBatch(const BGraph& g);
 
 typedef boost::adjacency_list<
     boost::vecS, boost::vecS, boost::bidirectionalS, std::shared_ptr<IRGraph>>

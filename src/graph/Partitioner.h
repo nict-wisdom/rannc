@@ -83,7 +83,6 @@ class MLPartitioner {
 
   ProfilerUtil prof_util_;
   PartitioningConf conf_;
-  size_t batch_size_;
   bool coarsen_by_time_;
   int max_repl_num_;
 

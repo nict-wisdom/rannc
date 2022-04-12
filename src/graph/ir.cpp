@@ -202,33 +202,36 @@ size_t IRType::getSizeInByte() const {
     case IRBaseType::STRING:
     case IRBaseType::OPTIONAL:
     case IRBaseType::NONE:
-      return 0;
     case IRBaseType::FUNCTION:
       return 0;
   }
   throw std::invalid_argument("Unexpected base type: " + toString(base_type_));
 }
 
-void IRType::setBatchSize(int64_t batch_size) {
+void IRType::setBatchSize(int64_t old_batch_size, int64_t new_batch_size) {
   switch (getBaseType()) {
     case IRBaseType::SCALAR:
       break;
     case IRBaseType::TENSOR: {
       if (!tensor_dim_.empty()) {
-        tensor_dim_[0] = batch_size;
+        assert(old_batch_size > 0);
+        assert(new_batch_size > 0);
+        assert(tensor_dim_[0] % old_batch_size == 0);
+        tensor_dim_[0] = tensor_dim_[0] / old_batch_size * new_batch_size;
       }
       return;
     }
     case IRBaseType::TUPLE:
     case IRBaseType::LIST: {
       for (auto& t : compound_types_) {
-        t.setBatchSize(batch_size);
+        t.setBatchSize(old_batch_size, new_batch_size);
       }
       break;
     }
     case IRBaseType::STRING:
     case IRBaseType::NONE:
     case IRBaseType::OPTIONAL:
+    case IRBaseType::FUNCTION:
       break;
   }
 }
@@ -353,7 +356,8 @@ std::ostream& operator<<(std::ostream& os, const IRNode& node) {
 std::ostream& operator<<(std::ostream& os, const IRGraph& graph) {
   const auto& dim_names = graph.getDimNames();
 
-  os << "Graph " << graph.getName() << std::endl;
+  os << "Graph " << graph.getName()
+     << " (batch=" << graph.getBatchSize() << ")" << std::endl;
   for (const std::string& input_name : graph.getInputNames()) {
     const auto& value = graph.getValue(input_name);
     os << "Graph input: " << value;
@@ -415,6 +419,7 @@ void IRGraph::setBatchSize(int64_t batch_size) {
       v.setBatchSize(batch_size);
     }
   }
+  batch_size_ = batch_size;
 }
 
 IRType doGetElemInIRType(
@@ -606,7 +611,8 @@ cloneSharedInputs(const std::shared_ptr<IRGraph>& ir_graph) {
 
   return {
       std::make_shared<IRGraph>(
-          ir_graph->getName(), nodes, values, graph_input_names, output_names),
+          ir_graph->getName(), nodes, values, graph_input_names,
+          output_names, ir_graph->getBatchSize()),
       shared_val_cl_names};
 }
 
@@ -640,27 +646,11 @@ std::vector<int64_t> getBatchDim(const IRType& type) {
       return {};
     }
     case IRBaseType::STRING:
-      return {};
     case IRBaseType::OPTIONAL:
-      return {};
     case IRBaseType::NONE:
+    case IRBaseType::FUNCTION:
       return {};
   }
-}
-
-int64_t guessGraphBatchSize(const std::shared_ptr<IRGraph>& ir_graph) {
-  std::stringstream ss;
-  ss << *ir_graph;
-
-  for (const auto& in_name : ir_graph->getInputNames()) {
-    const auto& val = ir_graph->getValue(in_name);
-    if (val.isBatch()) {
-      const auto& dim = getBatchDim(val.getType());
-      assert(!dim.empty());
-      return dim.front();
-    }
-  }
-  return 0;
 }
 
 bool verifyNoDuplicatedOutputs(const std::shared_ptr<IRGraph>& g) {
@@ -828,7 +818,7 @@ std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g) {
     }
     new_g = std::make_shared<IRGraph>(
         g->getName(), new_nodes, g->getValues(), g->getInputNames(),
-        g->getOutputNames());
+        g->getOutputNames(), g->getBatchSize());
     unused_outputs.clear();
     unused_nodes = detectUnusedNodes(new_g, unused_outputs);
   }
@@ -855,7 +845,7 @@ std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g) {
   }
 
   return std::make_shared<IRGraph>(
-      g->getName(), new_g->getNodes(), new_vals, new_inputs, new_outputs);
+      g->getName(), new_g->getNodes(), new_vals, new_inputs, new_outputs, g->getBatchSize());
 }
 
 size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g) {
