@@ -18,14 +18,16 @@ std::string profItemToStr(const ProfileItemKey& prof_key) {
   std::vector<std::string> graph_str_vec;
   graph_str_vec.reserve(prof_key.ir_graphs.size());
   for (const auto& it : prof_key.ir_graphs) {
-    IRGraph renamed("PROF_GRAPH", *it.second);
+    assert(contains(prof_key.repl_nums, it.first));
+    std::stringstream ss;
+    ss << "PROF_GRAPH_repl_num_" << prof_key.repl_nums.at(it.first);
+    IRGraph renamed(ss.str(), *it.second);
     graph_str_vec.push_back(toString(renamed));
   }
   std::sort(graph_str_vec.begin(), graph_str_vec.end());
 
   std::stringstream ss;
   ss << "graphs=" << join_as_str(graph_str_vec) << "_bs=" << prof_key.batch_size
-     << "_repl_num=" << join_as_str(prof_key.repl_nums)
      << "_iteration=" << prof_key.iteration
      << "_checkpointing=" << prof_key.checkpointing;
 
