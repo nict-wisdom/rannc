@@ -87,8 +87,8 @@ size_t getOptMemSize(
           // we have to keep memory for stashed gradients
           sum += val.getSizeInByte() * prof_in.opt_param_factor /
               zero_dist_num // optimizer state
-              / slice_num;
-          +val.getSizeInByte() / slice_num; // stashed gradients
+              / slice_num
+              + val.getSizeInByte() / slice_num; // stashed gradients
         } else {
           throw std::runtime_error(
               "Unexpected param type: " +

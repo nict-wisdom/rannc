@@ -380,136 +380,6 @@ std::shared_ptr<torch::jit::Graph> ConvertGraph::toTorchNoMerge(
   return graph;
 }
 
-bool isBatch(const IRType& type, int batch_size) {
-  switch (type.getBaseType()) {
-    case IRBaseType::SCALAR:
-      return false;
-    case IRBaseType::TENSOR: {
-      const auto& dim = type.getTensorDim();
-
-      if (dim.empty()) {
-        return false;
-      }
-      if (batch_size < 1) {
-        return true;
-      }
-      int64_t a_bsize = dim.front();
-      return batch_size == a_bsize;
-    }
-    case IRBaseType::LIST: {
-      IRListType list_type = type.getListType();
-      if (list_type == IRListType::TENSOR || list_type == IRListType::GENERIC) {
-        const auto& elem_types = type.getCompoundTypes();
-        bool ret = false;
-        for (const auto& et : elem_types) {
-          ret |= isBatch(et, batch_size);
-        }
-        return ret;
-      }
-      return false;
-    }
-    case IRBaseType::TUPLE: {
-      const auto& elem_types = type.getCompoundTypes();
-      bool ret = false;
-      for (const auto& et : elem_types) {
-        ret |= isBatch(et, batch_size);
-      }
-      return ret;
-    }
-    case IRBaseType::OPTIONAL:
-      return false;
-    case IRBaseType::NONE:
-      return false;
-  }
-}
-
-std::shared_ptr<IRGraph> guessBatchValuesByReachability(
-    const std::shared_ptr<IRGraph>& g) {
-  const auto& bg = toBGL(g);
-
-  std::unordered_map<std::string, IRValue> values = g->getValues();
-
-  for (const auto& in : graph_regular_input_nodes<Vertex, BGraph>(bg)) {
-    for (const auto& tgt : all_nodes<Vertex, BGraph>(bg)) {
-      if (bg[tgt].type == VALUE) {
-        if (is_reachable(in, tgt, bg)) {
-          //                        spdlog::info("{} is reachable from {}",
-          //                        bg[tgt].name, bg[in].name);
-          IRValue& val = values[bg[tgt].name];
-          val.setBatch(isBatch(val.getType(), 0));
-        }
-      }
-    }
-  }
-
-  std::vector<IRNode> nodes = g->getNodes();
-  for (auto& n : nodes) {
-    for (const auto& in_name : n.getInputNames()) {
-      const auto& in_val = values.at(in_name);
-
-      if (in_val.isBatch()) {
-        n.setBatch(!(n.getName() == "aten::size"));
-      }
-    }
-  }
-
-  return std::make_shared<IRGraph>(
-      g->getName(), nodes, values, g->getInputNames(), g->getOutputNames());
-}
-
-std::shared_ptr<IRGraph> guessBatchValues(const std::shared_ptr<IRGraph>& g) {
-  int64_t bsize = 0;
-  for (const auto& in_name : g->getInputNames()) {
-    const IRValue& in_val = g->getValue(in_name);
-    if (in_val.isParam()) {
-      continue;
-    }
-
-    const auto& type = in_val.getType();
-    if (type.getBaseType() == IRBaseType::TENSOR) {
-      const auto& dim = type.getTensorDim();
-      assert(!dim.empty());
-
-      int64_t a_bsize = dim.front();
-      if (bsize < 1) {
-        bsize = a_bsize;
-      } else if (bsize != a_bsize) {
-        logger()->info(
-            "Failed to guess a batch size. Detected different batch sizes: {} and {}",
-            bsize, a_bsize);
-        return g;
-      }
-    }
-  }
-  logger()->trace("Setting batch size in traced graph to {}", bsize);
-
-  std::unordered_map<std::string, IRValue> values = g->getValues();
-  for (auto& it : values) {
-    IRValue& v = it.second;
-
-    if (v.isParam()) {
-      continue;
-    }
-
-    const auto& type = v.getType();
-    v.setBatch(isBatch(type, bsize));
-  }
-
-  std::vector<IRNode> nodes = g->getNodes();
-  for (auto& n : nodes) {
-    for (const auto& in_name : n.getInputNames()) {
-      const auto& in_val = values.at(in_name);
-
-      if (in_val.isBatch()) {
-        n.setBatch(true);
-      }
-    }
-  }
-
-  return std::make_shared<IRGraph>(
-      g->getName(), nodes, values, g->getInputNames(), g->getOutputNames());
-}
-
 std::shared_ptr<IRGraph> setValueTypes(
     const std::shared_ptr<IRGraph>& g,
     const std::unordered_map<std::string, IRType>& value_types) {
@@ -529,12 +399,12 @@ std::shared_ptr<IRGraph> setValueTypes(
 
   return std::make_shared<IRGraph>(
       g->getName(), g->getNodes(), values, g->getInputNames(),
-      g->getOutputNames());
+      g->getOutputNames(), g->getBatchSize());
 }
 
 std::shared_ptr<IRGraph> fromTorch(
     const std::string& name, const std::shared_ptr<torch::jit::Graph>& graph,
-    size_t real_input_num) {
+    size_t real_input_num, int64_t batch_size) {
   std::unordered_map<std::string, IRValue> values;
   std::vector<IRNode> nodes;
 
@@ -590,7 +460,7 @@ std::shared_ptr<IRGraph> fromTorch(
       [](torch::jit::Value* n) { return n->debugName(); });
 
   auto ir_graph = std::make_shared<IRGraph>(
-      name, nodes, values, graphInputNames, graphOutputNames);
+      name, nodes, values, graphInputNames, graphOutputNames, batch_size);
 
   //        std::cout << *ir_graph << std::endl;
   return ir_graph;

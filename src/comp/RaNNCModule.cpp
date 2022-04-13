@@ -207,7 +207,7 @@ std::vector<long> RaNNCModule::init(
     logger->debug("Traced graph: {}", graph->toString());
     logger->info("Converting torch model to IR ...");
   }
-  ir_graph_ = fromTorch(id_, graph, args.size());
+  ir_graph_ = fromTorch(id_, graph, args.size(), local_batch_size);
 
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;

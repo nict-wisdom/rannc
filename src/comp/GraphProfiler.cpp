@@ -94,7 +94,7 @@ std::shared_ptr<IRGraph> setInputTypes(
 
   return std::make_shared<IRGraph>(
       g->getName(), g->getNodes(), values, g->getInputNames(),
-      g->getOutputNames());
+      g->getOutputNames(), g->getBatchSize());
 }
 
 std::unordered_map<std::string, at::Tensor> paramsToCuda(
@@ -785,7 +785,7 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
 
     const auto& id = n.getId();
     graphs[id] = std::make_shared<IRGraph>(
-        id, pf_nodes, pf_values, input_names, n.getOutputNames());
+        id, pf_nodes, pf_values, input_names, n.getOutputNames(), 0);
     node_map[id] = n;
 
     repl_nums[id] = dev_num_;

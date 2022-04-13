@@ -297,8 +297,12 @@ std::shared_ptr<IRGraph> merge(
       value_names.insert(v.first);
     }
   }
+
+  assert(g1->getBatchSize() == g2->getBatchSize());
+
   return std::make_shared<IRGraph>(
-      generateName("ML_"), nodes, merged_values, all_inputs, outputs);
+      generateName("ML_"), nodes, merged_values,
+      all_inputs, outputs, g1->getBatchSize());
 }
 
 bool ensureOutputsExist(const std::shared_ptr<IRGraph>& g) {

@@ -222,7 +222,7 @@ TensorPartitioningGraphInfo insertGather(
 
   part_info.graph = std::make_shared<IRGraph>(
       g->getName(), new_nodes, new_values, g->getInputNames(),
-      g->getOutputNames());
+      g->getOutputNames(), g->getBatchSize());
 
   return part_info;
 }
@@ -290,7 +290,7 @@ TensorPartitioningGraphInfo replaceWithDistOp(
 
   std::shared_ptr<IRGraph> ret_graph = std::make_shared<IRGraph>(
       g->getName(), new_nodes, new_values, g->getInputNames(),
-      g->getOutputNames());
+      g->getOutputNames(), g->getBatchSize());
 
   auto part_info = TensorPartitioningGraphInfo{
       ret_graph, ranks, param_part, dist_ranks, {}, rank_value_names};
