@@ -356,8 +356,8 @@ std::ostream& operator<<(std::ostream& os, const IRNode& node) {
 std::ostream& operator<<(std::ostream& os, const IRGraph& graph) {
   const auto& dim_names = graph.getDimNames();
 
-  os << "Graph " << graph.getName()
-     << " (batch=" << graph.getBatchSize() << ")" << std::endl;
+  os << "Graph " << graph.getName() << " (batch=" << graph.getBatchSize() << ")"
+     << std::endl;
   for (const std::string& input_name : graph.getInputNames()) {
     const auto& value = graph.getValue(input_name);
     os << "Graph input: " << value;
@@ -611,8 +611,8 @@ cloneSharedInputs(const std::shared_ptr<IRGraph>& ir_graph) {
 
   return {
       std::make_shared<IRGraph>(
-          ir_graph->getName(), nodes, values, graph_input_names,
-          output_names, ir_graph->getBatchSize()),
+          ir_graph->getName(), nodes, values, graph_input_names, output_names,
+          ir_graph->getBatchSize()),
       shared_val_cl_names};
 }
 
@@ -845,7 +845,8 @@ std::shared_ptr<IRGraph> removeUnusedNodes(const std::shared_ptr<IRGraph>& g) {
   }
 
   return std::make_shared<IRGraph>(
-      g->getName(), new_g->getNodes(), new_vals, new_inputs, new_outputs, g->getBatchSize());
+      g->getName(), new_g->getNodes(), new_vals, new_inputs, new_outputs,
+      g->getBatchSize());
 }
 
 size_t calcCommBufSize(const std::shared_ptr<IRGraph>& g) {

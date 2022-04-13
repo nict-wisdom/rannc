@@ -29,6 +29,7 @@
 #include "Validator.h"
 
 namespace {
+const size_t INITIAL_PROF_BATCH_SIZE = 1;
 
 /*
  * Matches param names to param ids.
@@ -207,7 +208,7 @@ std::vector<long> RaNNCModule::init(
     logger->debug("Traced graph: {}", graph->toString());
     logger->info("Converting torch model to IR ...");
   }
-  ir_graph_ = fromTorch(id_, graph, args.size(), local_batch_size);
+  ir_graph_ = fromTorch(id_, graph, args.size(), INITIAL_PROF_BATCH_SIZE);
 
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;
@@ -241,7 +242,7 @@ std::vector<long> RaNNCModule::init(
   std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
       param_storage_, ir_graph_, non_param_inputs, graph_params,
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
-      pconf.min_pipeline_num);
+      pconf.min_pipeline_num, INITIAL_PROF_BATCH_SIZE);
 
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
   dtd.start(sg_prof, prof_cache_size_);

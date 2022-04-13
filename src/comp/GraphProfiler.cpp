@@ -741,7 +741,7 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     IValueLocation loc{it.first};
     if (!contains(values_, loc)) {
       values_[it.first] =
-          alignTensorsInIValue(toCPU(it.second, true), 1, false);
+          alignTensorsInIValue(toCPU(it.second, true), prof_batch_size_, false);
     }
   }
 
