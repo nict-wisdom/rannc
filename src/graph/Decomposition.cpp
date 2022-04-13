@@ -64,6 +64,7 @@ BGraph toBGL(const std::shared_ptr<IRGraph>& ir_graph) {
   BGraph b_graph;
 
   b_graph[boost::graph_bundle].id = ir_graph->getName();
+  b_graph[boost::graph_bundle].batch_size = ir_graph->getBatchSize();
 
   const auto logger = getLogger(LOGGER_NAME);
   //        logger->trace("Converting graph:");
@@ -251,6 +252,7 @@ BDecomposition createSubGraphs(const BGraph& g) {
     auto& sg = subgraphs_by_rank.at(idx);
     const auto sg_id = createSubgraphId(g[boost::graph_bundle].id, idx);
     sg[boost::graph_bundle].id = sg_id;
+    sg[boost::graph_bundle].batch_size = g[boost::graph_bundle].batch_size;
 
     subgraph_id_map[idx] = sg_id;
     subgraphs[sg_id] = sg;
@@ -717,34 +719,6 @@ std::string createComponentGraphId(const std::string& orig_name, int index) {
   return ss.str();
 }
 
-std::vector<BGraph> getConnectedComponents(const BGraph& g) {
-  std::shared_ptr<std::vector<unsigned long>> mapping =
-      std::make_shared<std::vector<unsigned long>>(num_vertices(g));
-  UndirectedBGraph udg = toUndirected(g);
-  size_t num = boost::connected_components(udg, mapping->data());
-
-  std::vector<BGraph> component_graphs;
-
-  for (size_t i = 0; i < num; i++) {
-    ComponentGraph comp = {
-        g,
-        [mapping, i, &g](BGraph::edge_descriptor e) {
-          return mapping->at(source(e, g)) == i ||
-              mapping->at(target(e, g)) == i;
-        },
-        [mapping, i](BGraph::vertex_descriptor v) {
-          return mapping->at(v) == i;
-        }};
-    BGraph comp_g;
-    copy_graph(comp, comp_g);
-    comp_g[boost::graph_bundle].id =
-        createComponentGraphId(g[boost::graph_bundle].id, i);
-    component_graphs.emplace_back(comp_g);
-  }
-
-  return component_graphs;
-}
-
 std::string searchGraphWithValue(
     const std::unordered_map<std::string, std::shared_ptr<IRGraph>>& ir_graphs,
     const std::string& val_name) {
@@ -931,10 +905,42 @@ IRType getDistType(
     }
     case IRBaseType::STRING:
     case IRBaseType::NONE:
-    case IRBaseType::OPTIONAL: {
+    case IRBaseType::OPTIONAL:
+    case IRBaseType::FUNCTION: {
       return type;
     }
   }
+}
+
+int64_t guessBatchSize(
+    const IRType& type, const IRType& type_scaled, int64_t orig_batch_size) {
+  switch (type.getBaseType()) {
+    case IRBaseType::TENSOR: {
+      const auto& dim = type.getTensorDim();
+      const auto& dim_scaled = type_scaled.getTensorDim();
+      assert(!dim.empty() && !dim_scaled.empty());
+      return dim_scaled.front() / (dim.front() / orig_batch_size);
+    }
+    case IRBaseType::LIST:
+    case IRBaseType::TUPLE: {
+      std::vector<IRType> elem_types;
+      for (int i = 0; i < type.getCompoundTypes().size(); i++) {
+        const auto& t = type.getCompoundTypes().at(i);
+        const auto& ts = type_scaled.getCompoundTypes().at(i);
+        auto b = guessBatchSize(t, ts, orig_batch_size);
+        if (b > 0) {
+          return b;
+        }
+      }
+    }
+    case IRBaseType::SCALAR:
+    case IRBaseType::STRING:
+    case IRBaseType::NONE:
+    case IRBaseType::OPTIONAL:
+    case IRBaseType::FUNCTION:
+      break;
+  }
+  return -1;
 }
 
 std::shared_ptr<IRGraph> scaleGraph(
@@ -947,6 +953,8 @@ std::shared_ptr<IRGraph> scaleGraph(
     dummy_ranks.insert(i);
   }
 
+  int64_t new_batch_size = -1;
+
   std::unordered_map<std::string, IRValue> values;
   for (auto& v : graph->getValues()) {
     const auto ir_val = v.second;
@@ -954,8 +962,16 @@ std::shared_ptr<IRGraph> scaleGraph(
       const auto& type = ir_val.getType();
       const auto dp_type = getDistType(type, dummy_ranks, batch_size, index);
 
+      assert(ir_val.getBatchSize() == batch_size);
+
+      if (new_batch_size <= 0) {
+        new_batch_size = guessBatchSize(type, dp_type, batch_size);
+      }
+
+      assert(new_batch_size == guessBatchSize(type, dp_type, batch_size));
+
       IRValue batch_val(ir_val.getName(), dp_type);
-      batch_val.setBatch(true);
+      batch_val.setBatch(true, new_batch_size);
       values[v.first] = batch_val;
     } else {
       values[v.first] = ir_val;
@@ -964,29 +980,7 @@ std::shared_ptr<IRGraph> scaleGraph(
 
   return std::make_shared<IRGraph>(
       name, graph->getNodes(), values, graph->getInputNames(),
-      graph->getOutputNames());
-}
-
-std::shared_ptr<IRGraph> scaleGraph(
-    const std::shared_ptr<IRGraph>& graph, int num, int64_t batch_size) {
-  std::stringstream ss;
-  ss << graph->getName() << "_dev_" << num;
-  return scaleGraph(graph, ss.str(), num, 0, batch_size);
-}
-
-std::vector<std::shared_ptr<IRGraph>> replicateGraph(
-    const std::shared_ptr<IRGraph>& graph, int num, int64_t batch_size) {
-  std::vector<std::shared_ptr<IRGraph>> replicas;
-
-  for (int i = 0; i < num; i++) {
-    std::stringstream ss;
-    ss << graph->getName() << "_dp" << i;
-    auto replica = scaleGraph(graph, ss.str(), num, i, batch_size);
-    replica->setReplicable(graph->isReplicable());
-
-    replicas.push_back(replica);
-  }
-  return replicas;
+      graph->getOutputNames(), new_batch_size);
 }
 
 PartitionDP replicate(
@@ -1354,48 +1348,6 @@ void setRanksOnGraph(BGraph& g, const std::vector<size_t>& split) {
     //            spdlog::info("@setRanksOnGraph {} ranks={}", g[v].name,
     //            join_as_str(g[v].ranks));
   }
-}
-
-BGraph copyGraphWithBatch(const BGraph& g) {
-  BGraph copy_graph;
-  std::unordered_map<std::string, Vertex> desc_map;
-
-  copy_graph[boost::graph_bundle].id = g[boost::graph_bundle].id;
-  for (const auto& v : all_nodes_topo<Vertex, BGraph>(g)) {
-    if (g[v].type == VALUE) {
-      if (g[v].value.isBatch() || g[v].value.isLoss()) {
-        const auto new_v = add_vertex(copy_graph);
-        desc_map[g[v].id] = new_v;
-        copy_graph[new_v] = g[v];
-      }
-    } else {
-      if (g[v].node.isBatch() || g[v].node.isCriterion()) {
-        const auto new_v = add_vertex(copy_graph);
-        desc_map[g[v].id] = new_v;
-        copy_graph[new_v] = g[v];
-      }
-    }
-  }
-
-  typedef
-      typename boost::graph_traits<BGraph>::out_edge_iterator out_edge_iterator;
-  typedef typename boost::adjacency_iterator_generator<
-      BGraph, Vertex, out_edge_iterator>::type adjacency_iterator;
-
-  for (const auto& src : all_nodes_topo<Vertex, BGraph>(g)) {
-    std::pair<adjacency_iterator, adjacency_iterator> iter_pair =
-        boost::adjacent_vertices(src, g);
-    for (auto first = iter_pair.first, last = iter_pair.second; first != last;
-         ++first) {
-      Vertex tgt = *first;
-      if (contains(desc_map, g[src].id) && contains(desc_map, g[tgt].id)) {
-        boost::add_edge(
-            desc_map.at(g[src].id), desc_map.at(g[tgt].id), copy_graph);
-      }
-    }
-  }
-
-  return copy_graph;
 }
 
 void verifyDeployment(const Deployment& deployment) {

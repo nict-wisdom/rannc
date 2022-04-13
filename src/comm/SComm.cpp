@@ -449,9 +449,9 @@ torch::jit::IValue SComm::doDistribute(
 torch::jit::IValue SComm::distribute(
     const torch::jit::IValue& val, const RouteDP& route, bool is_bwd,
     int split_delay) {
-  auto ir_type = route.ir_value.getType();
-  ir_type.setBatchSize(getCurrentSplitBatchSize(split_delay));
-  return distribute(val, route, is_bwd, ir_type, split_delay);
+  auto ir_value = route.ir_value;
+  ir_value.setBatchSize(getCurrentSplitBatchSize(split_delay));
+  return distribute(val, route, is_bwd, ir_value.getType(), split_delay);
 }
 
 torch::jit::IValue SComm::distribute(

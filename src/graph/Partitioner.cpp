@@ -284,9 +284,12 @@ std::shared_ptr<IRGraph> MLPartitioner::removeTailSubgraph(
       outputs.push_back(o);
     }
   }
+
+  assert(g1->getBatchSize() == g2->getBatchSize());
+
   return removeUnusedNodes(std::make_shared<IRGraph>(
       g->getName(), g->getNodes(), g->getValues(), g->getInputNames(),
-      outputs));
+      outputs, g1->getBatchSize()));
 }
 
 std::shared_ptr<IRGraph> MLPartitioner::removeHeadSubgraph(
@@ -326,10 +329,11 @@ std::shared_ptr<IRGraph> MLPartitioner::removeHeadSubgraph(
   }
 
   assert(inputs.size() == vectorToSet(inputs).size());
+  assert(g1->getBatchSize() == g2->getBatchSize());
 
   return removeUnusedNodes(std::make_shared<IRGraph>(
       g->getName(), g->getNodes(), g->getValues(), inputs,
-      g->getOutputNames()));
+      g->getOutputNames(), g1->getBatchSize()));
 }
 
 std::shared_ptr<IRGraph> MLPartitioner::doRemoveSubgraph(
@@ -377,8 +381,11 @@ std::shared_ptr<IRGraph> MLPartitioner::doRemoveSubgraph(
     }
   }
 
+  assert(g1->getBatchSize() == g2->getBatchSize());
+
   return std::make_shared<IRGraph>(
-      generateName("REMOVED_"), nodes, values, input_names, output_names);
+      generateName("REMOVED_"), nodes, values,
+      input_names, output_names, g1->getBatchSize());
 }
 
 // src_node and tgt_node are nodes at level L,
@@ -868,9 +875,6 @@ MLGraph MLPartitioner::mergeSmall(
 MLGraph MLPartitioner::partition(const std::shared_ptr<IRGraph>& ir_graph) {
   logger->trace(
       "MLPartitioner::partition starting: id={}", ir_graph->getName());
-
-  batch_size_ = guessGraphBatchSize(ir_graph);
-  assert(batch_size_ > 0);
 
   //        std::stringstream ss;
   //        ss << *ir_graph;

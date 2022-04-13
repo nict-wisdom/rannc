@@ -41,7 +41,7 @@ class ConvertGraph {
 IRValue toIRValue(torch::jit::Value* value);
 std::shared_ptr<IRGraph> fromTorch(
     const std::string& name, const std::shared_ptr<torch::jit::Graph>& graph,
-    size_t real_input_num);
+    size_t real_input_num, int64_t batch_size);
 
 std::shared_ptr<IRGraph> guessBatchValuesByReachability(
     const std::shared_ptr<IRGraph>& g);

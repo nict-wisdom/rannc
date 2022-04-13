@@ -153,9 +153,6 @@ std::unordered_map<int, std::vector<int64_t>> BatchSizeCalculator::
     calcDistBatchDims(
         const std::vector<int64_t>& global_dim,
         const std::unordered_set<int>& ranks, int split_index) const {
-  std::vector<int> vec_ranks = rannc::setToVector(ranks);
-  std::sort(vec_ranks.begin(), vec_ranks.end());
-
   assert(!global_dim.empty());
 
   int64_t split_bs = getGlobalSplitBatchSize(split_index);
