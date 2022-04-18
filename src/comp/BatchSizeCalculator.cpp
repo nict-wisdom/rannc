@@ -159,6 +159,7 @@ std::unordered_map<int, std::vector<int64_t>> BatchSizeCalculator::
   std::unordered_map<int, int64_t> batch_sizes =
       getLocalSplitBatchSizes(split_bs, ranks, split_index);
 
+  assert(global_dim[0] % split_bs == 0);
   std::unordered_map<int, std::vector<int64_t>> results;
   for (const auto& it : batch_sizes) {
     int rank = it.first;
@@ -167,7 +168,6 @@ std::unordered_map<int, std::vector<int64_t>> BatchSizeCalculator::
     std::vector<int64_t> rank_dim = global_dim;
     // The head dimension may not equal the batch size.
     // We assume that the head dimension is divisible by the batch size.
-    assert(global_dim[0] % split_bs == 0);
     rank_dim[0] = global_dim[0] * rank_bs / split_bs;
     results[rank] = rank_dim;
   }

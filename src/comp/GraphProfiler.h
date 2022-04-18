@@ -242,6 +242,12 @@ class GraphProfiler {
 
   const std::shared_ptr<spdlog::logger> logger = getLogger("GraphProfiler");
 };
+
+std::shared_ptr<IRGraph> setGraphValueTypes(
+    const std::shared_ptr<IRGraph>& g, size_t batch_size,
+    size_t type_batch_size, // batch size set in value_types
+    const std::unordered_map<std::string, IRType>& value_types);
+
 } // namespace rannc
 
 #endif // PYRANNC_GRAPHPROFILER_H

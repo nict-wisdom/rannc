@@ -4,6 +4,7 @@
 
 #include "GraphLauncher.h"
 #include <comm/SComm.h>
+#include <cuda/CudaSync.h>
 #include <cuda/CudaUtil.h>
 #include "EventRecorder.h"
 

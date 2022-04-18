@@ -97,6 +97,16 @@ std::shared_ptr<IRGraph> setInputTypes(
       g->getOutputNames(), g->getBatchSize());
 }
 
+std::shared_ptr<IRGraph> setGraphValueTypes(
+    const std::shared_ptr<IRGraph>& g, size_t batch_size,
+    size_t type_batch_size, // batch size set in value_types
+    const std::unordered_map<std::string, IRType>& value_types) {
+  auto mod_g = setValueTypes(g, value_types);
+  mod_g = guessValueTypes(mod_g);
+  mod_g->setBatchSize(batch_size);
+  return mod_g;
+}
+
 std::unordered_map<std::string, at::Tensor> paramsToCuda(
     const std::unordered_map<std::string, at::Tensor>& params) {
   std::unordered_map<std::string, at::Tensor> cuda_params;
@@ -660,8 +670,8 @@ ProfilingResult GraphProfiler::doProfile(
         assert(contains(input.replica_nums, it.first));
         int replica_num = input.replica_nums.at(it.first);
         const auto pad_in = splitBatchInIValue(
-            in_val, 1, input.batch_size, replica_num * input.pipeline_num,
-            false);
+            in_val, prof_batch_size_, input.batch_size,
+            replica_num * input.pipeline_num, false);
 
         const auto& paths = findPathsToTensorInIValue(pad_in);
         for (const auto& path : paths) {
@@ -818,9 +828,9 @@ ProfilingResult GraphProfiler::init(bool trace_dim_names) {
     }
   }
 
-  base_graph_ = setValueTypes(base_graph_, ret.value_types);
-  base_graph_ = guessValueTypes(base_graph_);
-  base_graph_->setBatchSize(batch_size_);
+  size_t local_batch_size = batch_size_ / split_num;
+  base_graph_ = setGraphValueTypes(
+      base_graph_, batch_size_, local_batch_size, ret.value_types);
 
   std::unordered_map<std::string, std::vector<std::string>> str_dim_names;
   for (const auto& it : dim_names_) {

@@ -208,7 +208,9 @@ std::vector<long> RaNNCModule::init(
     logger->debug("Traced graph: {}", graph->toString());
     logger->info("Converting torch model to IR ...");
   }
-  ir_graph_ = fromTorch(id_, graph, args.size(), INITIAL_PROF_BATCH_SIZE);
+  ir_graph_ = fromTorch(
+      id_, graph, args.size(),
+      ceil(local_batch_size / (double)pconf.min_pipeline_num));
 
   if (ir_graph_->getNodes().empty()) {
     std::stringstream ss;
@@ -265,9 +267,9 @@ std::vector<long> RaNNCModule::init(
       throw std::runtime_error(ss.str());
     }
     logger->info("Profiling finished");
-    ir_graph_ = setValueTypes(ir_graph_, prof_results.value_types);
-    ir_graph_ = guessValueTypes(ir_graph_);
-    ir_graph_->setBatchSize(batch_size);
+    ir_graph_ = setGraphValueTypes(
+        ir_graph_, batch_size, local_batch_size / pconf.min_pipeline_num,
+        prof_results.value_types);
     logger->info("Assuming batch size: {}", batch_size);
 
     if (check_unused_values_) {

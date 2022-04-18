@@ -373,7 +373,8 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             self._setup_amp_params()
         return super().calc_grad_norm()
 
-    def state_dict(self, *args, no_hook=False, amp_master_params=True, **kwargs):
+    def state_dict(self, *args, no_hook=False, amp_master_params=True,
+                   rank0_only=True, **kwargs):
         r"""
         Returns ``state_dict`` of the model.
 
@@ -398,8 +399,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         for n, p in self.model.state_dict(*args, **kwargs).items():
             if n in self.name_to_param:
                 new_state_dict[n] = self.get_param(n, amp_master_params and self.enable_apex_amp)
+
+                if rank0_only and _pyrannc.get_rank() != 0:
+                    new_state_dict[n] = None
             else:
                 shared_params.append(n)
+
         # Set shared parameters with other names
         for name_set in self.shared_param_names:
             stored_names = [n for n in name_set if n in new_state_dict]
