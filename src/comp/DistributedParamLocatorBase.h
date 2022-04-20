@@ -35,12 +35,14 @@ class DistributedParamLocatorBase {
   std::unordered_map<long, int64_t> segment_sizes_;
   std::unordered_map<long, std::unordered_set<int>> ranks_;
   std::unordered_map<long, int> my_indices_;
+  std::unordered_map<long, at::Tensor> buf_tensors_;
 
   DistributedParamLocatorBase() : nccl_(NCCLWrapper::get()){};
   ~DistributedParamLocatorBase() = default;
 
   void doRegister(
       long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
+  int64_t alignSize(const at::Tensor& ten, size_t split_num);
 
   static const int FETCH_TAG;
 };

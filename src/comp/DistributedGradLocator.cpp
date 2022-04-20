@@ -11,6 +11,7 @@ void DistributedGradLocator::registerGrad(
     long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
   doRegister(pid, param, ranks);
   params_[pid] = param;
+  buf_aligned_[pid] = false;
 }
 
 at::Tensor DistributedGradLocator::getLocalParamSegment(long pid) {
@@ -46,7 +47,45 @@ at::Tensor DistributedGradLocator::getSegment(long pid, int index, bool grad) {
   return ten.view(-1).narrow(0, offset, src_size);
 }
 
-void DistributedGradLocator::checkIndices(long pid, int index) {
+void DistributedGradLocator::alignBuffer(long pid) {
+  const auto& param = params_.at(pid);
+  const auto& ranks = ranks_.at(pid);
+
+  int64_t aligned_size = alignSize(param, ranks.size());
+
+  const auto buf_type = IRType::createTensorType(
+      toTensorElemType(param.scalar_type()), {aligned_size}, false);
+  at::Tensor buf = createBufTensor(buf_type);
+  buf.narrow(0, 0, param.numel()).copy_(param.flatten());
+  buf_tensors_[pid] = buf;
+  param.set_data(buf.narrow(0, 0, param.numel()).view(getTensorDim(param)));
+  buf_aligned_[pid] = true;
+}
+
+at::Tensor DistributedGradLocator::getBuffer(long pid, bool grad) const {
+  assert(contains(buf_aligned_, pid) && buf_aligned_.at(pid));
+
+  assert(contains(buf_tensors_, pid));
+  auto& param = buf_tensors_.at(pid);
+  return grad ? param.grad() : param;
+}
+
+at::Tensor DistributedGradLocator::getBufferSegment(
+    long pid, int index, bool grad) const {
+  checkIndices(pid, index);
+  assert(contains(buf_aligned_, pid) && buf_aligned_.at(pid));
+
+  auto& param = buf_tensors_.at(pid);
+  const auto seg_size = segment_sizes_.at(pid);
+
+  auto& ten = grad ? param.grad() : param;
+  if (grad) {
+    assert(param.grad().defined());
+  }
+  return ten.view(-1).narrow(0, seg_size * index, seg_size);
+}
+
+void DistributedGradLocator::checkIndices(long pid, int index) const {
   assert(contains(params_, pid));
 
   auto& param = params_.at(pid);

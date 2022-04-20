@@ -505,6 +505,15 @@ void ParamStorage::setGradToLocalParamSegment(const std::string& graph_id) {
   }
 }
 
+void ParamStorage::alignBufferZero(const std::string& graph_id) {
+  if (zeroEnabled(graph_id)) {
+    auto locator = zero_grad_locators_.at(graph_id);
+    for (const auto& it : getParamIDs(graph_id, false)) {
+      locator->alignBuffer(it.second);
+    }
+  }
+}
+
 void ParamStorage::clearParamGrads(const std::string& graph_id) {
   if (consolidate_) {
     const auto& graph_grad_cons = grad_cons_[graph_id];
@@ -545,27 +554,18 @@ void ParamStorage::bcastParamsZero(const std::string& graph_id, bool grad) {
       const auto seg_key = ss_seg.str();
       recordStart(seg_key);
 
+      int local_rank = getLocalRank(ranks, mpi::getRank());
       const auto& param_ids = graph_grouped_params.at(tag);
-      std::vector<at::Tensor> params;
-      std::vector<int> roots;
-
-      params.reserve(param_ids.size() * ranks.size());
-      roots.reserve(param_ids.size() * ranks.size());
+      std::vector<at::Tensor> segments, params;
+      segments.reserve(param_ids.size());
+      params.reserve(param_ids.size());
 
       for (long pid : param_ids) {
-        for (int i = 0; i < locator->getSegmentNum(pid); i++) {
-          const auto range = locator->getSegmentRange(pid, i);
-          if (range.first == range.second) {
-            continue;
-          }
-
-          const auto segment = locator->getSegment(pid, i, grad);
-          params.push_back(segment);
-          roots.push_back(i);
-        }
+        segments.push_back(locator->getBufferSegment(pid, local_rank, grad));
+        params.push_back(locator->getBuffer(pid, grad));
       }
       recordEnd(seg_key);
-      ar.bcast(tag, params, roots);
+      ar.allgather(tag, segments, params);
     }
   }
   syncWithErrorCheck();

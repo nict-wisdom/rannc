@@ -18,11 +18,17 @@ class DistributedGradLocator : public DistributedParamLocatorBase {
   at::Tensor getLocalParamSegment(long pid);
   void setGradToLocalParamSegment(long pid);
 
+  void alignBuffer(long pid);
+  at::Tensor getBuffer(long pid, bool grad) const;
+  at::Tensor getBufferSegment(long pid, int index, bool grad) const;
+
  private:
-  void checkIndices(long pid, int index);
+  void checkIndices(long pid, int index) const;
 
   std::unordered_map<long, at::Tensor> params_;
   std::unordered_map<long, at::Tensor> local_param_segments_;
+
+  std::unordered_map<long, bool> buf_aligned_;
 };
 } // namespace rannc
 

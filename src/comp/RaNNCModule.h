@@ -79,6 +79,8 @@ class RaNNCModule {
 
   void destroy();
 
+  void alignParams();
+
   void enableDropout(bool enable);
 
  private:

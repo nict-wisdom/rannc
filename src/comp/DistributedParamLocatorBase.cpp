@@ -9,11 +9,32 @@
 #include <Config.h>
 #include <mpi.h>
 
+namespace {
+// NCCL's alignment
+int64_t ALIGNMENT_BASE = 16;
+} // namespace
+
 namespace rannc {
+
+int64_t DistributedParamLocatorBase::alignSize(
+    const at::Tensor& ten, size_t split_num) {
+  int64_t elem_size = elementSize(ten.scalar_type());
+  assert(ALIGNMENT_BASE % elem_size == 0);
+  int64_t align_elem_unit = ALIGNMENT_BASE / elem_size * split_num;
+  int64_t orig_size = ten.numel();
+
+  int64_t n_blocks = orig_size % align_elem_unit == 0
+      ? orig_size / align_elem_unit
+      : orig_size / align_elem_unit + 1;
+  return n_blocks * align_elem_unit;
+}
 
 void DistributedParamLocatorBase::doRegister(
     long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
-  int64_t segment_size = ceil(param.numel() / (double)ranks.size());
+  torch::NoGradGuard no_grad;
+
+  int64_t aligned_size = alignSize(param, ranks.size());
+  int64_t segment_size = aligned_size / ranks.size();
   int64_t offset = 0;
   for (size_t i = 0; i < ranks.size(); i++) {
     offsets_[pid].push_back(offset);
@@ -44,10 +65,13 @@ void DistributedParamLocatorBase::doRegister(
 
 void DistributedParamLocatorBase::remove(long pid) {
   global_id_to_local_.erase(pid);
-  ir_types_.erase(pid);
+  offsets_.erase(pid);
+  src_sizes_.erase(pid);
+  ranks_.erase(pid);
   segment_sizes_.erase(pid);
   ir_types_.erase(pid);
   my_indices_.erase(pid);
+  buf_tensors_.erase(pid);
 }
 
 size_t DistributedParamLocatorBase::getSegmentNum(long pid) {
@@ -84,12 +108,13 @@ size_t DistributedParamLocatorBase::getOwner(long pid, int index) {
 }
 
 bool DistributedParamLocatorBase::registered(long pid) {
-  return contains(offsets_, pid);
+  return contains(ranks_, pid);
 }
 
 at::Tensor DistributedParamLocatorBase::gather(
     const at::Tensor& tensor_part, long pid) {
-  assert(contains(segment_sizes_, pid));
+  torch::NoGradGuard no_grad;
+
   assert(contains(ranks_, pid));
   assert(contains(ir_types_, pid));
 
@@ -158,5 +183,6 @@ void DistributedParamLocatorBase::clear() {
   segment_sizes_.clear();
   ranks_.clear();
   my_indices_.clear();
+  buf_tensors_.clear();
 }
 } // namespace rannc

@@ -339,6 +339,7 @@ PYBIND11_MODULE(_pyrannc, m) {
           "use_amp_master_params",
           [](RaNNCModule& self) { return self.useAmpMasterParams(); })
       .def("undeploy", [](RaNNCModule& self) { self.destroy(); })
+      .def("align_params", [](RaNNCModule& self) { self.alignParams(); })
       .def(
           "sync_param",
           [](RaNNCModule& self, long param_id) {

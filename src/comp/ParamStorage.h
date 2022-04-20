@@ -90,6 +90,7 @@ class ParamStorage {
   void unscaleGrads(const std::string& graph_id, bool amp_master_grads);
 
   void setGradToLocalParamSegment(const std::string& graph_id);
+  void alignBufferZero(const std::string& graph_id);
 
   void registerAmpMasterParam(
       long model_param_id, long master_param_id,

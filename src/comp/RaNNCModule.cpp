@@ -649,6 +649,10 @@ void RaNNCModule::destroy() {
   destroyed_ = true;
 }
 
+void RaNNCModule::alignParams() {
+  param_storage_->alignBufferZero(id_);
+}
+
 void RaNNCModule::enableDropout(bool enable) {
   driver_->enableDropout(id_, enable);
 }

@@ -267,6 +267,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             utils._to_in_place([p for p in self.model.parameters() if id(p) in self.used_param_ids], self.device)
             utils._to_in_place([b for b in self.model.buffers() if id(b) in self.used_param_ids], self.device)
 
+            if self.enable_zero:
+                self.align_params()
+
             # Remove parameters from optimizer
             if self.optimizer and self.model.training:
                 patch_optimizer(self, self.optimizer)
