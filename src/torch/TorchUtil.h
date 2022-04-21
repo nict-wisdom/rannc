@@ -216,6 +216,8 @@ bool inPlaceOpName(const std::string& name);
 at::Tensor createTensorFromIRType(
     const IRType& ir_type, const c10::Device& device);
 
+int64_t alignSize(const at::Tensor& ten, size_t split_num);
+
 std::string toString(const std::vector<at::Dimname>& dims);
 std::string toString(const at::DimnameList& dims);
 

@@ -9,25 +9,7 @@
 #include <Config.h>
 #include <mpi.h>
 
-namespace {
-// NCCL's alignment
-int64_t ALIGNMENT_BASE = 16;
-} // namespace
-
 namespace rannc {
-
-int64_t DistributedParamLocatorBase::alignSize(
-    const at::Tensor& ten, size_t split_num) {
-  int64_t elem_size = elementSize(ten.scalar_type());
-  assert(ALIGNMENT_BASE % elem_size == 0);
-  int64_t align_elem_unit = ALIGNMENT_BASE / elem_size * split_num;
-  int64_t orig_size = ten.numel();
-
-  int64_t n_blocks = orig_size % align_elem_unit == 0
-      ? orig_size / align_elem_unit
-      : orig_size / align_elem_unit + 1;
-  return n_blocks * align_elem_unit;
-}
 
 void DistributedParamLocatorBase::doRegister(
     long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {

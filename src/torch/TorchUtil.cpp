@@ -1576,6 +1576,20 @@ std::string toString(const std::vector<at::Dimname>& dims) {
   return join_as_str(dim_names);
 }
 
+int64_t alignSize(const at::Tensor& ten, size_t split_num) {
+  int64_t ALIGNMENT_BASE = 16;
+
+  int64_t elem_size = elementSize(ten.scalar_type());
+  assert(ALIGNMENT_BASE % elem_size == 0);
+  int64_t align_elem_unit = ALIGNMENT_BASE / elem_size * split_num;
+  int64_t orig_size = ten.numel();
+
+  int64_t n_blocks = orig_size % align_elem_unit == 0
+      ? orig_size / align_elem_unit
+      : orig_size / align_elem_unit + 1;
+  return n_blocks * align_elem_unit;
+}
+
 std::string toString(const at::DimnameList& dims) {
   std::vector<at::Dimname> dim_names;
   for (const auto& d : dims) {

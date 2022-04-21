@@ -42,7 +42,6 @@ class DistributedParamLocatorBase {
 
   void doRegister(
       long pid, const at::Tensor& param, const std::unordered_set<int>& ranks);
-  int64_t alignSize(const at::Tensor& ten, size_t split_num);
 
   static const int FETCH_TAG;
 };
