@@ -64,7 +64,11 @@ class NCCLWrapper {
       const std::vector<at::Tensor>& out_bufs);
   void reduceScatter(
       int tag, const std::vector<at::Tensor>& tensors,
-      const std::vector<at::Tensor>& out_bufs);
+      const std::vector<at::Tensor>& out_bufs, size_t num_proc);
+  void reduceScatterWithScaling(
+      int tag, const std::vector<at::Tensor>& tensors,
+      const std::vector<at::Tensor>& out_bufs, size_t num_proc,
+      size_t world_size);
   void startBulk();
   void endBulk();
   void checkCommError(int tag);
@@ -95,11 +99,16 @@ class NCCLWrapper {
 
   void doAllreduce(
       int tag, const std::vector<at::Tensor>& tensors, ncclRedOp_t red_op);
+  void doReduceScatter(
+      int tag, const std::vector<at::Tensor>& tensors,
+      const std::vector<at::Tensor>& out_bufs, size_t num_proc, ncclRedOp_t op);
 
   std::unordered_map<int, AllReduceComm*> comm_map_;
   std::unordered_map<std::unordered_set<int>, int, IntSetHash> ranks_to_tag_;
   BufferTensorCache buf_cache_;
   NCCLBulkJobExecutor job_executor_;
+
+  std::unordered_map<int, ncclRedOp_t> reduce_ops_;
 
   std::shared_ptr<spdlog::logger> logger = getLogger("NCCLWrapper");
 };

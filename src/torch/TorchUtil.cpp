@@ -1576,7 +1576,7 @@ std::string toString(const std::vector<at::Dimname>& dims) {
   return join_as_str(dim_names);
 }
 
-int64_t alignSize(const at::Tensor& ten, size_t split_num) {
+int64_t calcAlignedNumElems(const at::Tensor& ten, size_t split_num) {
   int64_t ALIGNMENT_BASE = 16;
 
   int64_t elem_size = elementSize(ten.scalar_type());

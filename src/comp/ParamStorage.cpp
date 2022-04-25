@@ -381,23 +381,48 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
   recordEnd(ss.str());
 }
 
-void runReduceWithBucket(
-    int tag, std::vector<at::Tensor>& grads_running, std::vector<int>& roots,
-    std::vector<at::Tensor>& grads) {
+void runReduceScatterWithBucket(
+    int tag, std::vector<at::Tensor>& in_bufs_running,
+    std::vector<at::Tensor>& in_bufs, std::vector<at::Tensor>& out_bufs,
+    std::vector<at::Tensor>& grads, std::vector<int64_t> offsets,
+    size_t num_proc) {
+  assert(in_bufs.size() == out_bufs.size());
+  assert(in_bufs.size() == grads.size());
+  assert(in_bufs.size() == offsets.size());
+
   // Wail for the "previous" reduce to finish
   syncWithErrorCheck();
   // now you can free buffer
-  grads_running.clear();
+  in_bufs_running.clear();
 
   // start the next call
   NCCLWrapper& ar = NCCLWrapper::get();
-  ar.reduce(tag, grads, roots);
-  // copy grads to keep references
-  grads_running = grads;
+  ar.reduceScatterWithScaling(tag, in_bufs, out_bufs, num_proc, mpi::getSize());
+
+  for (size_t i = 0; i < out_bufs.size(); i++) {
+    const auto& in_buf = in_bufs.at(i);
+    const auto& grad = grads.at(i);
+    const auto& out_buf = out_bufs.at(i);
+
+    const int64_t offset = offsets.at(i);
+
+    int64_t length = std::min(out_buf.numel(), grad.numel() - offset);
+
+    if (length > 0) {
+      grad.flatten()
+          .narrow(0, offset, length)
+          .copy_(out_buf.narrow(0, 0, length), true);
+    }
+  }
+
+  // copy buffers to keep references
+  in_bufs_running = in_bufs;
 
   // clean the state
+  in_bufs.clear();
+  out_bufs.clear();
   grads.clear();
-  roots.clear();
+  offsets.clear();
 }
 
 void ParamStorage::allReduceParamGradsZero(
@@ -422,13 +447,16 @@ void ParamStorage::allReduceParamGradsZero(
 
   auto locator = zero_grad_locators_.at(graph_id);
   std::vector<int> sorted_tags = sortCommTags(graph_id);
-  std::vector<at::Tensor> grads_running;
+  std::vector<at::Tensor> in_bufs_running;
   for (int tag : sorted_tags) {
     assert(contains(tag_rank_set_, tag));
     const auto& ranks = tag_rank_set_.at(tag);
     if (contains(ranks, mpi::getRank())) {
       const auto& param_ids = graph_grouped_params.at(tag);
       std::vector<at::Tensor> grads;
+      std::vector<at::Tensor> in_bufs;
+      std::vector<at::Tensor> out_bufs;
+      std::vector<int64_t> offsets;
       std::vector<int> roots;
       grads.reserve(param_ids.size() * ranks.size());
       roots.reserve(param_ids.size() * ranks.size());
@@ -439,55 +467,40 @@ void ParamStorage::allReduceParamGradsZero(
           continue;
         }
 
-        for (int i = 0; i < locator->getSegmentNum(pid); i++) {
-          const auto range = locator->getSegmentRange(pid, i);
-          if (range.first == range.second) {
-            continue;
-          }
+        auto param = getParamTensor(pid);
+        const auto& grad = param.grad();
+        int local_rank = getLocalRank(ranks, mpi::getRank());
+        if (grad.defined()) {
+          int64_t aligned_elems = calcAlignedNumElems(grad, ranks.size());
+          int64_t aligned_bytes =
+              aligned_elems * elementSize(grad.scalar_type());
 
-          if (use_amp_master_params_.at(graph_id)) {
-            // Assuming that allreduce_amp_master_params_ == true
-            if (getLocalRank(ranks, mpi::getRank()) == i) {
-              // In this case, I am the owner.
-              auto segment_fp32 = hasAmpMasterParam(pid)
-                  ? getAmpMasterParamTensor(pid)
-                        .grad() // amp master grad (originally fp16)
-                  : locator->getSegment(pid, i, true); // fp32 param grad
-              assert(segment_fp32.defined());
-              assert(
-                  segment_fp32.scalar_type() == at::ScalarType::Float ||
-                  segment_fp32.scalar_type() == at::ScalarType::Double);
+          grads.push_back(grad);
 
-              grads.push_back(segment_fp32);
-              comm_size += segment_fp32.nbytes();
-            } else {
-              // Unscale grad because amp does not unscale segments that this
-              // process does not own. Note: Be careful about the lifetime of
-              // segment_fp32.
+          const auto buf_type = IRType::createTensorType(
+              toTensorElemType(param.scalar_type()), {aligned_elems}, false);
+          at::Tensor buf = createBufTensor(buf_type);
+          buf.narrow(0, 0, grad.numel()).copy_(grad.flatten(), true);
+          in_bufs.push_back(buf);
+          comm_size += buf.nbytes();
 
-              const at::Tensor segment = locator->getSegment(pid, i, true);
-              auto segment_fp32 = segment.to(at::ScalarType::Float, true);
-              segment_fp32 = segment_fp32.mul_(1 / loss_scale).detach();
-              grads.push_back(segment_fp32);
-
-              comm_size += segment_fp32.nbytes();
-            }
-          } else {
-            const auto segment = locator->getSegment(pid, i, true);
-            grads.push_back(segment);
-
-            comm_size += segment.nbytes();
-          }
-          roots.push_back(i);
+          int64_t segment_elems = aligned_elems / ranks.size();
+          int64_t offset = segment_elems * local_rank;
+          out_bufs.push_back(buf.narrow(0, offset, segment_elems));
+          offsets.push_back(offset);
         }
-        locator->setGradToLocalParamSegment(pid);
 
         if (comm_size > COMM_SIZE_LIMIT) {
-          runReduceWithBucket(tag, grads_running, roots, grads);
+          runReduceScatterWithBucket(
+              tag, in_bufs_running, in_bufs, out_bufs, grads, offsets,
+              ranks.size());
+
           comm_size = 0;
         }
       }
-      runReduceWithBucket(tag, grads_running, roots, grads);
+      runReduceScatterWithBucket(
+          tag, in_bufs_running, in_bufs, out_bufs, grads, offsets,
+          ranks.size());
     }
   }
 

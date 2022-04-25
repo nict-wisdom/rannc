@@ -349,20 +349,53 @@ void NCCLWrapper::allgather(
       });
 }
 
-void NCCLWrapper::reduceScatter(
+void NCCLWrapper::doReduceScatter(
     int tag, const std::vector<at::Tensor>& tensors,
-    const std::vector<at::Tensor>& out_bufs) {
-  size_t num_proc = tensors.size();
+    const std::vector<at::Tensor>& out_bufs, size_t num_proc, ncclRedOp_t op) {
   return runCollectiveComm(
       comm_map_, tag, tensors, out_bufs, {}, "reduceScatter",
-      [num_proc](
+      [num_proc, op](
           void* sendptr, void* recvptr, size_t count, int root,
           ncclDataType_t datatype, ncclComm_t* ncomm) {
         assert(count % num_proc == 0);
         return ncclReduceScatter(
-            sendptr, recvptr, count / num_proc, datatype, ncclSum, *ncomm,
+            sendptr, recvptr, count / num_proc, datatype, op, *ncomm,
             (cudaStream_t) nullptr);
       });
+}
+
+void NCCLWrapper::reduceScatter(
+    int tag, const std::vector<at::Tensor>& tensors,
+    const std::vector<at::Tensor>& out_bufs, size_t num_proc) {
+  return doReduceScatter(tag, tensors, out_bufs, num_proc, ncclSum);
+}
+
+void NCCLWrapper::reduceScatterWithScaling(
+    int tag, const std::vector<at::Tensor>& tensors,
+    const std::vector<at::Tensor>& out_bufs, size_t num_proc,
+    size_t world_size) {
+  if (tensors.empty()) {
+    return;
+  }
+
+  if (!contains(reduce_ops_, tag)) {
+    at::NoGradGuard no_grad;
+
+    ncclDataType_t datatype = getReduceNcclDataType(tensors.front());
+    double scale = 1 / (double)world_size;
+    at::Tensor scale_ten = torch::tensor(scale, {});
+    scale_ten = scale_ten.to(at::ScalarType(tensors.front().scalar_type()))
+                    .contiguous();
+
+    assert(contains(comm_map_, tag));
+    AllReduceComm* comm_info = comm_map_.at(tag);
+    ncclComm_t* ncomm = comm_info->comm;
+    ncclRedOp_t op;
+    ncclRedOpCreatePreMulSum(
+        &op, scale_ten.data_ptr(), datatype, ncclScalarHostImmediate, *ncomm);
+    reduce_ops_[tag] = op;
+  }
+  return doReduceScatter(tag, tensors, out_bufs, num_proc, reduce_ops_.at(tag));
 }
 
 std::string getBoolBufKey(const RouteDP& route, const std::string& action) {
@@ -553,8 +586,14 @@ void NCCLWrapper::syncWithErrorCheck() {
 void NCCLWrapper::destroyCommunicator(int tag) {
   if (contains(comm_map_, tag)) {
     AllReduceComm* comm_info = comm_map_.at(tag);
-    ncclCommDestroy(*comm_info->comm);
-    delete comm_info->comm;
+    ncclComm_t* ncomm = comm_info->comm;
+
+    if (contains(reduce_ops_, tag)) {
+      ncclRedOpDestroy(reduce_ops_.at(tag), *ncomm);
+    }
+    ncclCommDestroy(*ncomm);
+
+    delete ncomm;
     delete comm_info;
     comm_map_.erase(tag);
   }

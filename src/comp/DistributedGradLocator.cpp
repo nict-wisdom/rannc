@@ -51,7 +51,7 @@ void DistributedGradLocator::alignBuffer(long pid) {
   const auto& param = params_.at(pid);
   const auto& ranks = ranks_.at(pid);
 
-  int64_t aligned_size = alignSize(param, ranks.size());
+  int64_t aligned_size = calcAlignedNumElems(param, ranks.size());
 
   const auto buf_type = IRType::createTensorType(
       toTensorElemType(param.scalar_type()), {aligned_size}, false);

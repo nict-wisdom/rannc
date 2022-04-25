@@ -15,7 +15,7 @@ void DistributedParamLocatorBase::doRegister(
     long pid, const at::Tensor& param, const std::unordered_set<int>& ranks) {
   torch::NoGradGuard no_grad;
 
-  int64_t aligned_size = alignSize(param, ranks.size());
+  int64_t aligned_size = calcAlignedNumElems(param, ranks.size());
   int64_t segment_size = aligned_size / ranks.size();
   int64_t offset = 0;
   for (size_t i = 0; i < ranks.size(); i++) {

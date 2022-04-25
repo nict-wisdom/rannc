@@ -518,14 +518,14 @@ py::object RaNNCModule::operator()(
 
 void RaNNCModule::allReduceParamGrads() {
   NCCLWrapper& ar = NCCLWrapper::get();
-  param_storage_->allReduceParamGrads(this->id_);
   param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
+  param_storage_->allReduceParamGrads(this->id_);
 }
 
 void RaNNCModule::allReduceParamGradsZero(double loss_scale) {
   NCCLWrapper& ar = NCCLWrapper::get();
-  param_storage_->allReduceParamGradsZero(this->id_, loss_scale);
   param_storage_->scaleGrads(id_, allreduce_amp_master_param_);
+  param_storage_->allReduceParamGradsZero(this->id_, loss_scale);
 }
 
 void RaNNCModule::clearParamGrads() {
