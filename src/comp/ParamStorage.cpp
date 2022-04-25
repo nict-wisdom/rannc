@@ -425,17 +425,9 @@ void runReduceScatterWithBucket(
   offsets.clear();
 }
 
-void ParamStorage::allReduceParamGradsZero(
-    const std::string& graph_id, double loss_scale) {
+void ParamStorage::allReduceParamGradsZero(const std::string& graph_id) {
   logger->trace("allReduceParamGradsZero starting {}", graph_id);
-
-  const auto& graph_grouped_params = grouped_params_[graph_id];
-
   assert(zeroEnabled(graph_id));
-
-  assert(contains(use_amp_master_params_, graph_id));
-  bool use_amp_master_params = use_amp_master_params_.at(graph_id);
-  assert(!use_amp_master_params || allreduce_amp_master_params_);
 
   torch::NoGradGuard no_grad;
 
@@ -448,6 +440,7 @@ void ParamStorage::allReduceParamGradsZero(
   auto locator = zero_grad_locators_.at(graph_id);
   std::vector<int> sorted_tags = sortCommTags(graph_id);
   std::vector<at::Tensor> in_bufs_running;
+  const auto& graph_grouped_params = grouped_params_[graph_id];
   for (int tag : sorted_tags) {
     assert(contains(tag_rank_set_, tag));
     const auto& ranks = tag_rank_set_.at(tag);
@@ -477,6 +470,11 @@ void ParamStorage::allReduceParamGradsZero(
 
           grads.push_back(grad);
 
+          at::ScalarType buf_scalar_type = param.scalar_type();
+          if (allreduce_amp_master_params_ &&
+              buf_scalar_type == at::ScalarType::Half) {
+            buf_scalar_type = at::ScalarType::Float;
+          }
           const auto buf_type = IRType::createTensorType(
               toTensorElemType(param.scalar_type()), {aligned_elems}, false);
           at::Tensor buf = createBufTensor(buf_type);

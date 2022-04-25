@@ -317,9 +317,7 @@ PYBIND11_MODULE(_pyrannc, m) {
           [](RaNNCModule& self) { self.allReduceParamGrads(); })
       .def(
           "allreduce_grads_zero",
-          [](RaNNCModule& self, double loss_scale) {
-            self.allReduceParamGradsZero(loss_scale);
-          })
+          [](RaNNCModule& self) { self.allReduceParamGradsZero(); })
       .def(
           "clip_grad_norm",
           [](RaNNCModule& self, float max_grad_norm) {

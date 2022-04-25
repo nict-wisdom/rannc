@@ -101,7 +101,7 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
     if (!delay_grad_allreduce_) {
       NCCLWrapper& ar = NCCLWrapper::get();
       if (enable_zero_) {
-        param_storage_->allReduceParamGradsZero(graph_id_, 1.0);
+        param_storage_->allReduceParamGradsZero(graph_id_);
       } else {
         param_storage_->allReduceParamGrads(graph_id_);
 
