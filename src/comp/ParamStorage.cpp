@@ -369,7 +369,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
             grads.push_back(grad);
           }
         }
-        ar.allreduce(tag, grads);
+        ar.allreduceWithScaling(tag, grads, mpi::getSize());
       }
     }
     if (sync_allreduce) {

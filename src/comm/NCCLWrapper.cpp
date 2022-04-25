@@ -138,9 +138,9 @@ void NCCLWrapper::destroy() {
   job_executor_ = NCCLBulkJobExecutor();
 }
 
-ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
+ncclDataType_t getReduceNcclDataType(at::ScalarType scalar_type) {
   ncclDataType_t datatype;
-  switch (t.scalar_type()) {
+  switch (scalar_type) {
     case at::ScalarType::Half:
       datatype = ncclFloat16;
       break;
@@ -161,10 +161,14 @@ ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
       break;
     default:
       std::stringstream ss;
-      ss << "Unsupported type given to NCCL: " << toString(t.scalar_type());
+      ss << "Unsupported type given to NCCL: " << toString(scalar_type);
       throw std::invalid_argument(ss.str());
   }
   return datatype;
+}
+
+ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
+  return getReduceNcclDataType(t.scalar_type());
 }
 
 ncclDataType_t getRedistNcclDataType(const IRTensorElemType t) {
@@ -295,6 +299,16 @@ void NCCLWrapper::doAllreduce(
       });
 }
 
+void NCCLWrapper::allreduceWithScaling(
+    int tag, const std::vector<at::Tensor>& tensors, size_t world_size) {
+  if (tensors.empty()) {
+    return;
+  }
+  doAllreduce(
+      tag, tensors,
+      getScalingReduceOp(tag, world_size, tensors.front().scalar_type()));
+}
+
 void NCCLWrapper::allreduce(int tag, const std::vector<at::Tensor>& tensors) {
   doAllreduce(tag, tensors, ncclSum);
 }
@@ -377,25 +391,9 @@ void NCCLWrapper::reduceScatterWithScaling(
   if (tensors.empty()) {
     return;
   }
-
-  if (!contains(reduce_ops_, tag)) {
-    at::NoGradGuard no_grad;
-
-    ncclDataType_t datatype = getReduceNcclDataType(tensors.front());
-    double scale = 1 / (double)world_size;
-    at::Tensor scale_ten = torch::tensor(scale, {});
-    scale_ten = scale_ten.to(at::ScalarType(tensors.front().scalar_type()))
-                    .contiguous();
-
-    assert(contains(comm_map_, tag));
-    AllReduceComm* comm_info = comm_map_.at(tag);
-    ncclComm_t* ncomm = comm_info->comm;
-    ncclRedOp_t op;
-    ncclRedOpCreatePreMulSum(
-        &op, scale_ten.data_ptr(), datatype, ncclScalarHostImmediate, *ncomm);
-    reduce_ops_[tag] = op;
-  }
-  return doReduceScatter(tag, tensors, out_bufs, num_proc, reduce_ops_.at(tag));
+  return doReduceScatter(
+      tag, tensors, out_bufs, num_proc,
+      getScalingReduceOp(tag, world_size, tensors.front().scalar_type()));
 }
 
 std::string getBoolBufKey(const RouteDP& route, const std::string& action) {
@@ -654,6 +652,27 @@ void NCCLWrapper::recreateAllCommunicators() {
     recreateCommunicator(tag);
   }
   MPI_Barrier(MPI_COMM_WORLD);
+}
+
+ncclRedOp_t NCCLWrapper::getScalingReduceOp(
+    int tag, size_t world_size, at::ScalarType scalar_type) {
+  if (!contains(reduce_ops_, tag)) {
+    at::NoGradGuard no_grad;
+
+    ncclDataType_t datatype = getReduceNcclDataType(scalar_type);
+    double scale = 1 / (double)world_size;
+    at::Tensor scale_ten = torch::tensor(scale, {});
+    scale_ten = scale_ten.to(scalar_type).contiguous();
+
+    assert(contains(comm_map_, tag));
+    AllReduceComm* comm_info = comm_map_.at(tag);
+    ncclComm_t* ncomm = comm_info->comm;
+    ncclRedOp_t op;
+    ncclRedOpCreatePreMulSum(
+        &op, scale_ten.data_ptr(), datatype, ncclScalarHostImmediate, *ncomm);
+    reduce_ops_[tag] = op;
+  }
+  return reduce_ops_.at(tag);
 }
 
 void NCCLWrapper::commWithRetry(const std::function<void()>& f) {

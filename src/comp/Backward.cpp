@@ -104,16 +104,8 @@ variable_list RaNNCTensorBackward::apply(variable_list&& grads) {
         param_storage_->allReduceParamGradsZero(graph_id_);
       } else {
         param_storage_->allReduceParamGrads(graph_id_);
-
-        std::stringstream ss_scale;
-        ss_scale << "RaNNCTensorBackward::apply_" << toString(value_name_)
-                 << "_scaleGrads";
-        recordStart(ss_scale.str());
-        param_storage_->scaleGrads(graph_id_, false);
-        recordEnd(ss_scale.str());
       }
     }
-
     recordEnd(ss.str());
 
     variable_list grad_inputs;

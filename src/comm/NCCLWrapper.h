@@ -50,6 +50,8 @@ class NCCLWrapper {
   void allreduce(int tag, const std::vector<at::Tensor>& tensors);
   void allreduceMin(int tag, const std::vector<at::Tensor>& tensors);
   void allreduceMax(int tag, const std::vector<at::Tensor>& tensors);
+  void allreduceWithScaling(
+      int tag, const std::vector<at::Tensor>& tensors, size_t world_size);
   void reduce(
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<int>& roots);
@@ -102,6 +104,8 @@ class NCCLWrapper {
   void doReduceScatter(
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<at::Tensor>& out_bufs, size_t num_proc, ncclRedOp_t op);
+  ncclRedOp_t getScalingReduceOp(
+      int tag, size_t world_size, at::ScalarType scalar_type);
 
   std::unordered_map<int, AllReduceComm*> comm_map_;
   std::unordered_map<std::unordered_set<int>, int, IntSetHash> ranks_to_tag_;
