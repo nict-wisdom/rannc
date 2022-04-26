@@ -381,7 +381,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
 void runReduceScatterWithBucket(
     int tag, std::vector<at::Tensor>& in_bufs_running,
     std::vector<at::Tensor>& in_bufs, std::vector<at::Tensor>& out_bufs,
-    std::vector<at::Tensor>& grads, std::vector<int64_t> offsets,
+    std::vector<at::Tensor>& grads, std::vector<int64_t>& offsets,
     size_t num_proc) {
   assert(in_bufs.size() == out_bufs.size());
   assert(in_bufs.size() == grads.size());
