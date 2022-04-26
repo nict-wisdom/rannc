@@ -205,6 +205,9 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         :param offload_params: If ``True``, parameters are moved to host memory until they are used.
         """
 
+        if not enable_apex_amp and enable_zero:
+            raise ValueError("enable_apex_amp must be True if enable_zero=True.")
+
         old_flag = torch._C._jit_set_profiling_executor(True)
         if not old_flag:
             logger.warning("RaNNC set torch._C._jit_set_profiling_executor(True).")
