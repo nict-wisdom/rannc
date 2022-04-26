@@ -357,10 +357,7 @@ void ParamStorage::allReduceParamGrads(const std::string& graph_id) {
 
         grads.reserve(param_ids.size());
         for (long pid : param_ids) {
-          auto param = allreduce_amp_master_params_ && hasAmpMasterParam(pid)
-              ? getAmpMasterParamTensor(pid)
-              : getParamTensor(pid);
-          auto& grad = param.grad();
+          auto& grad = getParamTensor(pid).grad();
           if (grad.defined()) {
             if (sp_loc->registered(pid)) {
               grad.mul_(1 / (double)mpi::getSize());
