@@ -184,6 +184,10 @@ std::vector<long> RaNNCModule::init(
   PartitioningConf pconf = makePartitioningConf(
       mpi::getSize(), batch_size, dev_info.total_mem, use_amp_master_params_,
       enable_zero_, offload_params_);
+  if (enable_zero_ && pconf.force_dist_matmul) {
+    throw std::invalid_argument(
+        "enable_zero must be False when force_dist_matmul=True.");
+  }
 
   if (mpi::isMaster()) {
     logger->info("Tracing model ...");
