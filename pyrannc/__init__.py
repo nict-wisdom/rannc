@@ -439,17 +439,6 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
         return self.model.load_state_dict(*args, **kwargs)
 
-    def allreduce_grads(self):
-        r"""
-        Performs *allreduce* on gradients of model parameters.
-
-        .. note::
-            This method must be called from all ranks.
-        """
-        if self.enable_apex_amp:
-            self._setup_amp_params()
-        super().allreduce_grads()
-
     def zero_grad(self):
         r"""
         Sets zeros to  gradients of model parameters.
@@ -573,24 +562,6 @@ class RaNNCModule(_pyrannc.RaNNCModule):
                         pid_to_names[id(p)] = set()
                     pid_to_names[id(p)].add(name)
         return list(pid_to_names.values())
-
-def allreduce_grads(rmodel, optimizer, prescale=1.0):
-    if rmodel.enable_apex_amp:
-        rmodel._setup_amp_params()
-        from .amp import allreduce_grads_amp
-        return allreduce_grads_amp(rmodel, optimizer, prescale)
-
-    if rmodel.enable_zero:
-        rmodel.allreduce_grads_zero(prescale)
-    else:
-        with torch.no_grad():
-            for p in rmodel.parameters():
-                if p.grad is None:
-                    continue
-                p.grad.mul_(prescale)
-        rmodel.allreduce_grads()
-
-    return False
 
 
 def _run_dp_dry(path):
