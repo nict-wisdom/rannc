@@ -191,13 +191,10 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
     else:
         compare_params(model, rmodel, rtol, atol, False)
 
-    delay_grad_allreduce = allreduce_amp_master_params or gradient_accumulation_steps > 1
-    pyrannc.delay_grad_allreduce(delay_grad_allreduce)
-
     data_loader = get_loader(batch_size_per_proc, input_dim, output_dim, num_iter, get_dataset, gather_inputs)
     for step, (x, tgt) in enumerate(data_loader):
 
-        run_update = step % gradient_accumulation_steps == 0 if delay_grad_allreduce else True
+        run_update = step % gradient_accumulation_steps == 0
 
         # Create test input
         x = x.to(device)
@@ -232,10 +229,9 @@ def do_run(model_cls, batch_size_per_proc, num_iter,
         # Create test target
         if has_param:
             bwd(p_out, tgt, opt, use_amp)
-            bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
-            if delay_grad_allreduce and run_update:
-                pyrannc.allreduce_grads(rmodel, r_opt)
+            pyrannc.delay_grad_allreduce(not run_update)
+            bwd(r_out, convert_dtype(tgt, dtype), r_opt, use_amp)
 
             if run_update:
                 compare_grads(model, rmodel, rtol, atol, use_amp, zero=enable_zero, opt_exp=opt, opt_act=r_opt)

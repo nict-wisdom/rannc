@@ -61,16 +61,24 @@ def test_match(init_dist, init_seed, batch_size, iteration, test_model, gradient
         if k not in test_model:
             test_model[k] = v
 
-    common.run(test_model["model"], batch_size, iteration,
-               loss_out=test_model["loss_out"],
-               preprocess=test_model["preprocess"],
-               gradient_accumulation_steps=gradient_accumulation_steps,
-               use_amp=use_amp,
-               allreduce_amp_master_params=allreduce_amp_master_params,
-               enable_zero=enable_zero,
-               dist_params=dist_params,
-               offload_params=offload_params,
-               rtol=test_model["rtol"],
-               atol=test_model["atol"],
-               get_dataset=test_model["get_dataset"]
-               )
+    try:
+        common.run(test_model["model"], batch_size, iteration,
+                   loss_out=test_model["loss_out"],
+                   preprocess=test_model["preprocess"],
+                   gradient_accumulation_steps=gradient_accumulation_steps,
+                   use_amp=use_amp,
+                   allreduce_amp_master_params=allreduce_amp_master_params,
+                   enable_zero=enable_zero,
+                   dist_params=dist_params,
+                   offload_params=offload_params,
+                   rtol=test_model["rtol"]["fp16"] if use_amp else test_model["rtol"]["fp32"],
+                   atol=test_model["atol"]["fp16"] if use_amp else test_model["atol"]["fp32"],
+                   get_dataset=test_model["get_dataset"]
+                   )
+    except AssertionError as e:
+        print(
+            "Exception: AssertionError {} model={} use_amp={} allreduce_amp_master_params={} enable_zero={} dist_params={}"
+            " gradient_accumulation_steps={} offload_params={}".format(
+                e, test_model["model"].__name__,
+                use_amp, allreduce_amp_master_params, enable_zero, dist_params, gradient_accumulation_steps,
+                offload_params))
