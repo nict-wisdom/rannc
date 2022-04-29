@@ -588,6 +588,7 @@ void NCCLWrapper::destroyCommunicator(int tag) {
 
     if (contains(reduce_ops_, tag)) {
       ncclRedOpDestroy(reduce_ops_.at(tag), *ncomm);
+      reduce_ops_.erase(tag);
     }
     ncclCommDestroy(*ncomm);
 
