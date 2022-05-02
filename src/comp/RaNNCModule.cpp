@@ -605,7 +605,12 @@ std::tuple<int64_t, int64_t> RaNNCModule::getLocalParamRange(long param_id) {
 at::Tensor RaNNCModule::doGetParam(
     long param_id, bool grad, bool amp_master_param) {
   bool zero = param_storage_->zeroEnabled(id_);
-  if (zero && amp_master_param) {
+  const auto param_type = param_storage_->getParamType(param_id);
+
+  if (zero && amp_master_param &&
+      param_type.getTensorElemType() == IRTensorElemType::HALF) {
+    // FP32 params should not match this.
+    // Only FP16 params with master params should match.
     if (grad) {
       return param_storage_->gatherParamGradZero(param_id, amp_master_param);
     } else {
@@ -618,6 +623,7 @@ at::Tensor RaNNCModule::doGetParam(
       return param_storage_->gatherParam(param_id, amp_master_param);
     }
   } else {
+    // FP32 and FP16 params should be processed here.
     if (grad) {
       return param_storage_->syncParamGrad(param_id, amp_master_param);
     } else {

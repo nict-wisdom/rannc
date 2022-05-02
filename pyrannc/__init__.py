@@ -404,21 +404,14 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         # (due to the behavior of named_parameters())
         for n, p in self.model.state_dict(*args, **kwargs).items():
             if n in self.name_to_param:
-                new_state_dict[n] = self.get_param(n, amp_master_params and self.enable_apex_amp)
+                param = self.get_param(n, amp_master_params and self.enable_apex_amp)
 
-                if rank0_only and _pyrannc.get_rank() != 0:
-                    new_state_dict[n] = None
-            else:
-                shared_params.append(n)
-
-        # Set shared parameters with other names
-        for name_set in self.shared_param_names:
-            stored_names = [n for n in name_set if n in new_state_dict]
-            assert (len(stored_names) == 1)
-            stored_name = stored_names[0]
-            for n in name_set:
-                if n != stored_name:
-                    new_state_dict[n] = new_state_dict[stored_name]
+                if not rank0_only or _pyrannc.get_rank() == 0:
+                    for name_set in self.shared_param_names:
+                        if n in name_set:
+                            # Set shared parameters with other names
+                            for clone_name in name_set:
+                                new_state_dict[clone_name] = param
 
         if no_hook:
             _unstash_state_dict_hooks(self.model, stashed_hooks)

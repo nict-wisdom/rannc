@@ -171,6 +171,8 @@ class ParamStorage {
   std::unordered_map<long, long> id_global_to_local_;
   std::unordered_map<long, long> id_local_to_global_;
 
+  std::unordered_map<long, IRType> param_types_;
+
  private:
   bool consolidate_ = false;
   bool allreduce_amp_master_params_ = false;

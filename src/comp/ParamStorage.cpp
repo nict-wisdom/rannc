@@ -204,6 +204,7 @@ void ParamStorage::registerParam(
   global_id = ocomm.bcast(global_id);
   id_global_to_local_[global_id] = param_id;
   id_local_to_global_[param_id] = global_id;
+  param_types_[param_id] = toIRType(param_tensor);
 
   if (buffer) {
     buffer_ids_.insert(param_id);
@@ -297,7 +298,8 @@ bool ParamStorage::hasAmpMasterParam(long param_id) const {
 }
 
 IRType ParamStorage::getParamType(long param_id) {
-  return toIRType(getParamTensor(param_id));
+  assert(contains(param_types_, param_id));
+  return param_types_.at(param_id);
 }
 
 IRType ParamStorage::getParamType(
@@ -927,7 +929,7 @@ void ParamStorage::deploy(
       if (contains(param_ranks, mpi::getRank())) {
         param_tensor.set_data(gathered_param);
       } else {
-        param_tensor.set_data(torch::zeros({1}));
+        param_tensor.set_data(torch::zeros({1}, param_tensor.scalar_type()));
       }
       zpl.remove(param_id);
       dist_ids_.erase(param_id);
@@ -1104,8 +1106,7 @@ at::Tensor ParamStorage::doSyncParam(
 
   at::Tensor param;
   if (contains(param_ranks, mpi::getRank())) {
-    if (amp_master_param) {
-      assert(hasAmpMasterParam(param_id));
+    if (amp_master_param && hasAmpMasterParam(param_id)) {
       param = getAmpMasterParamTensor(param_id);
     } else {
       param = params_.at(param_id);
@@ -1261,6 +1262,7 @@ void ParamStorage::clear() {
   grouped_params_.clear();
   tag_rank_set_.clear();
   use_amp_master_params_.clear();
+  param_types_.clear();
 
   dist_ids_.clear();
   DistributedParamLocator& zpl = DistributedParamLocator::get();
