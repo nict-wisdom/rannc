@@ -632,7 +632,7 @@ bool SComm::isLastLocalSplit(
       last_index = i;
     }
   }
-  assert(last_index > 0);
+  assert(last_index >= 0);
 
   return last_index == split_index;
 }

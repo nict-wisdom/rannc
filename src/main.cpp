@@ -118,6 +118,23 @@ PYBIND11_MODULE(_pyrannc, m) {
     return ten;
   });
 
+  m.def("all_gather", [](py::handle py_ten, py::handle py_buf) {
+    auto iv_ten = torch::jit::_toTypeInferredIValue(py_ten);
+    assert(iv_ten.isTensor());
+    at::Tensor ten = iv_ten.toTensor();
+
+    auto iv_buf = torch::jit::_toTypeInferredIValue(py_buf);
+    assert(iv_buf.isTensor());
+    at::Tensor buf = iv_buf.toTensor();
+
+    NCCLWrapper& ar = NCCLWrapper::get();
+    TagMap& tag_map = TagMap::get();
+    int tag = tag_map.getRankSetTag(mpi::getAllRanks());
+
+    ar.createCommunicator(tag, mpi::getAllRanks());
+    ar.allgather(tag, {ten}, {buf});
+  });
+
   m.def("gather_tensor_zero", [](py::handle py_tensor, long param_id) {
     auto r = RaNNCFactory::get();
     auto param_storage = r->getParamStorage();
