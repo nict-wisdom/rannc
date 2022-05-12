@@ -11,3 +11,7 @@ def _allreduce_min(t):
 
 def bcast(t, root):
     return _pyrannc.bcast_tensor(t, root)
+
+
+def all_gather(ten, buf):
+    return _pyrannc.all_gather(ten, buf)

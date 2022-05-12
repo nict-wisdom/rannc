@@ -12,6 +12,7 @@ from . import _pyrannc, utils
 from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, set_dist_param_dtype, \
     DistributeModelParams
 from .opt import patch_optimizer
+from .tensor_coll import all_gather
 
 # Run backward to set python engine as the default engine
 x = torch.randn(2, 2, requires_grad=True)
