@@ -67,7 +67,7 @@ std::string EventRecorder::dump() {
       obj["ph"] = evt.phase;
       obj["pid"] = evt.rank;
       obj["tid"] = 0;
-      obj["ts"] = evt.time * 1000;
+      obj["ts"] = evt.time;
 
       js_events.push_back(obj);
     }

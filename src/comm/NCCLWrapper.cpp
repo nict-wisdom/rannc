@@ -167,6 +167,28 @@ ncclDataType_t getReduceNcclDataType(at::ScalarType scalar_type) {
   return datatype;
 }
 
+at::ScalarType getScalarTypeFromNcclDataType(ncclDataType_t datatype) {
+  at::ScalarType scalar_type;
+  switch (datatype) {
+    case ncclFloat16:
+      return at::ScalarType::Half;
+    case ncclFloat32:
+      return at::ScalarType::Float;
+    case ncclFloat64:
+      return at::ScalarType::Double;
+    case ncclInt32:
+      return at::ScalarType::Int;
+    case ncclInt64:
+      return at::ScalarType::Long;
+    case ncclBfloat16:
+      return at::ScalarType::BFloat16;
+    default:
+      std::stringstream ss;
+      ss << "Unsupported NCCL datatype: " << datatype;
+      throw std::invalid_argument(ss.str());
+  }
+}
+
 ncclDataType_t getReduceNcclDataType(const at::Tensor& t) {
   return getReduceNcclDataType(t.scalar_type());
 }
@@ -304,9 +326,18 @@ void NCCLWrapper::allreduceWithScaling(
   if (tensors.empty()) {
     return;
   }
-  doAllreduce(
-      tag, tensors,
-      getScalingReduceOp(tag, world_size, tensors.front().scalar_type()));
+
+  runCollectiveComm(
+      comm_map_, tag, tensors, {}, {}, "allreduce",
+      [this, tag, world_size](
+          void* sendptr, void* recvptr, size_t count, int root,
+          ncclDataType_t datatype, ncclComm_t* ncomm) {
+        // in-place only
+        return ncclAllReduce(
+            sendptr, sendptr, count, datatype,
+            this->getScalingReduceOp(tag, world_size, datatype), *ncomm,
+            (cudaStream_t) nullptr);
+      });
 }
 
 void NCCLWrapper::allreduce(int tag, const std::vector<at::Tensor>& tensors) {
@@ -391,9 +422,18 @@ void NCCLWrapper::reduceScatterWithScaling(
   if (tensors.empty()) {
     return;
   }
-  return doReduceScatter(
-      tag, tensors, out_bufs, num_proc,
-      getScalingReduceOp(tag, world_size, tensors.front().scalar_type()));
+
+  return runCollectiveComm(
+      comm_map_, tag, tensors, out_bufs, {}, "reduceScatter",
+      [this, tag, world_size, num_proc](
+          void* sendptr, void* recvptr, size_t count, int root,
+          ncclDataType_t datatype, ncclComm_t* ncomm) {
+        assert(count % num_proc == 0);
+        return ncclReduceScatter(
+            sendptr, recvptr, count / num_proc, datatype,
+            this->getScalingReduceOp(tag, world_size, datatype), *ncomm,
+            (cudaStream_t) nullptr);
+      });
 }
 
 std::string getBoolBufKey(const RouteDP& route, const std::string& action) {
@@ -586,10 +626,17 @@ void NCCLWrapper::destroyCommunicator(int tag) {
     AllReduceComm* comm_info = comm_map_.at(tag);
     ncclComm_t* ncomm = comm_info->comm;
 
-    if (contains(reduce_ops_, tag)) {
-      ncclRedOpDestroy(reduce_ops_.at(tag), *ncomm);
-      reduce_ops_.erase(tag);
+    std::vector<ReduceOpKey> ops_to_delete;
+    for (const auto& it : reduce_ops_) {
+      if (it.first.first == tag) {
+        ops_to_delete.push_back(it.first);
+      }
     }
+    for (const auto& key : ops_to_delete) {
+      ncclRedOpDestroy(reduce_ops_.at(key), *ncomm);
+      reduce_ops_.erase(key);
+    }
+
     ncclCommDestroy(*ncomm);
 
     delete ncomm;
@@ -656,24 +703,26 @@ void NCCLWrapper::recreateAllCommunicators() {
 }
 
 ncclRedOp_t NCCLWrapper::getScalingReduceOp(
-    int tag, size_t world_size, at::ScalarType scalar_type) {
-  if (!contains(reduce_ops_, tag)) {
+    int tag, size_t world_size, ncclDataType_t datatype) {
+  ReduceOpKey key{tag, datatype};
+  if (!contains(reduce_ops_, key)) {
     at::NoGradGuard no_grad;
 
-    ncclDataType_t datatype = getReduceNcclDataType(scalar_type);
     double scale = 1 / (double)world_size;
     at::Tensor scale_ten = torch::tensor(scale, {});
-    scale_ten = scale_ten.to(scalar_type).contiguous();
+    scale_ten =
+        scale_ten.to(getScalarTypeFromNcclDataType(datatype)).contiguous();
 
     assert(contains(comm_map_, tag));
     AllReduceComm* comm_info = comm_map_.at(tag);
     ncclComm_t* ncomm = comm_info->comm;
     ncclRedOp_t op;
+    // scalar is copied when ncclScalarHostImmediate is given
     ncclRedOpCreatePreMulSum(
         &op, scale_ten.data_ptr(), datatype, ncclScalarHostImmediate, *ncomm);
-    reduce_ops_[tag] = op;
+    reduce_ops_[key] = op;
   }
-  return reduce_ops_.at(tag);
+  return reduce_ops_.at(key);
 }
 
 void NCCLWrapper::commWithRetry(const std::function<void()>& f) {

@@ -37,6 +37,16 @@ class NCCLBulkJobExecutor {
   std::vector<std::function<void(void)>> post_comm_jobs_;
 };
 
+using ReduceOpKey = std::pair<int, ncclDataType_t>;
+
+struct ReduceOpKeyHash {
+  std::size_t operator()(const ReduceOpKey& pair) const {
+    std::stringstream ss;
+    ss << pair.first << "_" << toString(pair.second);
+    return std::hash<std::string>()(ss.str());
+  };
+};
+
 class NCCLWrapper {
  public:
   static NCCLWrapper& get() {
@@ -105,14 +115,14 @@ class NCCLWrapper {
       int tag, const std::vector<at::Tensor>& tensors,
       const std::vector<at::Tensor>& out_bufs, size_t num_proc, ncclRedOp_t op);
   ncclRedOp_t getScalingReduceOp(
-      int tag, size_t world_size, at::ScalarType scalar_type);
+      int tag, size_t world_size, ncclDataType_t scalar_type);
 
   std::unordered_map<int, AllReduceComm*> comm_map_;
   std::unordered_map<std::unordered_set<int>, int, IntSetHash> ranks_to_tag_;
   BufferTensorCache buf_cache_;
   NCCLBulkJobExecutor job_executor_;
 
-  std::unordered_map<int, ncclRedOp_t> reduce_ops_;
+  std::unordered_map<ReduceOpKey, ncclRedOp_t, ReduceOpKeyHash> reduce_ops_;
 
   std::shared_ptr<spdlog::logger> logger = getLogger("NCCLWrapper");
 };
