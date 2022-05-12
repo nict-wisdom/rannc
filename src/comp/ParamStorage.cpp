@@ -475,7 +475,7 @@ void ParamStorage::allReduceParamGradsZero(const std::string& graph_id) {
             buf_scalar_type = at::ScalarType::Float;
           }
           const auto buf_type = IRType::createTensorType(
-              toTensorElemType(param.scalar_type()), {aligned_elems}, false);
+              toTensorElemType(buf_scalar_type), {aligned_elems}, false);
           at::Tensor buf = createBufTensor(buf_type);
           buf.narrow(0, 0, grad.numel()).copy_(grad.flatten(), true);
           in_bufs.push_back(buf);
