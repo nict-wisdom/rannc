@@ -108,6 +108,7 @@ class ParamStorage {
 
   IRType getParamType(long param_id);
   IRType getParamType(const std::string& graph_id, const std::string& name);
+  std::string getParamName(const std::string& graph_id, long pid);
 
   bool isConsolidate() const {
     return consolidate_;

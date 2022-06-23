@@ -307,6 +307,19 @@ IRType ParamStorage::getParamType(
   return getParamType(getParamID(graph_id, name));
 }
 
+std::string ParamStorage::getParamName(const std::string& graph_id, long pid) {
+  assert(contains(graph_params_, graph_id));
+  const auto& params = graph_params_.at(graph_id);
+  for (const auto& it : params) {
+    if (it.second == pid) {
+      return it.first;
+    }
+  }
+  std::stringstream ss;
+  ss << "Parameter not found: graph_id=" << graph_id << " pid=" << pid;
+  throw std::invalid_argument(ss.str());
+}
+
 bool ParamStorage::distributed(long param_id) const {
   return contains(dist_ids_, param_id);
 }
@@ -967,7 +980,10 @@ void ParamStorage::deploy(
       }
     }
 
-    graph_grouped_params[comm_tag].push_back(param_id);
+    // do not associate buffer with comm tag
+    if (!contains(buffer_ids_, param_id)) {
+      graph_grouped_params[comm_tag].push_back(param_id);
+    }
     tag_rank_set_[comm_tag] = param_ranks;
     i++;
   }
