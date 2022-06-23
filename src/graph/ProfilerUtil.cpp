@@ -86,13 +86,13 @@ size_t getOptMemSize(
             val.getType().getTensorElemType() == IRTensorElemType::BFLOAT16) {
           // we have to keep memory for stashed gradients
           sum += val.getSizeInByte() * prof_in.opt_param_factor /
-              zero_dist_num // optimizer state
-              / slice_num
-              + val.getSizeInByte() / slice_num; // stashed gradients
+                  zero_dist_num // optimizer state
+                  / slice_num +
+              val.getSizeInByte() / slice_num; // stashed gradients
         } else {
-          throw std::runtime_error(
-              "Unexpected param type: " +
-              toString(val.getType().getTensorElemType()));
+          spdlog::trace(
+              "Unexpected param type. skipping counting size. val={} type={}",
+              val.getName(), toString(val.getType().getTensorElemType()));
         }
       } else {
         sum += val.getSizeInByte() * prof_in.opt_param_factor /
