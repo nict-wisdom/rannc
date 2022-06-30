@@ -102,6 +102,19 @@ std::unordered_set<std::string> getRequiredInputs(
       }
     }
   }
+
+  std::unordered_set<std::string> g1_outputs =
+      vectorToSet(g1->getOutputNames());
+
+  for (const auto& in : g1->getInputNames()) {
+    required_inputs.erase(in);
+  }
+  for (const auto& in : g2->getInputNames()) {
+    if (!contains(g1_outputs, in)) {
+      required_inputs.erase(in);
+    }
+  }
+
   return required_inputs;
 }
 
@@ -662,7 +675,6 @@ MLGraph fromBGL(const MLBGraph& bg) {
   std::vector<MLNode> nodes;
   nodes.reserve(num_vertices(bg));
   for (const auto& v : all_nodes_topo<MLVertex, MLBGraph>(bg)) {
-    ;
     nodes.push_back(bg[v]);
   }
 

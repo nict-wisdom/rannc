@@ -276,9 +276,9 @@ BDecomposition createSubGraphs(const BGraph& g) {
         assert(!g[src].ranks.empty());
         int src_rank = *(g[src].ranks.begin());
 
-        //                    spdlog::info("Checking graph edge:
-        //                    {}@rank{}->{}@rank{}", g[src].name, src_rank,
-        //                    g[tgt].name, tgt_rank);
+        //        spdlog::info(
+        //            "Checking graph edge: {}@rank{}->{}@rank{}", g[src].name,
+        //            src_rank, g[tgt].name, tgt_rank);
         const auto& src_graph_id = subgraph_id_map[src_rank];
         const auto& tgt_graph_id = subgraph_id_map[tgt_rank];
 
@@ -287,16 +287,16 @@ BDecomposition createSubGraphs(const BGraph& g) {
         if (g[src].is_param) {
           if (!containsConnection(param_connections, con)) {
             param_connections.emplace_back(con);
-            //                            spdlog::info("Found shared param
-            //                            connection: {} {}->{}", g[src].name,
-            //                            src_graph_id, tgt_graph_id);
+            //            spdlog::info(
+            //                "Found shared param connection: {} {}->{}",
+            //                g[src].name, src_graph_id, tgt_graph_id);
           }
         } else {
           if (!containsConnection(connections, con)) {
             connections.emplace_back(con);
-            //                            spdlog::info("Created graph
-            //                            connection: {} {}->{}", g[src].name,
-            //                            src_graph_id, tgt_graph_id);
+            //            spdlog::info(
+            //                "Created graph connection: {} {}->{}",
+            //                g[src].name, src_graph_id, tgt_graph_id);
           }
         }
       }
@@ -337,17 +337,16 @@ BDecomposition createSubGraphs(const BGraph& g) {
         if (!hasSameValueConnection(connections, vi.name, sg_id)) {
           GraphConnection con{vi.name, MASTER_NAME, sg_id, "NA", vi.id};
           connections.push_back(con);
-          //
-          //                        spdlog::info("Created graph connection: {}
-          //                        MASTER->{}", vi.name, sg_id);
+          //          spdlog::info("Created graph connection: {} MASTER->{}",
+          //          vi.name, sg_id);
         }
       }
       if (vi.is_orig_output) {
         GraphConnection con{vi.name, sg_id, MASTER_NAME, vi.id, "NA"};
         connections.push_back(con);
         //
-        //                    spdlog::info("Created graph connection: {}
-        //                    {}->MASTER", vi.name, sg_id);
+        //        spdlog::info("Created graph connection: {} {}->MASTER",
+        //        vi.name, sg_id);
       }
     }
   }
@@ -768,9 +767,7 @@ Partition createPartition(const BGraph& g) {
       boost::write_graphviz(
           file1, subg, vertex_rank_label_writer<BGraph>(subg));
     }
-
-    comp_graphs[subg_id] = fromBGL(subg);
-    comp_graph_groups[subg_id][subg_id] = fromBGL(subg);
+    comp_graph_groups[subg_id][subg_id] = comp_graphs[subg_id] = fromBGL(subg);
   }
   // fix connections
   //        spdlog::info("b_decomp.connections={}",
@@ -778,7 +775,7 @@ Partition createPartition(const BGraph& g) {
 
   std::vector<GraphConnection> comp_connection;
   for (const auto& con : b_decomp.connections) {
-    //            spdlog::info("  con={}", toString(con));
+    //    spdlog::info("  con={}", toString(con));
     std::string comp_src = con.src;
     if (con.src != MASTER_NAME) {
       comp_src = searchGraphWithValue(comp_graph_groups[con.src], con.value);
@@ -1277,12 +1274,10 @@ void fixNonBatchRanks(BGraph& g) {
         output_names.push_back(g[val].name);
       }
 
-      //                spdlog::info("Node {} {} (out={}) changed ranks: {} to
-      //                {}",
-      //                             g[v].name, g[v].id,
-      //                             join_as_str(output_names),
-      //                             join_as_str(g[v].ranks),
-      //                             join_as_str(fixed_ranks));
+      //      spdlog::info(
+      //          "Node {} {} (out={}) changed ranks: {} to {}", g[v].name,
+      //          g[v].id, join_as_str(output_names), join_as_str(g[v].ranks),
+      //          join_as_str(fixed_ranks));
 
       if (!fixed_ranks.empty()) {
         g[v].ranks = fixed_ranks;

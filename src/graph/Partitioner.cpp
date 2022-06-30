@@ -895,6 +895,8 @@ MLGraph MLPartitioner::partition(const std::shared_ptr<IRGraph>& ir_graph) {
     }
   }
 
+  fixNonBatchRanks(bg);
+
   // label graph inputs
   for (auto& in_v : graph_regular_input_nodes<Vertex, BGraph>(bg)) {
     assert(bg[in_v].value.isBatch());
@@ -904,8 +906,6 @@ MLGraph MLPartitioner::partition(const std::shared_ptr<IRGraph>& ir_graph) {
       }
     }
   }
-
-  fixNonBatchRanks(bg);
 
   //        std::ofstream file("batch_only_graph.dot");
   //        boost::write_graphviz(file, bg,
