@@ -400,7 +400,6 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             stashed_hooks = _stash_state_dict_hooks(self.model)
 
         new_state_dict = {}
-        shared_params = []
         # self.name_to_param contains only one of parameters that share the same data.
         # (due to the behavior of named_parameters())
         for n, p in self.model.state_dict(*args, **kwargs).items():
@@ -548,7 +547,7 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
     def _shared_param_names(self):
         pid_to_names = {}
-        for prefix, module in self.named_modules():
+        for prefix, module in self.named_modules(remove_duplicate=False):
             for n, p in module._parameters.items():
                 if p is not None:
                     name = prefix + ('.' if prefix else '') + n
