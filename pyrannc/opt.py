@@ -119,6 +119,9 @@ def gather_optimizer_state_dict(optimizer, use_amp_master_param=False, enable_ze
             param_state = state_dict["state"][global_order]
             tensor_item_names = [k for k, v in param_state.items() if torch.is_tensor(v)]
             non_tensor_item_names = [k for k, v in param_state.items() if not torch.is_tensor(v)]
+            if "step" in tensor_item_names:
+                tensor_item_names.remove("step")
+                non_tensor_item_names.append("step")
         tensor_item_names = comm_utils.bcast_obj(tensor_item_names, param_root)
         non_tensor_item_names = comm_utils.bcast_obj(non_tensor_item_names, param_root)
 
