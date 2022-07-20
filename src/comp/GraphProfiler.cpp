@@ -278,9 +278,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       // Run forward enabling grad to judge whether bwd is required or not
       driver_out = driver.forward(id, graph_inputs, split_index);
       bool run_bwd = setRequiresGrad(subgraph, driver_out) > 0;
-      if (i == 0) {
-        alloc_fwd_out_with_act = getAllocatedMemory();
-      }
+      alloc_fwd_out_with_act = getAllocatedMemory();
 
       // Clear to release memory
       driver_out.clear();
@@ -292,8 +290,13 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
             },
             i, iteration / 2, time_counter, fwd_time_key);
 
-        if (i == 0) {
+        // Prevent negative value of activation size.
+        // The allocated memory sizes with/without grad may differ even when
+        // run_bwd==false.
+        if (run_bwd) {
           alloc_fwd_out_no_act = getAllocatedMemory();
+        } else {
+          alloc_fwd_out_no_act = alloc_fwd_out_with_act;
         }
       }
 
@@ -308,11 +311,24 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
             i, iteration / 2, time_counter, bwd_time_key);
       }
     } else {
+      // Run once to measure activation size
+      if (i == 0) {
+        torch::NoGradGuard no_grad;
+        driver_out = measureTime<IValueMap>(
+            [&driver, &id, &graph_inputs, split_index]() {
+              return driver.forward(id, graph_inputs, split_index);
+            },
+            i, iteration / 2, time_counter, fwd_time_key);
+        alloc_fwd_out_no_act = getAllocatedMemory();
+        driver_out.clear();
+      }
+
       driver_out = measureTime<IValueMap>(
           [&driver, &id, &graph_inputs, split_index]() {
             return driver.forward(id, graph_inputs, split_index);
           },
           i, iteration / 2, time_counter, fwd_time_key);
+
       if (trace_dim_names) {
         recordDimNamesFromIValue(driver_out, dim_names_);
         for (auto& it : graph_inputs) {
@@ -324,11 +340,14 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       }
 
       if (setRequiresGrad(subgraph, driver_out) > 0) {
+        alloc_fwd_out_with_act = getAllocatedMemory();
         measureTime(
             [this, &subgraph, &driver_out, split_index]() {
               this->backward(subgraph, driver_out, split_index);
             },
             i, iteration / 2, time_counter, bwd_time_key);
+      } else {
+        alloc_fwd_out_no_act = alloc_fwd_out_with_act;
       }
     }
   }
@@ -344,15 +363,23 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 
   long input_size = 0;
   for (const auto& it : graph_inputs) {
-    input_size += toIRType(it.second).getSizeInByte();
+    if (it.second.isTensor()) {
+      input_size += toIRType(it.second).getSizeInByte();
+    }
   }
   long output_size = 0;
   for (const auto& it : driver_out) {
-    output_size += toIRType(it.second).getSizeInByte();
+    if (it.second.isTensor()) {
+      output_size += toIRType(it.second).getSizeInByte();
+    }
   }
   long act_mem = alloc_fwd_out_with_act - alloc_fwd_out_no_act;
-  long work_mem =
-      total_mem - (input_size + output_size + param_size * 2 + act_mem);
+
+  long work_mem = total_mem
+      // total_mem does not include input_size
+      - output_size // work_mem does not include output_size
+      - param_size * 2 // parameters and gradients
+      - act_mem; // work_mem does not include activation size
 
   GraphProfile prof{
       id,
@@ -362,7 +389,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       param_size,
       input_size,
       output_size,
-      alloc_fwd_out_with_act - alloc_fwd_out_no_act,
+      act_mem,
       work_mem, // gradients
       conf.checkpointing};
 
