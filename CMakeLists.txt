@@ -73,6 +73,7 @@ set(RANNC_SRCS
         src/comp/DistributedGradLocator.cpp
         src/comp/DistributedParamLocator.cpp
         src/comp/GraphProfiler.cpp
+        src/comp/KinetoWrapper.cpp
         src/comp/GraphValueCache.cpp
         src/comp/RaNNCModule.cpp
         src/comp/TimeCounter.cpp

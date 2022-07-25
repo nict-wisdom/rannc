@@ -11,6 +11,7 @@
 #include "ConfiguredTorch.h"
 #include "graph/ConvertGraph.h"
 #include "GraphProfiler.h"
+#include "KinetoWrapper.h"
 
 namespace rannc {
 
@@ -270,6 +271,8 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   IValueMap driver_out;
   TimeCounter time_counter(true);
   long alloc_fwd_out_with_act, alloc_fwd_out_no_act;
+
+  KinetoWrapper kineto_wrapper(iteration / 2);
   for (size_t i = 0; i < iteration; i++) {
     driver_out.clear();
 
@@ -285,7 +288,9 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       {
         torch::NoGradGuard no_grad;
         driver_out = measureTime<IValueMap>(
-            [&driver, &id, &graph_inputs, split_index]() {
+            [&driver, &id, &graph_inputs, split_index, &kineto_wrapper,
+             &fwd_time_key]() {
+              KinetoProfilingGuard guard(kineto_wrapper, fwd_time_key);
               return driver.forward(id, graph_inputs, split_index);
             },
             i, iteration / 2, time_counter, fwd_time_key);
@@ -302,7 +307,10 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
 
       if (run_bwd) {
         driver_out = measureTime<IValueMap>(
-            [&driver, &id, &graph_inputs, this, &subgraph, split_index]() {
+            [&driver, &id, &graph_inputs, this, &subgraph, split_index,
+             &kineto_wrapper, &bwd_time_key]() {
+              KinetoProfilingGuard guard(kineto_wrapper, bwd_time_key);
+
               const auto out = driver.forward(id, graph_inputs, split_index);
               setRequiresGrad(subgraph, out);
               this->backward(subgraph, out, split_index);
@@ -315,7 +323,9 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       if (i == 0) {
         torch::NoGradGuard no_grad;
         driver_out = measureTime<IValueMap>(
-            [&driver, &id, &graph_inputs, split_index]() {
+            [&driver, &id, &graph_inputs, split_index, &kineto_wrapper,
+             &fwd_time_key]() {
+              KinetoProfilingGuard guard(kineto_wrapper, fwd_time_key);
               return driver.forward(id, graph_inputs, split_index);
             },
             i, iteration / 2, time_counter, fwd_time_key);
@@ -324,7 +334,9 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       }
 
       driver_out = measureTime<IValueMap>(
-          [&driver, &id, &graph_inputs, split_index]() {
+          [&driver, &id, &graph_inputs, split_index, &kineto_wrapper,
+           &fwd_time_key]() {
+            KinetoProfilingGuard guard(kineto_wrapper, fwd_time_key);
             return driver.forward(id, graph_inputs, split_index);
           },
           i, iteration / 2, time_counter, fwd_time_key);
@@ -342,7 +354,9 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       if (setRequiresGrad(subgraph, driver_out) > 0) {
         alloc_fwd_out_with_act = getAllocatedMemory();
         measureTime(
-            [this, &subgraph, &driver_out, split_index]() {
+            [this, &subgraph, &driver_out, split_index, &kineto_wrapper,
+             &bwd_time_key]() {
+              KinetoProfilingGuard guard(kineto_wrapper, bwd_time_key);
               this->backward(subgraph, driver_out, split_index);
             },
             i, iteration / 2, time_counter, bwd_time_key);
@@ -393,7 +407,12 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       work_mem, // gradients
       conf.checkpointing};
 
-  logger->trace("{}", toString(prof));
+  logger->info(
+      "{} iter={} fwd_cuda={} fwd_cpu={} bwd_cuda={} bwd_cpu={} {}",
+      toString(prof), iteration, kineto_wrapper.getCudaTime(fwd_time_key),
+      kineto_wrapper.getCpuTime(fwd_time_key),
+      kineto_wrapper.getCudaTime(bwd_time_key),
+      kineto_wrapper.getCpuTime(bwd_time_key), toString(*subgraph));
 
   return {driver_out, prof};
 }
