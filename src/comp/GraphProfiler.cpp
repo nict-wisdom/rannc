@@ -398,7 +398,11 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   GraphProfile prof{
       id,
       time_counter.get<std::chrono::microseconds>(fwd_time_key),
+      kineto_wrapper.getCpuTime(fwd_time_key),
+      kineto_wrapper.getCudaTime(fwd_time_key),
       bwd_time,
+      kineto_wrapper.getCpuTime(bwd_time_key),
+      kineto_wrapper.getCudaTime(bwd_time_key),
       total_mem,
       param_size,
       input_size,
