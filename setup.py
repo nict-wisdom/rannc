@@ -3,9 +3,9 @@ import os
 import platform
 import re
 import subprocess
+import sys
 from distutils.version import LooseVersion
 
-import sys
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 
@@ -64,7 +64,7 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
-VERSION = "0.7.4rc1"
+VERSION = "0.7.4"
 
 if "CUDA_VERSION" in os.environ:
     version_nums = os.environ["CUDA_VERSION"].split(".")

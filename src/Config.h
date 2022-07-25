@@ -79,6 +79,7 @@ extern const char WATCHDOG_LOCKFILE_DIR[];
 extern const char FORCE_DIST_MATMUL[];
 extern const char USE_NAMED_TENSORS[];
 extern const char PROFILER_CACHE_SIZE[];
+extern const char ENABLE_KINETO[];
 
 extern const char
     CONF_DIR[]; // this is special because Config itself sets this item

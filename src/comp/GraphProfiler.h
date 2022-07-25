@@ -20,7 +20,11 @@ class FunctionStorage;
 struct GraphProfile {
   std::string name;
   long fwd_time;
+  long fwd_cpu_time;
+  long fwd_cuda_time;
   long bwd_time;
+  long bwd_cpu_time;
+  long bwd_cuda_time;
   long max_allocated_mem;
   long param_size;
   long input_size;
@@ -31,9 +35,12 @@ struct GraphProfile {
 
   friend std::ostream& operator<<(
       std::ostream& os, const GraphProfile& profile) {
-    os << "name: " << profile.name
-       << " fwd_time: " << profile.fwd_time
+    os << "name: " << profile.name << " fwd_time: " << profile.fwd_time
+       << " fwd_cpu_time: " << profile.fwd_cpu_time
+       << " fwd_cuda_time: " << profile.fwd_cuda_time
        << " bwd_time: " << profile.bwd_time
+       << " bwd_cpu_time: " << profile.bwd_cpu_time
+       << " bwd_cuda_time: " << profile.bwd_cuda_time
        << " max_allocated_mem: " << profile.max_allocated_mem
        << " param_size: " << profile.param_size
        << " input_size: " << profile.input_size
@@ -45,8 +52,9 @@ struct GraphProfile {
   }
 
   MSGPACK_DEFINE(
-      name, fwd_time, bwd_time, max_allocated_mem, param_size, input_size,
-      output_size, working_mem, activation_size, checkpointing);
+      name, fwd_time, fwd_cpu_time, fwd_cuda_time, bwd_time, bwd_cpu_time,
+      bwd_cuda_time, max_allocated_mem, param_size, input_size, output_size,
+      working_mem, activation_size, checkpointing);
 };
 
 struct ProfilingInput {
@@ -171,7 +179,8 @@ class GraphProfiler {
       std::unordered_map<std::string, torch::jit::IValue> non_param_inputs,
       std::unordered_map<std::string, long> graph_params, IValueMap constants,
       std::shared_ptr<FunctionStorage> functions, size_t batch_size,
-      int dev_num, size_t min_pipeline_num, size_t prof_batch_size)
+      int dev_num, size_t min_pipeline_num, size_t prof_batch_size,
+      bool enable_kineto)
       : param_storage_(std::move(param_storage)),
         base_graph_(std::move(base_graph)),
         non_param_inputs_(std::move(non_param_inputs)),
@@ -180,6 +189,7 @@ class GraphProfiler {
         functions_(std::move(functions)),
         batch_size_(batch_size),
         prof_batch_size_(prof_batch_size),
+        enable_kineto_(enable_kineto),
         dev_num_(dev_num),
         min_pipeline_num_(min_pipeline_num) {}
 
@@ -215,6 +225,7 @@ class GraphProfiler {
   std::shared_ptr<FunctionStorage> functions_;
   size_t batch_size_;
   size_t prof_batch_size_;
+  bool enable_kineto_;
   int dev_num_;
   size_t min_pipeline_num_;
 

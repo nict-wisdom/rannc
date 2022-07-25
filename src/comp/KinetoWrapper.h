@@ -15,8 +15,9 @@ namespace rannc {
 
 class KinetoWrapper {
  public:
-  KinetoWrapper(size_t warmup)
-      : config_(torch::autograd::profiler::ProfilerState::KINETO),
+  KinetoWrapper(bool enable, size_t warmup)
+      : enabled_(enable),
+        config_(torch::autograd::profiler::ProfilerState::KINETO),
         activities_(
             {torch::autograd::profiler::ActivityType::CUDA,
              torch::autograd::profiler::ActivityType::CPU}),
@@ -50,6 +51,7 @@ class KinetoWrapper {
   }
 
  private:
+  bool enabled_;
   torch::autograd::profiler::ProfilerConfig config_;
   std::set<torch::autograd::profiler::ActivityType> activities_;
   std::unordered_set<at::RecordScope> scopes_;

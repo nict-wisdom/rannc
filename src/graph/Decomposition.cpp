@@ -1571,6 +1571,7 @@ PartitioningConf makePartitioningConf(
   part_conf.min_partition_num = conf.getVal<int>(config::MIN_PARTITION_NUM);
   part_conf.max_partition_num = conf.getVal<int>(config::MAX_PARTITION_NUM);
   part_conf.cfg_stage_num = conf.getVal<int>(config::PARTITION_NUM);
+  part_conf.enable_kineto = conf.getVal<bool>(config::ENABLE_KINETO);
   return part_conf;
 }
 } // namespace rannc

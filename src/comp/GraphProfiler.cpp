@@ -272,7 +272,7 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
   TimeCounter time_counter(true);
   long alloc_fwd_out_with_act, alloc_fwd_out_no_act;
 
-  KinetoWrapper kineto_wrapper(iteration / 2);
+  KinetoWrapper kineto_wrapper(enable_kineto_, iteration / 2);
   for (size_t i = 0; i < iteration; i++) {
     driver_out.clear();
 
@@ -406,13 +406,6 @@ std::pair<IValueMap, GraphProfile> GraphProfiler::computeGraph(
       act_mem,
       work_mem, // gradients
       conf.checkpointing};
-
-  logger->info(
-      "{} iter={} fwd_cuda={} fwd_cpu={} bwd_cuda={} bwd_cpu={} {}",
-      toString(prof), iteration, kineto_wrapper.getCudaTime(fwd_time_key),
-      kineto_wrapper.getCpuTime(fwd_time_key),
-      kineto_wrapper.getCudaTime(bwd_time_key),
-      kineto_wrapper.getCpuTime(bwd_time_key), toString(*subgraph));
 
   return {driver_out, prof};
 }

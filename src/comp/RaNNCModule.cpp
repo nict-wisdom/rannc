@@ -248,7 +248,7 @@ std::vector<long> RaNNCModule::init(
   std::shared_ptr<GraphProfiler> sg_prof = std::make_shared<GraphProfiler>(
       param_storage_, ir_graph_, non_param_inputs, graph_params,
       value_storage_->getValues(), func_storage_, batch_size, mpi::getSize(),
-      pconf.min_pipeline_num, INITIAL_PROF_BATCH_SIZE);
+      pconf.min_pipeline_num, INITIAL_PROF_BATCH_SIZE, pconf.enable_kineto);
 
   DistTaskDispatcher& dtd = DistTaskDispatcher::get();
   dtd.start(sg_prof, prof_cache_size_);

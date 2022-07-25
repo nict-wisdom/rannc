@@ -559,12 +559,13 @@ struct PartitioningConf {
   int max_partition_num;
   int cfg_pipeline_num;
   size_t cfg_stage_num;
+  bool enable_kineto;
 
   MSGPACK_DEFINE(
       dev_num, batch_size, dev_mem, opt_param_factor, use_amp_master_params,
       enable_zero, offload_params, force_dist_matmul, min_pipeline_num,
       max_pipeline_num, min_partition_num, max_partition_num, cfg_pipeline_num,
-      cfg_stage_num);
+      cfg_stage_num, enable_kineto);
 };
 
 PartitioningConf makePartitioningConf(

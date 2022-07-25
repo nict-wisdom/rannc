@@ -7,11 +7,17 @@
 namespace rannc {
 
 void KinetoWrapper::start() {
+  if (!enabled_) {
+    return;
+  }
   torch::autograd::profiler::prepareProfiler(config_, activities_);
   torch::autograd::profiler::enableProfiler(config_, activities_, scopes_);
 }
 
 void KinetoWrapper::stop(const std::string& key) {
+  if (!enabled_) {
+    return;
+  }
   auto profiler_results_ptr = torch::autograd::profiler::disableProfiler();
 
   long cuda_time_sum = 0;
