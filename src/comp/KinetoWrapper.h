@@ -23,7 +23,10 @@ class KinetoWrapper {
              torch::autograd::profiler::ActivityType::CPU}),
         scopes_(
             {at::RecordScope::FUNCTION, at::RecordScope::BACKWARD_FUNCTION,
-             at::RecordScope::USER_SCOPE}),
+             at::RecordScope::TORCHSCRIPT_FUNCTION,
+             at::RecordScope::CUSTOM_CLASS, at::RecordScope::USER_SCOPE,
+             at::RecordScope::STATIC_RUNTIME_OP,
+             at::RecordScope::STATIC_RUNTIME_MODEL}),
         warmup_(warmup) {}
 
   void start();
