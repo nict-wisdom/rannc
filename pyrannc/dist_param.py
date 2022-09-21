@@ -73,6 +73,7 @@ class DistributeModelParams(object):
                 f(model, *args, **kwargs)
                 self._store_dist_params(model)
                 self._set_hooks(model)
+                model._dist_params = True
 
             return wrapper
 
@@ -83,8 +84,11 @@ class DistributeModelParams(object):
                 name = module + "." + name
             return name
 
+        def has_custom_init(cls):
+            return "__init__" in vars(cls)
+
         for subclass in self._all_subclasses(torch.nn.modules.module.Module):
-            if "torch.jit" not in fq_classname(subclass):
+            if "torch.jit" not in fq_classname(subclass) and has_custom_init(subclass):
                 subclass._old_init = subclass.__init__
                 subclass.__init__ = add_post_process(subclass.__init__)
 
