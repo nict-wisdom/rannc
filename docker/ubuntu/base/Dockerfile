@@ -8,14 +8,15 @@ ARG PYTHON_VERSION
 ENV DOCKER_BUILD_DIR /build
 ENV BOOST_VERSION 1.78.0
 ENV OPENUCX_VERSION 1.9.0
-ENV OPENMPI_VERSION 4.0.5
+ENV OPENMPI_VERSION 4.0.7
 ENV CONDA_VERSION 4.9.2
-ENV PYTORCH_VERSION 1.12.0
+ENV PYTORCH_VERSION 1.12.1
+ENV NCCL_VERSION 2.14.3-1
 
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update
-RUN apt-get install -y wget git libnuma-dev libibverbs-dev librdmacm-dev libssl-dev && apt-get clean
+RUN apt-get install -y wget git libnuma-dev libibverbs-dev librdmacm-dev libssl-dev libffi-dev zlib1g-dev && apt-get clean
 
 RUN mkdir -p $DOCKER_BUILD_DIR
 
@@ -52,30 +53,25 @@ RUN cd ${DOCKER_BUILD_DIR} \
         --disable-getpwuid --without-usnic --enable-orterun-prefix-by-default \
     && make -j 4 && make install
 
-# Miniconda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-py38_${CONDA_VERSION}-Linux-x86_64.sh -O ~/miniconda.sh \
-    && /bin/bash ~/miniconda.sh -b -p /opt/conda \
-    && rm ~/miniconda.sh \
-    && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
-    && echo ". /opt/conda/etc/profile.d/conda.sh" >> /root/.bashrc
+# Python
+RUN cd ${DOCKER_BUILD_DIR} \
+    && wget --quiet https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
+    && tar -xzf Python-${PYTHON_VERSION}.tgz \
+    && cd Python-${PYTHON_VERSION} \
+    && ./configure \
+    && make \
+    && make install
 
-## Env & PyTorch
-RUN . /opt/conda/etc/profile.d/conda.sh \
-    && conda create -y -n rannc python=${PYTHON_VERSION} \
-    && conda activate rannc \
-    && if [[ $CUDA_VERSION =~ ^11. ]]; then \
-          export CUDA_TOOLKIT_VERSION="11.3"; \
-       else \
-          export CUDA_TOOLKIT_VERSION="10.2"; \
-       fi \
-    && conda install -y pytorch=${PYTORCH_VERSION} torchvision torchaudio cudatoolkit=${CUDA_TOOLKIT_VERSION} -c pytorch -c conda-forge \
-    && conda clean --all \
-    && echo "conda activate rannc" >> /root/.bashrc
+# PyTorch
+RUN CUDA_VERSION_SHORT=${CUDA_VERSION//.} \
+    && CUDA_VERSION_SHORT=${CUDA_VERSION_SHORT:0:3} \
+    && pip3 install torch==${PYTORCH_VERSION} --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION_SHORT}
 
+# NCCL
 RUN cd ${DOCKER_BUILD_DIR} \
     && git clone https://github.com/NVIDIA/nccl \
     && cd nccl \
-    && git checkout v2.11.4-1 \
+    && git checkout v${NCCL_VERSION} \
     && make -j src.build \
     && make install
 

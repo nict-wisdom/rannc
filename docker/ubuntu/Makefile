@@ -1,6 +1,6 @@
-CUDA_VERSION = 11.3
+CUDA_VERSION = 11.3.1
 OS_NAME = ubuntu
-OS_VERSION = 16.04
+OS_VERSION = 18.04
 PYTHON_VERSION = 3.8
 
 .PHONY: base package runtime

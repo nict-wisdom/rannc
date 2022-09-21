@@ -15,6 +15,4 @@ RUN cd ${DOCKER_BUILD_DIR} \
     && make -j 4 \
     && make install
 
-RUN . /opt/conda/etc/profile.d/conda.sh \
-    && conda activate rannc \
-    && pip install bdist_wheel_name
+RUN pip3 install bdist_wheel_name
