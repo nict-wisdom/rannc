@@ -217,6 +217,12 @@ Config::Config() {
       throw std::invalid_argument("Config dir not found: " + conf_dir.string());
     }
 
+    if (!fs::is_directory(conf_dir)) {
+      throw std::invalid_argument(
+          "The path specified as the config dir is not a directory: " +
+          conf_dir.string());
+    }
+
     conf_file = conf_dir / RANNC_CONF_FILE;
   } else {
     const fs::path home_dir = getHomeDir();
@@ -225,23 +231,33 @@ Config::Config() {
   }
 
   if (fs::exists(conf_file)) {
-    values_[CONF_DIR] = conf_dir.string();
+    if (fs::is_directory(conf_file)) {
+      std::cerr
+          << "The path of the config file is a directory. Skipping loading config: "
+          << conf_file << std::endl;
+    } else {
+      values_[CONF_DIR] = conf_dir.string();
 
-    const auto data = toml::parse(conf_file.string());
-    for (const auto& it : data.as_table()) {
-      //                for(const auto& [name, val] : data.as_table())
+      try {
+        const auto data = toml::parse(conf_file.string());
+        for (const auto& it : data.as_table()) {
+          const std::string& name = it.first;
+          toml::value val = it.second;
 
-      const std::string& name = it.first;
-      toml::value val = it.second;
+          if (!contains(items_, name)) {
+            std::cerr << "Ignored unknown item in " << conf_file << ": " << name
+                      << std::endl;
+            continue;
+          }
 
-      if (!contains(items_, name)) {
-        std::cerr << "Ignored unknown item in " << conf_file << ": " << name
-                  << std::endl;
-        continue;
+          const auto& item = items_.at(name);
+          values_[name] = convertValue(val, item.type);
+        }
+      } catch (const std::exception& e) {
+        std::stringstream ss;
+        ss << "Failed to parse config file: " << conf_file;
+        throw std::invalid_argument(ss.str());
       }
-
-      const auto& item = items_.at(name);
-      values_[name] = convertValue(val, item.type);
     }
   }
 

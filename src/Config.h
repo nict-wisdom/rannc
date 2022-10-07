@@ -172,8 +172,13 @@ class Config {
   Config& operator=(Config&&) = delete;
 
   static Config& get() {
-    static Config instance;
-    return instance;
+    try {
+      static Config instance;
+      return instance;
+    } catch (const std::exception& e) {
+      std::cerr << "Error: " << e.what() << std::endl;
+      std::exit(1);
+    }
   }
 
   template <typename T>
