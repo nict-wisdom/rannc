@@ -283,9 +283,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
 
         out = super().__call__(*args)
 
-        if self.enable_apex_amp:
+        if self.enable_apex_amp and torch.is_grad_enabled():
+            import weakref
+            weak_self = weakref.ref(self)
+
             def setup_amp(grad):
-                self._setup_amp_params()
+                weak_self()._setup_amp_params()
                 return grad
 
             out.register_hook(setup_amp)
