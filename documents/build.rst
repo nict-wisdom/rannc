@@ -7,7 +7,7 @@ Compiler version
 You must use GCC v5.4 or newer. RaNNC has been tested with GCC v8.2.
 Note that RaNNC must be built in compliance with ABI of PyTorch.
 
-RaNNC is built with *Pre-cxx11 ABI* (``_GLIBCXX_USE_CXX11_ABI=0``) as default because PyTorch installed via conda is built with it.
+RaNNC is built with *Pre-cxx11 ABI* (``_GLIBCXX_USE_CXX11_ABI=0``) following the binary packages of PyTorch.
 You can change the ABI setting in ``CMakeLists.txt``.
 PyTorch provides you with `function <https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html>`_ below to understand how the binary is compiled.
 
