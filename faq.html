@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FAQs &mdash; RaNNC 0.7.3 documentation</title>
+  <title>FAQs &mdash; RaNNC 0.7.4 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -14,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -81,7 +83,7 @@
            <div itemprop="articleBody">
              
   <section id="faqs">
-<h1>FAQs<a class="headerlink" href="#faqs" title="Permalink to this headline"></a></h1>
+<h1>FAQs<a class="headerlink" href="#faqs" title="Permalink to this heading"></a></h1>
 <div class="contents local topic" id="contents">
 <ul class="simple">
 <li><p><a class="reference internal" href="#does-rannc-work-with-apex-amp" id="id1">Does RaNNC work with Apex AMP?</a></p></li>
@@ -92,13 +94,13 @@
 </ul>
 </div>
 <section id="does-rannc-work-with-apex-amp">
-<h2><a class="toc-backref" href="#id1">Does RaNNC work with Apex AMP?</a><a class="headerlink" href="#does-rannc-work-with-apex-amp" title="Permalink to this headline"></a></h2>
+<h2><a class="toc-backref" href="#id1">Does RaNNC work with Apex AMP?</a><a class="headerlink" href="#does-rannc-work-with-apex-amp" title="Permalink to this heading"></a></h2>
 <p>Yes.
 Convert your model with <code class="docutils literal notranslate"><span class="pre">amp.initialize()</span></code> and pass
 the resulting model to <code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code> using <code class="docutils literal notranslate"><span class="pre">use_amp_master_params=True</span></code>.</p>
 </section>
 <section id="how-can-i-save-load-a-rannc-module">
-<h2><a class="toc-backref" href="#id2">How can I save/load a RaNNC module?</a><a class="headerlink" href="#how-can-i-save-load-a-rannc-module" title="Permalink to this headline"></a></h2>
+<h2><a class="toc-backref" href="#id2">How can I save/load a RaNNC module?</a><a class="headerlink" href="#how-can-i-save-load-a-rannc-module" title="Permalink to this heading"></a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">state_dict()</span></code> of the RaNNC module.
 The returned <em>state_dict</em> can be saved and loaded, as with PyTorch.
 Make sure <code class="docutils literal notranslate"><span class="pre">state_dict()</span></code> is called from all ranks.
@@ -110,7 +112,7 @@ Note that the returned <em>state_dict</em> can be loaded after RaNNC partitions 
 You can find typical usages in <a class="reference external" href="https://github.com/nict-wisdom/rannc-examples/">examples</a>.</p>
 </section>
 <section id="can-i-use-gradient-accumulation">
-<h2><a class="toc-backref" href="#id3">Can I use gradient accumulation?</a><a class="headerlink" href="#can-i-use-gradient-accumulation" title="Permalink to this headline"></a></h2>
+<h2><a class="toc-backref" href="#id3">Can I use gradient accumulation?</a><a class="headerlink" href="#can-i-use-gradient-accumulation" title="Permalink to this heading"></a></h2>
 <p>Yes.</p>
 <p>As default, RaNNC implicitly performs allreduce (sum) of gradients on all ranks after a backward pass.
 To prevent this allreduce, you can use <code class="docutils literal notranslate"><span class="pre">pyrannc.delay_grad_allreduce(True)</span></code>.</p>
@@ -118,7 +120,7 @@ To prevent this allreduce, you can use <code class="docutils literal notranslate
 using <code class="docutils literal notranslate"><span class="pre">allreduce_grads</span></code> of your <code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code>.</p>
 </section>
 <section id="my-model-takes-too-long-before-partitioning-is-determined">
-<h2><a class="toc-backref" href="#id4">My model takes too long before partitioning is determined</a><a class="headerlink" href="#my-model-takes-too-long-before-partitioning-is-determined" title="Permalink to this headline"></a></h2>
+<h2><a class="toc-backref" href="#id4">My model takes too long before partitioning is determined</a><a class="headerlink" href="#my-model-takes-too-long-before-partitioning-is-determined" title="Permalink to this heading"></a></h2>
 <p>By setting <code class="docutils literal notranslate"><span class="pre">save_deployment=true</span></code>, RaNNC outputs the deployment state to a file called <code class="docutils literal notranslate"><span class="pre">deployment_file</span></code> after
 partitioning is determined. You can load the deployment file by setting <code class="docutils literal notranslate"><span class="pre">load_deployment=true</span></code>.
 This greatly saves time if you run a program using RaNNC with similar settings, e.g. with only the learning rate different.
@@ -129,7 +131,7 @@ partitioning process.
 (See also <a class="reference internal" href="logging.html"><span class="doc">Logging</span></a>)</p>
 </section>
 <section id="how-can-i-check-partitioning-results">
-<h2><a class="toc-backref" href="#id5">How can I check partitioning results?</a><a class="headerlink" href="#how-can-i-check-partitioning-results" title="Permalink to this headline"></a></h2>
+<h2><a class="toc-backref" href="#id5">How can I check partitioning results?</a><a class="headerlink" href="#how-can-i-check-partitioning-results" title="Permalink to this heading"></a></h2>
 <p>You can save a partitioning result using options <code class="docutils literal notranslate"><span class="pre">SAVE_DEPLOYMENT=true</span></code> and <code class="docutils literal notranslate"><span class="pre">DEPLOYMENT_FILE=[PATH]</span></code>.
 When these options are enabled, RaNNC outputs the partitioning result to the specified path. (See also <a class="reference internal" href="config.html"><span class="doc">Configurations</span></a>)</p>
 <p>Then, you can read the output file and display the partitioning results using <code class="docutils literal notranslate"><span class="pre">pyrannc.show_deployment(PATH,</span> <span class="pre">batch_size)</span></code>.

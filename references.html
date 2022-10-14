@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API references &mdash; RaNNC 0.7.3 documentation</title>
+  <title>API references &mdash; RaNNC 0.7.4 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -14,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -43,7 +45,38 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="limitations.html">Limitations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQs</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">API references</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API references</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.RaNNCModule"><code class="docutils literal notranslate"><span class="pre">RaNNCModule</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.buffers"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.buffers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.clip_grad_norm"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.clip_grad_norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.cuda"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.cuda()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.enable_dropout"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.enable_dropout()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.eval"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.eval()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.get_param"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.get_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.get_param_grad"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.get_param_grad()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.load_state_dict"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.load_state_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.named_buffers"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.named_buffers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.named_parameters"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.named_parameters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.parameters"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.parameters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.save_deployment"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.save_deployment()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.state_dict"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.state_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.to"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.to()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.train"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.train()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.undeploy"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.undeploy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyrannc.RaNNCModule.zero_grad"><code class="docutils literal notranslate"><span class="pre">RaNNCModule.zero_grad()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.barrier"><code class="docutils literal notranslate"><span class="pre">barrier()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.clear"><code class="docutils literal notranslate"><span class="pre">clear()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.delay_grad_allreduce"><code class="docutils literal notranslate"><span class="pre">delay_grad_allreduce()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.get_rank"><code class="docutils literal notranslate"><span class="pre">get_rank()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.get_world_size"><code class="docutils literal notranslate"><span class="pre">get_world_size()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.keep_graph"><code class="docutils literal notranslate"><span class="pre">keep_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.recreate_all_communicators"><code class="docutils literal notranslate"><span class="pre">recreate_all_communicators()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.show_deployment"><code class="docutils literal notranslate"><span class="pre">show_deployment()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pyrannc.sync_params_on_init"><code class="docutils literal notranslate"><span class="pre">sync_params_on_init()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config.html">Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="build.html">Building from source</a></li>
@@ -74,10 +107,10 @@
            <div itemprop="articleBody">
              
   <section id="module-pyrannc">
-<span id="api-references"></span><h1>API references<a class="headerlink" href="#module-pyrannc" title="Permalink to this headline"></a></h1>
+<span id="api-references"></span><h1>API references<a class="headerlink" href="#module-pyrannc" title="Permalink to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">pyrannc.</span></span><span class="sig-name descname"><span class="pre">RaNNCModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gather_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_deployment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_apex_amp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allreduce_amp_master_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_zero</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_unused_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offload_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrannc.</span></span><span class="sig-name descname"><span class="pre">RaNNCModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gather_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_deployment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_apex_amp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allreduce_amp_master_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_zero</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_unused_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offload_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule" title="Permalink to this definition"></a></dt>
 <dd><p>Computes a PyTorch model on multiple GPUs with a hybrid parallelism.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -93,16 +126,6 @@
 </ul>
 </dd>
 </dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="pyrannc.RaNNCModule.allreduce_grads">
-<span class="sig-name descname"><span class="pre">allreduce_grads</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.allreduce_grads" title="Permalink to this definition"></a></dt>
-<dd><p>Performs <em>allreduce</em> on gradients of model parameters.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This method must be called from all ranks.</p>
-</div>
-</dd></dl>
-
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.buffers">
 <span class="sig-name descname"><span class="pre">buffers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.buffers" title="Permalink to this definition"></a></dt>
@@ -134,7 +157,7 @@ This method calculates norm of all distributed gradients and clips them.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.enable_dropout">
-<span class="sig-name descname"><span class="pre">enable_dropout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">pyrannc._pyrannc.RaNNCModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg0</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyrannc.RaNNCModule.enable_dropout" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">enable_dropout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pyrannc._pyrannc.RaNNCModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyrannc.RaNNCModule.enable_dropout" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -142,6 +165,16 @@ This method calculates norm of all distributed gradients and clips them.</p>
 <span class="sig-name descname"><span class="pre">eval</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.eval" title="Permalink to this definition"></a></dt>
 <dd><p>Sets the training mode to <code class="docutils literal notranslate"><span class="pre">False</span></code> (i.e. evaluation mode).</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyrannc.RaNNCModule.get_param">
+<span class="sig-name descname"><span class="pre">get_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pyrannc._pyrannc.RaNNCModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">at::Tensor</span></span></span><a class="headerlink" href="#pyrannc.RaNNCModule.get_param" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyrannc.RaNNCModule.get_param_grad">
+<span class="sig-name descname"><span class="pre">get_param_grad</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pyrannc._pyrannc.RaNNCModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">at::Tensor</span></span></span><a class="headerlink" href="#pyrannc.RaNNCModule.get_param_grad" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.load_state_dict">
@@ -191,13 +224,13 @@ This method calculates norm of all distributed gradients and clips them.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.state_dict">
-<span class="sig-name descname"><span class="pre">state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_hook</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sync_all_ranks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sync_grad</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.state_dict" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_hook</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp_master_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rank0_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.state_dict" title="Permalink to this definition"></a></dt>
 <dd><p>Returns <code class="docutils literal notranslate"><span class="pre">state_dict</span></code> of the model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>no_hook</strong> – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, hooks on <code class="docutils literal notranslate"><span class="pre">state_dict</span></code> of the original models are ignored.</p></li>
-<li><p><strong>sync_grad</strong> – Set <code class="docutils literal notranslate"><span class="pre">True</span></code> to synchronize gradients.</p></li>
+<li><p><strong>amp_master_params</strong> – Set <code class="docutils literal notranslate"><span class="pre">True</span></code> to get apex amp master params.</p></li>
 </ul>
 </dd>
 </dl>
@@ -216,7 +249,7 @@ This method calculates norm of all distributed gradients and clips them.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.train">
 <span class="sig-name descname"><span class="pre">train</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.train" title="Permalink to this definition"></a></dt>
-<dd><p>Changes the training mode. If the model is changed after the deployment, model partitioning is recomputed.</p>
+<dd><p>Outputs warning because a RaNNC module cannot change the grad mode.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><p><strong>mode</strong> – Training mode.</p>
@@ -226,13 +259,8 @@ This method calculates norm of all distributed gradients and clips them.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrannc.RaNNCModule.undeploy">
-<span class="sig-name descname"><span class="pre">undeploy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sync</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.undeploy" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">undeploy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.RaNNCModule.undeploy" title="Permalink to this definition"></a></dt>
 <dd><p>Undeploys a model distributed on GPUs. This frees GPU memory used for the model.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>sync</strong> – Set <code class="docutils literal notranslate"><span class="pre">True</span></code> if you need to synchronize model parameters before undeploying the model.</p>
-</dd>
-</dl>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This method must be called from all ranks.</p>
@@ -246,11 +274,6 @@ This method calculates norm of all distributed gradients and clips them.</p>
 </dd></dl>
 
 </dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="pyrannc.allreduce_grads">
-<span class="sig-prename descclassname"><span class="pre">pyrannc.</span></span><span class="sig-name descname"><span class="pre">allreduce_grads</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rmodel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prescale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyrannc.allreduce_grads" title="Permalink to this definition"></a></dt>
-<dd></dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="pyrannc.barrier">

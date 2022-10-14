@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Building from source &mdash; RaNNC 0.7.3 documentation</title>
+  <title>Building from source &mdash; RaNNC 0.7.4 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -14,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -77,17 +79,17 @@
            <div itemprop="articleBody">
              
   <section id="building-from-source">
-<h1>Building from source<a class="headerlink" href="#building-from-source" title="Permalink to this headline"></a></h1>
+<h1>Building from source<a class="headerlink" href="#building-from-source" title="Permalink to this heading"></a></h1>
 <section id="compiler-version">
-<h2>Compiler version<a class="headerlink" href="#compiler-version" title="Permalink to this headline"></a></h2>
+<h2>Compiler version<a class="headerlink" href="#compiler-version" title="Permalink to this heading"></a></h2>
 <p>You must use GCC v5.4 or newer. RaNNC has been tested with GCC v8.2.
 Note that RaNNC must be built in compliance with ABI of PyTorch.</p>
-<p>RaNNC is built with <em>Pre-cxx11 ABI</em> (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=0</span></code>) as default because PyTorch installed via conda is built with it.
+<p>RaNNC is built with <em>Pre-cxx11 ABI</em> (<code class="docutils literal notranslate"><span class="pre">_GLIBCXX_USE_CXX11_ABI=0</span></code>) following the binary packages of PyTorch.
 You can change the ABI setting in <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>.
 PyTorch provides you with <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compiled_with_cxx11_abi.html">function</a> below to understand how the binary is compiled.</p>
 </section>
 <section id="build-and-install">
-<h2>Build and Install<a class="headerlink" href="#build-and-install" title="Permalink to this headline"></a></h2>
+<h2>Build and Install<a class="headerlink" href="#build-and-install" title="Permalink to this heading"></a></h2>
 <p>Clone the repository with the submodules (<code class="docutils literal notranslate"><span class="pre">--recursive</span></code> is required).</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone --recursive https://github.com/nict-wisdom/rannc
 </pre></div>

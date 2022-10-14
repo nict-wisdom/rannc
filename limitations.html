@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Limitations &mdash; RaNNC 0.7.3 documentation</title>
+  <title>Limitations &mdash; RaNNC 0.7.4 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -14,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -78,10 +80,10 @@
            <div itemprop="articleBody">
              
   <section id="limitations">
-<h1>Limitations<a class="headerlink" href="#limitations" title="Permalink to this headline"></a></h1>
+<h1>Limitations<a class="headerlink" href="#limitations" title="Permalink to this heading"></a></h1>
 <p>Although <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> is designed to work in the manner of <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, it has the following limitations.</p>
 <section id="control-constructs">
-<h2>Control constructs<a class="headerlink" href="#control-constructs" title="Permalink to this headline"></a></h2>
+<h2>Control constructs<a class="headerlink" href="#control-constructs" title="Permalink to this heading"></a></h2>
 <p>RaNNC uses a computation graph produced by PyTorch’s <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.jit.trace.html">tracing function</a>.
 As explained in PyTorch’s documentation, the tracing function does not record control constructs, including conditional branches and loops.</p>
 <p>However, a function with <code class="docutils literal notranslate"><span class="pre">&#64;torch.jit.script</span></code> can preserve control constructs even after tracing.
@@ -89,7 +91,7 @@ You can call such a function from your model.
 <code class="docutils literal notranslate"><span class="pre">test_function()</span></code> in <code class="docutils literal notranslate"><span class="pre">test/test_simple.py</span></code> shows an example using a function with <code class="docutils literal notranslate"><span class="pre">&#64;torch.jit.script</span></code>.</p>
 </section>
 <section id="arguments-and-return-values">
-<h2>Arguments and return values<a class="headerlink" href="#arguments-and-return-values" title="Permalink to this headline"></a></h2>
+<h2>Arguments and return values<a class="headerlink" href="#arguments-and-return-values" title="Permalink to this heading"></a></h2>
 <p>Arguments and outputs of <code class="docutils literal notranslate"><span class="pre">RaNNCModel</span></code> must satisfy the following conditions.</p>
 <ul class="simple">
 <li><p>Arguments must be (mini-)batches tensors, whose first dimension corresponds to samples in a mini-batch.</p></li>
