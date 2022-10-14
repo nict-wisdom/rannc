@@ -6,6 +6,7 @@ import subprocess
 import sys
 from distutils.version import LooseVersion
 
+import torch
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 
@@ -69,6 +70,10 @@ VERSION = "0.7.4"
 if "CUDA_VERSION" in os.environ:
     version_nums = os.environ["CUDA_VERSION"].split(".")
     VERSION += "+cu{}{}".format(version_nums[0], version_nums[1])
+
+with open('pyrannc/torch_version.py', mode='w') as f:
+    f.write('BUILD_TORCH_VER="{}"\n'.format(torch.__version__))
+    f.write('BUILD_TORCH_CUDA_VER="{}"\n'.format(torch.version.cuda))
 
 setup(
     name='pyrannc',

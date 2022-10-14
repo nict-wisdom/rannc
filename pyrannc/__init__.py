@@ -1,6 +1,7 @@
 import copy
 import inspect
 import logging
+import sys
 from collections import OrderedDict
 
 import torch
@@ -8,7 +9,21 @@ import torch.cuda
 import torch.onnx.utils
 import torch.random
 
-from . import _pyrannc, utils
+from .torch_version import BUILD_TORCH_VER
+
+try:
+    from . import _pyrannc
+except ImportError as e:
+    import re
+
+    torch_ver = re.sub(r"\+.*", "", torch.__version__)
+    build_torch_ver = re.sub(r"\+.*", "", BUILD_TORCH_VER)
+    if torch_version != build_torch_ver:
+        print("RaNNC was compiled with PyTorch {}, but the current PyTorch version is {}.".format(
+            BUILD_TORCH_VER, torch.__version__), file=sys.stderr)
+    raise e
+
+from . import utils
 from .dist_param import store_dist_param, load_dist_param, set_dist_param, get_dist_param_range, set_dist_param_dtype, \
     DistributeModelParams
 from .opt import patch_optimizer
@@ -442,6 +457,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         super().zero_grad()
 
     def get_param(self, name, amp_master_param=False):
+        r"""
+        Gets a parameter tensor specified by ``name``.
+
+        :param args: Name of a parameter.
+        :param amp_master_param: Gets Apex amp master parameter if ``True``.
+        """
         if name not in self.name_to_pid or name not in self.name_to_param:
             raise RuntimeError("No parameter found: {}".format(name))
 
@@ -450,6 +471,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
         return self.name_to_param[name]
 
     def get_param_grad(self, name, amp_master_param=False):
+        r"""
+        Gets the gradient of a parameter tensor specified by ``name``.
+
+        :param args: Name of a parameter.
+        :param amp_master_param: Gets Apex amp master gradient if ``True``.
+        """
         if name not in self.name_to_pid or name not in self.name_to_param:
             raise RuntimeError("No parameter found: {}".format(name))
 
@@ -482,6 +509,12 @@ class RaNNCModule(_pyrannc.RaNNCModule):
             super().undeploy()
 
     def enable_dropout(self, enable):
+        r"""
+        Enables/disables dropout layers.
+        This method is useful for evaluation because model.eval() does not work for a RaNNCModule.
+
+        :param enable: Set ``True`` to enable and ``False`` to disable dropout layers.
+        """
         if self.ready:
             super().enable_dropout(enable)
         else:
@@ -565,11 +598,14 @@ def _run_dp_dry(path):
 
 
 def recreate_all_communicators():
+    r"""
+    Destroy and recreate all communicators.
+    """
     _pyrannc.recreate_all_communicators()
 
 
 def show_deployment(path, batch_size):
-    """
+    r"""
     Show a deployment (Subgraphs and micro-batch sizes in pipeline parallelism) saved in a file.
     This is used for debugging.
 
