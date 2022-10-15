@@ -18,7 +18,7 @@ except ImportError as e:
 
     torch_ver = re.sub(r"\+.*", "", torch.__version__)
     build_torch_ver = re.sub(r"\+.*", "", BUILD_TORCH_VER)
-    if torch_version != build_torch_ver:
+    if torch_ver != build_torch_ver:
         print("RaNNC was compiled with PyTorch {}, but the current PyTorch version is {}.".format(
             BUILD_TORCH_VER, torch.__version__), file=sys.stderr)
     raise e

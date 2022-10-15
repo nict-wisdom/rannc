@@ -65,7 +65,7 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
-VERSION = "0.7.4"
+VERSION = "0.7.5"
 
 if "CUDA_VERSION" in os.environ:
     version_nums = os.environ["CUDA_VERSION"].split(".")
